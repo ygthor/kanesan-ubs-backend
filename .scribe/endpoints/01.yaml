@@ -1,19 +1,16 @@
-name: Developer
+name: Testing
 description: ''
 endpoints:
   -
     httpMethods:
       - POST
-    uri: api/developer/create
+    uri: api/test/api
     metadata:
-      groupName: Developer
+      groupName: Testing
       groupDescription: ''
       subgroup: ''
       subgroupDescription: ''
-      title: |-
-        Create a new user
-
-        This endpoint allows you to create a new user with their name, email, and password.
+      title: 'Just a test endpoint'
       description: ''
       authenticated: false
       custom: []
@@ -24,54 +21,17 @@ endpoints:
     cleanUrlParameters: []
     queryParameters: []
     cleanQueryParameters: []
-    bodyParameters:
-      name:
-        name: name
-        description: 'The name of the user.'
-        required: true
-        example: 'John Doe'
-        type: string
-        enumValues: []
-        exampleWasSpecified: true
-        nullable: false
-        custom: []
-      email:
-        name: email
-        description: 'The email address of the user.'
-        required: true
-        example: john@example.com
-        type: string
-        enumValues: []
-        exampleWasSpecified: true
-        nullable: false
-        custom: []
-      password:
-        name: password
-        description: 'The password of the user.'
-        required: true
-        example: secret123
-        type: string
-        enumValues: []
-        exampleWasSpecified: true
-        nullable: false
-        custom: []
-    cleanBodyParameters:
-      name: 'John Doe'
-      email: john@example.com
-      password: secret123
+    bodyParameters: []
+    cleanBodyParameters: []
     fileParameters: []
     responses:
       -
         status: 201
         content: |-
           {
-            "message": "User created successfully",
+            "message": "Tested",
             "data": {
-              "id": 1,
-              "name": "John Doe",
-              "email": "john@example.com",
-              "created_at": "2025-04-02T12:34:56",
-              "updated_at": "2025-04-02T12:34:56"
+              "message": "ok",
             }
           }
         headers: []
@@ -83,7 +43,7 @@ endpoints:
           {
             "message": "Validation errors",
             "errors": {
-              "name": ["The name field is required."]
+              "name": ["just error"]
             }
           }
         headers: []

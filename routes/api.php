@@ -22,7 +22,34 @@ Route::any('/test/response', function(){
 Route::post('/sync/local', SyncController::class . '@syncLocalData');
 Route::post('/auth/token', AuthController::class . '@get_token')->name('auth.token');
 
-
+/**
+     * @unauthenticated
+     * @group Testing
+     *
+     * Just a test endpoint
+     *
+     * @response 201 {
+     *   "message": "Tested",
+     *   "data": {
+     *     "message": "ok",
+     *   }
+     * }
+     * @response 400 {
+     *   "message": "Validation errors",
+     *   "errors": {
+     *     "name": ["just error"]
+     *   }
+     * }
+     */
+    Route::post('/test/api', function(){
+        return response()->json([
+            'status' => 200,
+            'message' => 'ok',
+            'data' => [
+                'name' => 'test'
+            ]
+        ]);
+    })->name('test.api');
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user',UserController::class . '@info')->name('user.info');
