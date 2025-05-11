@@ -13,8 +13,8 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $q = ArCust::query();
-        $q->where('CUSTNO', '=', '3000/U01');
-        $q->limit(1);
+        // $q->where('CUSTNO', '=', '3000/U01');
+        // $q->limit(1);
         $data = $q->get();
         return response()->json($data);
     }
@@ -60,6 +60,6 @@ class CustomerController extends Controller
 
         ];
         $data = ArCust::create($insert_arr);
-        return response()->json($data);
+        return makeResponse(200, 'Customer created successfully', $data);
     }
 }

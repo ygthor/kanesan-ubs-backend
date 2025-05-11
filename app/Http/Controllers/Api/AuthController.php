@@ -18,21 +18,46 @@ class AuthController extends Controller
      * }
      * responseFile storage/responses/auth.token.scr
      */
-    public function get_token(Request $request){
+    public function get_token(Request $request)
+    {
+        // Validate the request data
+        // Now accepts 'identifier' which can be an email or username
         $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'identifier' => 'required|string', // Can be email or username
+            'password' => 'required|string',
         ]);
-    
-        $user = User::where('email', $request->email)->first();
-    
-        if (!$user || !Hash::check($request->password, $user->password)) {
+
+        // Retrieve the identifier and password from the request
+        $identifier = $request->input('identifier');
+        $password = $request->input('password');
+
+        // Attempt to find the user by email or username
+        // This assumes you have a 'username' column in your 'users' table
+        // If your username column has a different name, adjust it accordingly (e.g., 'user_name', 'login_id')
+        $user = User::where('email', $identifier)
+                    ->orWhere('username', $identifier) // Add this line to check for username
+                    ->first();
+
+        // Check if a user was found and if the password is correct
+        if (!$user || !Hash::check($password, $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
-    
-        // Create a Sanctum token for the user
+
+        // Revoke all old tokens for the user to ensure only one active token (optional, but good practice)
+        // $user->tokens()->delete();
+
+        // Create a new Sanctum token for the user
         $token = $user->createToken('auth-token')->plainTextToken;
-    
-        return response()->json(['token' => $token]);
+
+        // Return the token in the response
+        return response()->json([
+            'token' => $token,
+            'user' => [ // Optionally, return some user details
+                'id' => $user->id,
+                'name' => $user->name, // Assuming you have a 'name' field
+                'email' => $user->email,
+                'username' => $user->username, // Assuming you have a 'username' field
+            ]
+        ]);
     }
 }
