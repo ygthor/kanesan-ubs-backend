@@ -13,6 +13,6 @@ class UserController extends Controller
 
     public function info(Request $request){
         $user = $request->user();  // This assumes authentication is handled via Sanctum or JWT
-        return response()->json($user);
+        return makeResponse(200,'success',$user);
     }
 }

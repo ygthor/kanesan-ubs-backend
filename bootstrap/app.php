@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\EnsureTokenIsValid;
+use Illuminate\Auth\AuthenticationException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,5 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(EnsureTokenIsValid::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (AuthenticationException $e) {
+            $response['statusCode'] = 403;
+            $response['message'] = 'Unauthorized';
+            return makeResponse(403,'Unauthorized');
+        });
+        
     })->create();

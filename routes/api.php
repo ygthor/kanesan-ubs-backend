@@ -53,6 +53,8 @@ Route::post('/test/api', function () {
 })->name('test.api');
 
 Route::middleware(['auth:sanctum'])->group(function () {
+
+    Route::any('/me', UserController::class . '@info')->name('user.info');
     Route::get('/user', UserController::class . '@info')->name('user.info');
 
     Route::get('/ubs/customer', CustomerController::class . '@index')->name('customer.index');
