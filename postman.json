@@ -1,0 +1,152 @@
+{
+	"info": {
+		"_postman_id": "YOUR_ORDER_COLLECTION_ID",
+		"name": "Laravel Order API",
+		"description": "API for managing Orders and Order Items.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Orders",
+			"description": "Operations for Orders",
+			"item": [
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{url}}/api/orders?per_page=5",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"api",
+								"orders"
+							],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "5",
+									"description": "Number of items per page for pagination (optional)"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create New Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_id\": 1,\n    \"customer_name\": \"AHS3185 S02 KANESAN\",\n    \"order_date\": \"2025-05-20 10:30:00\",\n    \"remarks\": \"Please deliver after 2 PM.\",\n    \"items\": [\n        {\n            \"product_id\": 1, \n            \"product_name\": \"Product A1\",\n            \"sku_code\": \"SKU001\",\n            \"quantity\": 2,\n            \"unit_price\": 10.00,\n            \"discount\": 1.00,\n            \"is_free_good\": false,\n            \"is_trade_return\": false,\n            \"trade_return_is_good\": true\n        },\n        {\n            \"product_id\": 2,\n            \"product_name\": \"Product A2\",\n            \"sku_code\": \"SKU002\",\n            \"quantity\": 1,\n            \"unit_price\": 12.50,\n            \"discount\": 0,\n            \"is_free_good\": true,\n            \"is_trade_return\": false,\n            \"trade_return_is_good\": true\n        },\n        {\n            \"product_id\": 3,\n            \"product_name\": \"Product B1\",\n            \"sku_code\": \"SKU003\",\n            \"quantity\": 3,\n            \"unit_price\": 15.00,\n            \"discount\": 0,\n            \"is_free_good\": false,\n            \"is_trade_return\": true,\n            \"trade_return_is_good\": false\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{url}}/api/orders",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"api",
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Specific Order",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{url}}/api/orders/1",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"1"
+							],
+							"variable": [
+								{
+									"key": "orderId",
+									"value": "1",
+									"description": "(Required) The ID of the order to retrieve."
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{authToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "url",
+			"value": "http://your-laravel-app.test",
+			"type": "string",
+			"description": "Base URL of your Laravel application"
+		},
+		{
+			"key": "authToken",
+			"value": "YOUR_SANCTUM_TOKEN",
+			"type": "string",
+			"description": "Sanctum API token obtained after authentication (e.g., from /api/auth/token)"
+		}
+	]
+}
