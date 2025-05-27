@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\SyncController;
 // Correctly namespacing the CustomerController we've been working on
 use App\Http\Controllers\Api\CustomerController; // <<< Ensure this is the controller from laravel_customer_controller_v2
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\UserController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
@@ -63,7 +64,7 @@ Route::post('/test/api', function () {
         ]
     ]);
 })->name('test.api');
-
+Route::get('products', [ProductController::class,'index']);
 Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::any('/me', [UserController::class, 'info'])->name('user.info'); // Recommended array syntax
@@ -78,6 +79,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'show']);
+    
 
     // The route below for '/customer' (singular) pointing to index would be redundant
     // if you use apiResource with 'customers' (plural) as the resource name.

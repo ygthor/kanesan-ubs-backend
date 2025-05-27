@@ -110,7 +110,7 @@ class OrderController extends Controller
 
             DB::commit();
 
-            return makeResponse(201, 'Order created successfully.', $order->load('items'));
+            return makeResponse(200, 'Order created successfully.', $order->load('items'));
         } catch (\Exception $e) {
             DB::rollBack();
             // Log::error('Order creation failed: ' . $e->getMessage());
