@@ -7,7 +7,11 @@ use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\CustomerController; // <<< Ensure this is the controller from laravel_customer_controller_v2
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ReceiptController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DebtController;
+use App\Http\Controllers\Api\InventoryController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -70,6 +74,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::any('/me', [UserController::class, 'info'])->name('user.info'); // Recommended array syntax
     // Route::get('/user', [UserController::class, 'info'])->name('user.info'); // This is redundant if /me is any HTTP verb
 
+    Route::get('/dashboard', [DashboardController::class, 'getSummary'])->name('dashboard.summary');
+
     // CRUD API routes for the Customer model
     // This will create the following routes:
     // GET      /api/customers             -> customers.index   (CustomerController@index)
@@ -79,7 +85,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'show']);
-    
+    Route::apiResource('receipts', ReceiptController::class);
+    Route::get('/debts', [DebtController::class, 'index'])->name('debts.index');
+    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
 
     // The route below for '/customer' (singular) pointing to index would be redundant
     // if you use apiResource with 'customers' (plural) as the resource name.

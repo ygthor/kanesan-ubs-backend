@@ -79,8 +79,8 @@ class Customer extends Model
     // ];
 
     // Relationships (examples, uncomment and modify if needed)
-    // public function orders()
-    // {
-    //     return $this->hasMany(Order::class);
-    // }
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
 }
