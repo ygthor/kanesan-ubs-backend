@@ -12,6 +12,26 @@ use Illuminate\Support\Facades\Schema;
 
 class SyncController extends Controller
 {
+    public function fetchTableData(Request $request)
+    {
+        $table = $request->input('table');
+        $updatedAfter = $request->input('updated_after'); // e.g., 2024-01-01T00:00:00
+
+
+        // 3. Build query
+        $query = DB::table($table);
+
+        // 4. Optional updated_at filter
+        if ($updatedAfter && Schema::hasColumn($table, 'updated_at')) {
+            $query->where('updated_at', '>=', $updatedAfter);
+        }
+
+        // 5. Execute and return
+        $data = $query->get();
+
+        return response()->json($data);
+    }
+
 
     public function syncLocalData(Request $request)
     {

@@ -109,3 +109,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 
 Route::post('developer/create', [DeveloperController::class, 'create'])->name('developer.create');
+
+
+Route::post('data_sync/',[SyncController::class, 'fetchTableData']);
