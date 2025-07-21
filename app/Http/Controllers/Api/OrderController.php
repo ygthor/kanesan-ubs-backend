@@ -22,8 +22,8 @@ class OrderController extends Controller
     {
         // Basic index, can be expanded with pagination, filtering by customer, date range etc.
         $orders = Order::with('items', 'customer') // Eager load items and customer
-                       ->orderBy('order_date', 'desc')
-                       ->paginate($request->input('per_page', 15));
+            ->orderBy('order_date', 'desc')
+            ->paginate($request->input('per_page', 15));
 
         return makeResponse(200, 'Orders retrieved successfully.', $orders);
     }
@@ -48,16 +48,25 @@ class OrderController extends Controller
      */
     public function store(Request $request)
     {
+        return $this->saveOrder($request);
+    }
+
+    public function update(Request $request, $id)
+    {
+        return $this->saveOrder($request, $id);
+    }
+
+
+    public function saveOrder(Request $request, $id = null)
+    {
         $validator = Validator::make($request->all(), [
-            'customer_id' => 'required|exists:customers,id', // Ensure customer exists
-            'customer_name' => 'required|string|max:255', // Can be fetched via customer_id too
-            'order_date' => 'nullable|date_format:Y-m-d H:i:s',
+            'type' => 'required',
+            'customer_id' => 'required|exists:customers,id',
+            'order_date' => 'nullable|date_format:Y-m-d',
             'remarks' => 'nullable|string',
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:product,id', // Ensure product exists
-            'items.*.product_name' => 'required|string|max:255', // From Flutter OrderItem
-            'items.*.sku_code' => 'required|string|max:255',     // From Flutter OrderItem
-            'items.*.quantity' => 'required|numeric|min:0', // Allow 0 for free goods if that's a case
+            'items.*.product_id' => 'required|exists:product,id',
+            'items.*.quantity' => 'required|numeric|min:0',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
             'items.*.is_free_good' => 'sometimes|boolean',
@@ -71,30 +80,65 @@ class OrderController extends Controller
 
         DB::beginTransaction();
         try {
-            $orderData = $request->only(['customer_id', 'customer_name', 'order_date', 'remarks']);
-            if (empty($orderData['order_date'])) {
-                $orderData['order_date'] = now();
+            $orderData = $request->only([
+                'type',
+                'branch_id',
+                'customer_id',
+                'order_date',
+                'remarks',
+                'tax1_percentage',
+                'discount'
+            ]);
+
+            $orderData['order_date'] = $orderData['order_date'] ?? now();
+            $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
+            $orderData['type'] = $orderData['type'] ?? 'SO';
+
+            $customer = Customer::find($orderData['customer_id']);
+            $orderData['customer_code'] = $customer->customer_code;
+            $orderData['customer_name'] = $customer->name;
+
+            $orderData['status'] = 'pending';
+
+            if ($id) {
+                // ✅ Update mode
+                $order = Order::with('items')->findOrFail($id);
+
+                // Optionally delete previous items (or diff logic)
+                $order->items()->delete();
+
+                $order->fill($orderData)->save();
+            } else {
+                // ✅ Create mode
+                $order = Order::create($orderData);
+                $order->reference_no = $order->getReferenceNo();
+                $order->save();
             }
 
-            $order = Order::create($orderData);
-
-            $totalOrderAmount = 0;
+            $reference_no = $order->reference_no;
+            $item_count = 1;
 
             foreach ($request->input('items') as $itemData) {
-                $product = Product::find($itemData['product_id']); // Fetch product for current price if needed
+                $product = Product::find($itemData['product_id']);
                 if (!$product) {
-                    DB::rollBack(); // Should be caught by validator, but as a safeguard
-                    return makeResponse(400, 'Invalid product ID: ' . $itemData['product_id'] . ' found in items.');
+                    DB::rollBack();
+                    return makeResponse(400, 'Invalid product ID: ' . $itemData['product_id']);
                 }
 
                 $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);
                 $quantity = $itemData['quantity'];
                 $discount = $itemData['discount'] ?? 0;
+                $unique_key = "$reference_no|$item_count";
 
                 $orderItem = $order->items()->create([
+                    'unique_key' => $unique_key,
+                    'reference_no' => $reference_no,
+                    'item_count' => $item_count,
                     'product_id' => $product->id,
-                    'product_name' => $itemData['product_name'], // Using name from request (as per Flutter)
-                    'sku_code' => $itemData['sku_code'],         // Using SKU from request
+                    'product_no' => $product->product_no,
+                    'product_name' => $product->product_name,
+                    'description' => $product->product_name,
+                    'sku_code' => $product->sku_code,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount' => $discount,
@@ -102,21 +146,24 @@ class OrderController extends Controller
                     'is_trade_return' => $itemData['is_trade_return'] ?? false,
                     'trade_return_is_good' => $itemData['is_trade_return'] ? ($itemData['trade_return_is_good'] ?? true) : true,
                 ]);
-                $totalOrderAmount += $orderItem->getSubtotalAttribute(); // Use accessor
+                $orderItem->calculate();
+                $orderItem->save();
+                $item_count++;
             }
 
-            $order->total_amount = $totalOrderAmount;
+            $order->calculate();
             $order->save();
 
             DB::commit();
 
-            return makeResponse(200, 'Order created successfully.', $order->load('items'));
+            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $order->load('items'));
         } catch (\Exception $e) {
             DB::rollBack();
-            // Log::error('Order creation failed: ' . $e->getMessage());
-            return makeResponse(500, 'Failed to create order.', ['error' => $e->getMessage()]);
+            \Log::error('Order save failed: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to save order.', ['error' => $e->getMessage()]);
         }
     }
+
 
     /**
      * Display the specified order.
@@ -131,7 +178,51 @@ class OrderController extends Controller
         return makeResponse(200, 'Order retrieved successfully.', $order);
     }
 
-    // You might add update and delete methods for orders later if needed
-    // public function update(Request $request, Order $order) { ... }
-    // public function destroy(Order $order) { ... }
+
+
+    public function deleteOrderItem($itemId)
+    {
+        try {
+            DB::beginTransaction();
+
+            $item = OrderItem::findOrFail($itemId);
+            $order = $item->order;
+
+            $item->delete();
+
+            // Optional: recalculate order total
+            $order->calculate();
+            $order->save();
+
+            DB::commit();
+            return makeResponse(200, 'Order item deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to delete order item: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to delete order item.', ['error' => $e->getMessage()]);
+        }
+    }
+
+
+    public function deleteOrder($id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $order = Order::with('items')->findOrFail($id);
+
+            // Delete all items
+            $order->items()->delete();
+
+            // Delete the order itself
+            $order->delete();
+
+            DB::commit();
+            return makeResponse(200, 'Order deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to delete order: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to delete order.', ['error' => $e->getMessage()]);
+        }
+    }
 }

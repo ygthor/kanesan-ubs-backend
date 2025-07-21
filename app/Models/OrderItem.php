@@ -2,19 +2,25 @@
 
 namespace App\Models;
 
+use App\Models\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class OrderItem extends Model
+class OrderItem extends BaseModel
 {
     use HasFactory;
 
     protected $table = 'order_items';
 
     protected $fillable = [
+        'unique_key',
+        'reference_no',
         'order_id',
+        'item_count',
         'product_id',
+        'product_no',
         'product_name',         // Denormalized product name
+        'description',
         'sku_code',             // Denormalized SKU
         'quantity',
         'unit_price',
@@ -50,16 +56,11 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 
-    /**
-     * Accessor to calculate the subtotal for this line item.
-     * Formula: (quantity * unit_price) - discount
-     * If it's a free good, subtotal is 0.
-     */
-    public function getSubtotalAttribute(): float
+    public function calculate()
     {
         if ($this->is_free_good) {
             return 0.00;
         }
-        return ($this->quantity * $this->unit_price) - $this->discount;
+        $this->amount = $this->quantity * $this->unit_price;
     }
 }

@@ -84,7 +84,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // PUT/PATCH /api/customers/{customer} -> customers.update  (CustomerController@update)
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class);
-    Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'show']);
+    Route::delete('/orders/{id}', [OrderController::class, 'deleteOrder']);
+    Route::delete('/order-items/{id}', [OrderController::class, 'deleteOrderItem']);
+
+    Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'update', 'show']);
     Route::apiResource('receipts', ReceiptController::class);
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
