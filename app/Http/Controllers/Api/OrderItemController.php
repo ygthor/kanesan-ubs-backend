@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
-class OrderController extends Controller
+class OrderItemController extends Controller
 {
     /**
      * Display a listing of the orders.
@@ -21,8 +21,8 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         // Basic index, can be expanded with pagination, filtering by customer, date range etc.
-        $orders = Order::with('items', 'customer') // Eager load items and customer
-            ->orderBy('order_date', 'desc')
+        $orders = OrderItem // Eager load items and customer
+            ::orderBy('order_date', 'desc')
             ->paginate($request->input('per_page', 15));
 
         return makeResponse(200, 'Orders retrieved successfully.', $orders);
@@ -48,22 +48,20 @@ class OrderController extends Controller
      */
     public function store(Request $request)
     {
-        return $this->saveOrder($request);
+        return $this->saveOrderItem($request);
     }
 
     public function update(Request $request, $id)
     {
-        return $this->saveOrder($request, $id);
+        return $this->saveOrderItem($request, $id);
     }
 
 
-    public function saveOrder(Request $request, $id = null)
+    public function saveOrderItem(Request $request, $id = null)
     {
         $validator = Validator::make($request->all(), [
-            // 'type' => 'required',
-            'customer_id' => 'required|exists:customers,id',
-            // 'order_date' => 'nullable|date',
-            'remarks' => 'nullable|string',
+            'product_id' => 'required',
+            'quantity' => 'required|min:1',
             // 'items' => 'required|array|min:1',
             // 'items.*.product_id' => 'required|exists:product,id',
             // 'items.*.quantity' => 'required|numeric|min:0',
@@ -81,71 +79,44 @@ class OrderController extends Controller
         DB::beginTransaction();
         try {
             $orderData = $request->only([
-                'type',
-                'branch_id',
-                'customer_id',
-                'order_date',
-                'remarks',
-                'tax1_percentage',
-                'discount'
+                'order_id',
+                'product_id',
+                'quantity',
+                'unit_price',
             ]);
+
+            $order_id = $orderData['order_id'];
+            $order = Order::find($order_id);
+
+            $item_count = DB::table('order_items')->where('order_id', $order_id)->count() + 1;
+
+            $orderData['reference_no'] = $order->reference_no;
+            $orderData['order_id'] = $order_id;
+            $orderData['item_count'] = $item_count;
+            $orderData['unique_key'] = $order->reference_no . '|' . $item_count;
+
 
             $orderData['order_date'] = $orderData['order_date'] ?? now();
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
             $orderData['type'] = $orderData['type'] ?? 'SO';
 
-            $customer = Customer::find($orderData['customer_id']);
-            $orderData['customer_code'] = $customer->customer_code;
-            $orderData['customer_name'] = $customer->name;
+            $product = Product::find($orderData['product_id']);
+            $orderData['product_no'] = $product->Product_Id;
+            $orderData['product_name'] = $product->Product_English_Name;
 
-            $orderData['status'] = 'pending';
+            $orderData['amount'] = $orderData['quantity'] * $orderData['unit_price'];
+            $orderData['updated_at'] = timestamp();
+
+
 
             if ($id) {
                 // ✅ Update mode
-                $order = Order::with('items')->findOrFail($id);
-                $order->fill($orderData)->save();
+                $orderItem = OrderItem::findOrFail($id);
+                $orderItem->fill($orderData)->save();
             } else {
                 // ✅ Create mode
-                $order = Order::create($orderData);
-                $order->reference_no = $order->getReferenceNo();
-                $order->save();
-            }
-
-            $reference_no = $order->reference_no;
-            $item_count = 1;
-
-            $items = $request->input('items') ?? [];
-            foreach ($items as $itemData) {
-                $product = Product::find($itemData['product_id']);
-                if (!$product) {
-                    DB::rollBack();
-                    return makeResponse(400, 'Invalid product ID: ' . $itemData['product_id']);
-                }
-
-                $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);
-                $quantity = $itemData['quantity'];
-                $discount = $itemData['discount'] ?? 0;
-                $unique_key = "$reference_no|$item_count";
-
-                $orderItem = $order->items()->create([
-                    'unique_key' => $unique_key,
-                    'reference_no' => $reference_no,
-                    'item_count' => $item_count,
-                    'product_id' => $product->id,
-                    'product_no' => $product->product_no,
-                    'product_name' => $product->product_name,
-                    'description' => $product->product_name,
-                    'sku_code' => $product->sku_code,
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'discount' => $discount,
-                    'is_free_good' => $itemData['is_free_good'] ?? false,
-                    'is_trade_return' => $itemData['is_trade_return'] ?? false,
-                    'trade_return_is_good' => $itemData['is_trade_return'] ? ($itemData['trade_return_is_good'] ?? true) : true,
-                ]);
-                $orderItem->calculate();
+                $orderItem = OrderItem::create($orderData);
                 $orderItem->save();
-                $item_count++;
             }
 
             $order->calculate();
@@ -153,7 +124,7 @@ class OrderController extends Controller
 
             DB::commit();
 
-            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $order->load('items'));
+            return makeResponse($id ? 200 : 201, $id ? 'Order item updated successfully.' : 'Order item created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Order save failed: ' . $e->getMessage());
@@ -172,29 +143,34 @@ class OrderController extends Controller
     {
         // Load items and customer relationship for detailed view
         $order->load('items.product', 'customer');
-        return makeResponse(200, 'Order retrieved successfully.', $order);
+        return makeResponse(200, 'Order item retrieved successfully.', $order);
     }
 
 
-    public function deleteOrder($id)
+
+    public function destroy($itemId)
     {
         try {
             DB::beginTransaction();
 
-            $order = Order::with('items')->findOrFail($id);
+            $item = OrderItem::findOrFail($itemId);
+            $order = $item->order;
 
-            // Delete all items
-            $order->items()->delete();
+            $item->delete();
 
-            // Delete the order itself
-            $order->delete();
+            // Optional: recalculate order total
+            $order->calculate();
+            $order->save();
 
             DB::commit();
-            return makeResponse(200, 'Order deleted successfully.');
+            return makeResponse(200, 'Order item deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Failed to delete order: ' . $e->getMessage());
-            return makeResponse(500, 'Failed to delete order.', ['error' => $e->getMessage()]);
+            \Log::error('Failed to delete order item: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to delete order item.', ['error' => $e->getMessage()]);
         }
     }
+
+
+    
 }

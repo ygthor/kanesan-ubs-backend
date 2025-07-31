@@ -73,6 +73,7 @@ class Order extends BaseModel
         $this->tax1 = $total * $this->tax1_percentage / 100;
         $this->grand_amount = $this->gross_amount + $this->tax1;
         $this->net_amount = $this->grand_amount - $this->discount;
+        $this->updated_at = timestamp();
     }
 
     public function getReferenceNo()
@@ -83,7 +84,7 @@ class Order extends BaseModel
         $found = false;
         $running_number = $count;
         while (!$found) {
-            $refNo = $type . "W" . str_pad($running_number, 5, '0', STR_PAD_LEFT);
+            $refNo = $type . str_pad($running_number, 5, '0', STR_PAD_LEFT);
             $chk = Order::where('reference_no', "=", $refNo)->first();
             if ($chk == null) break;
             $running_number++;

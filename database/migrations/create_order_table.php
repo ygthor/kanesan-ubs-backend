@@ -21,7 +21,7 @@ return new class extends Migration
                 $table->string('customer_name')->nullable()->comment('Denormalized for convenience');
                 $table->timestamp('order_date')->useCurrent();
                 $table->string('status')->default('pending'); // e.g., pending, processing, shipped, delivered, cancelled
-                $table->decimal('total_amount', 10, 2)->default(0.00);
+                $table->decimal('net_amount', 10, 2)->default(0.00);
                 $table->text('remarks')->nullable();
                 // Add other relevant fields: shipping_address_id, billing_address_id, payment_status, etc.
                 $table->timestamps();

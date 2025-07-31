@@ -55,7 +55,7 @@ class DebtController extends Controller
                     'paymentType' => $customer->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $customer->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toIso8601String(),
-                    'outstandingAmount' => (float) $order->total_amount,
+                    'outstandingAmount' => (float) $order->net_amount,
                     'currency' => 'RM', // Example currency
                 ];
             });
@@ -65,7 +65,7 @@ class DebtController extends Controller
                 'outletsCode' => $customer->customer_code, // Assuming this is the same
                 'companyName' => $customer->company_name,
                 'debtItems' => $debtItems,
-                'totalOutstandingAmount' => $customer->orders->sum('total_amount'),
+                'totalOutstandingAmount' => $customer->orders->sum('net_amount'),
             ];
         });
 

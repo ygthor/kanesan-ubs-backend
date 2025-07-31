@@ -44,7 +44,7 @@ class DashboardController extends Controller
         // This assumes 'completed' or 'shipped' are your final order statuses.
         $nettSales = Order::whereIn('status', ['completed', 'shipped', 'processing']) // Adjust statuses as needed
             ->whereBetween('order_date', [$dateFrom, $dateTo])
-            ->sum('total_amount');
+            ->sum('net_amount');
 
         // Invoices Issued: Count of all orders in the date range.
         $invoicesIssued = Order::whereBetween('order_date', [$dateFrom, $dateTo])->count();
@@ -64,7 +64,7 @@ class DashboardController extends Controller
 
         // Outstanding Debt: A simplified calculation of total order amounts minus total collections.
         // A more complex ledger system would be needed for perfect accuracy.
-        $totalOrderedAmount = Order::sum('total_amount');
+        $totalOrderedAmount = Order::sum('net_amount');
         $totalCollectedAmount = Receipt::sum('paid_amount');
         $outstandingDebt = $totalOrderedAmount - $totalCollectedAmount;
 

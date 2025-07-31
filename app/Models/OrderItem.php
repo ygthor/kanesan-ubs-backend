@@ -25,6 +25,7 @@ class OrderItem extends BaseModel
         'quantity',
         'unit_price',
         'discount',             // Discount amount for this line item
+        'amount',
         'is_free_good',
         'is_trade_return',
         'trade_return_is_good', // Condition if it's a trade return

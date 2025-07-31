@@ -15,3 +15,8 @@ function makeResponse($status_code, $message = "", $data =[])
         'data' => $data,
     ]);
 }
+
+function timestamp() {
+    $dt = new DateTime('now', new DateTimeZone('Asia/Kuala_Lumpur'));
+    return $dt->format('Y-m-d H:i:s');
+}
