@@ -83,4 +83,10 @@ class Customer extends Model
     {
         return $this->hasMany(Order::class);
     }
+
+
+    public static function fromCode($cpde){
+        return self::where('customer_code',$cpde)->first();
+
+    }
 }

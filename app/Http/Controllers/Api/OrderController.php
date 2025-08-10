@@ -20,10 +20,46 @@ class OrderController extends Controller
      */
     public function index(Request $request)
     {
-        // Basic index, can be expanded with pagination, filtering by customer, date range etc.
-        $orders = Order::with('items', 'customer') // Eager load items and customer
-            ->orderBy('order_date', 'desc')
-            ->paginate($request->input('per_page', 15));
+        // Retrieve all filter parameters from the request
+        $customerName = $request->input('customer_name');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $orderType = $request->input('order_type');
+
+        // Start building the query
+        $orders = Order::with('items', 'customer');
+
+        // --- Apply filters conditionally ---
+
+        // Filter by customer name
+        if ($customerName) {
+            $orders->whereHas('customer', function ($query) use ($customerName) {
+                $query->where('name', 'like', "%{$customerName}%");
+            });
+        }
+
+        // Filter by date range
+        if ($startDate) {
+            // Assuming your order_date is a DateTime column
+            $orders->whereDate('order_date', '>=', $startDate);
+        }
+
+        if ($endDate) {
+            $orders->whereDate('order_date', '<=', $endDate);
+        }
+
+        // Filter by order type
+        if ($orderType) {
+            // The Flutter app sends a comma-separated string, so we need to split it
+            $types = explode(',', $orderType);
+            $orders->whereIn('type', $types);
+        }
+
+        // Order the results
+        $orders->orderBy('order_date', 'desc');
+
+        // Paginate the results
+        $orders = $orders->paginate($request->input('per_page', 15));
 
         return makeResponse(200, 'Orders retrieved successfully.', $orders);
     }

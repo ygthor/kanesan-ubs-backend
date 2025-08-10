@@ -11,8 +11,11 @@ use App\Http\Controllers\Api\ReceiptController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DebtController;
+use App\Http\Controllers\Api\IcitemController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OrderItemController;
+use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\InvoiceItemController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -70,6 +73,8 @@ Route::post('/test/api', function () {
     ]);
 })->name('test.api');
 Route::get('products', [ProductController::class,'index']);
+Route::get('icitem', [IcitemController::class,'index']);
+// Route::middleware([])->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::any('/me', [UserController::class, 'info'])->name('user.info'); // Recommended array syntax
@@ -91,6 +96,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'update', 'show']);
     Route::apiResource('orders-items', OrderItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
     Route::apiResource('receipts', ReceiptController::class);
+
+    Route::apiResource('invoices', InvoiceController::class)->only(['index', 'store', 'update', 'show']);
+    Route::apiResource('invoices-items', InvoiceItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
+
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
 
