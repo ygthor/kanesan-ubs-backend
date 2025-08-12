@@ -21,10 +21,17 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         // Retrieve all filter parameters from the request
+        $customerId = $request->input('customer_id');
+        $customerCode = $request->input('customer_code');
         $customerName = $request->input('customer_name');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
         $orderType = $request->input('order_type');
+        $paginate = $request->input('paginate');
+
+        if($paginate === null){
+            $paginate = true;
+        }
 
         // Start building the query
         $orders = Order::with('items', 'customer');
@@ -36,6 +43,13 @@ class OrderController extends Controller
             $orders->whereHas('customer', function ($query) use ($customerName) {
                 $query->where('name', 'like', "%{$customerName}%");
             });
+        }
+        if($customerCode){
+            $orders->where('customer_code', 'like', "{$customerCode}");
+        }
+
+        if($customerId){
+            $orders->where('customer_id', 'like', "{$customerId}");
         }
 
         // Filter by date range
@@ -59,7 +73,11 @@ class OrderController extends Controller
         $orders->orderBy('order_date', 'desc');
 
         // Paginate the results
-        $orders = $orders->paginate($request->input('per_page', 15));
+        if($paginate){
+            $orders = $orders->paginate($request->input('per_page', 15));
+        }else{
+            $orders = $orders->get();
+        }
 
         return makeResponse(200, 'Orders retrieved successfully.', $orders);
     }

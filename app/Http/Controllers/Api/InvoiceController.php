@@ -20,10 +20,16 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
+        $CUSTNO = $request->input('CUSTNO');
         $customerName = $request->input('customer_name');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
         $invoiceType = $request->input('invoice_type'); // e.g., 'SO', 'IV'
+        $paginate = $request->input('paginate'); 
+        
+        if($paginate === null){
+            $paginate = true;
+        }
 
         // Start building the query on the Artran model
         $invoices = Artran::with('items', 'customer');
@@ -31,6 +37,9 @@ class InvoiceController extends Controller
         // Filter by customer name (using the 'NAME' column in 'artrans')
         if ($customerName) {
             $invoices->where('NAME', 'like', "%{$customerName}%");
+        }
+        if($CUSTNO){
+            $invoices->where('CUSTNO', 'like', "{$CUSTNO}");
         }
 
         // Filter by date range (using the 'DATE' column)
@@ -49,7 +58,12 @@ class InvoiceController extends Controller
 
         $invoices->orderBy('DATE', 'desc')->orderBy('REFNO', 'desc');
 
-        $paginatedInvoices = $invoices->paginate($request->input('per_page', 15));
+        if($paginate){
+            $paginatedInvoices = $invoices->paginate($request->input('per_page', 15));
+        }else{
+            $paginatedInvoices = $invoices->get();
+        }
+        
 
         return makeResponse(200, 'Invoices retrieved successfully.', $paginatedInvoices);
     }

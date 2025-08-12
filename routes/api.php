@@ -44,6 +44,17 @@ Route::any('/test/response', function () {
 Route::post('/sync/local', [SyncController::class, 'syncLocalData']); // Recommended array syntax
 Route::post('/auth/token', [AuthController::class, 'get_token'])->name('auth.token'); // Recommended array syntax
 
+Route::get('/script_to_run/update_customer_name',function(){
+    DB::statement("
+        UPDATE customers
+        SET company_name = name
+        WHERE company_name IS NULL OR company_name = '';
+    ");
+    echo 'success';
+});
+
+
+
 /**
  * @unauthenticated
  * @group Testing
@@ -90,6 +101,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // PUT/PATCH /api/customers/{customer} -> customers.update  (CustomerController@update)
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class);
+    
     Route::delete('/orders/{id}', [OrderController::class, 'deleteOrder']);
     Route::delete('/order-items/{id}', [OrderController::class, 'deleteOrderItem']);
 

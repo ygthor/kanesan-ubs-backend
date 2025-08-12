@@ -83,11 +83,29 @@ class CustomerController extends Controller
             // Ensure all fields from your Flutter form are included in $fillable in Customer model
             // and are passed here in $request->only([...])
             $customer = Customer::create($request->only([
-                'customer_code', 'company_name', 'address1', 'address2', 'postcode',
-                'state', 'territory', 'telephone1', 'telephone2', 'fax_no',
-                'contact_person', 'customer_group', 'customer_type', 'lot_type',
-                'email', 'phone', 'avatar_url', 'payment_term', 'max_discount',
-                'segment', 'payment_type', 'name', 'address'
+                'customer_code',
+                'company_name',
+                'address1',
+                'address2',
+                'postcode',
+                'state',
+                'territory',
+                'telephone1',
+                'telephone2',
+                'fax_no',
+                'contact_person',
+                'customer_group',
+                'customer_type',
+                'lot_type',
+                'email',
+                'phone',
+                'avatar_url',
+                'payment_term',
+                'max_discount',
+                'segment',
+                'payment_type',
+                'name',
+                'address'
                 // Ensure this list matches the $fillable array in your Customer model
                 // and the fields sent from your Flutter "Detailed Form".
             ]));
@@ -164,11 +182,29 @@ class CustomerController extends Controller
             // Ensure all fields intended for update are in $request->only([...])
             // and are $fillable in the Customer model.
             $customer->update($request->only([
-                'customer_code', 'company_name', 'address1', 'address2', 'postcode',
-                'state', 'territory', 'telephone1', 'telephone2', 'fax_no',
-                'contact_person', 'customer_group', 'customer_type', 'lot_type',
-                'email', 'phone', 'avatar_url', 'payment_term', 'max_discount',
-                'segment', 'payment_type', 'name', 'address'
+                'customer_code',
+                'company_name',
+                'address1',
+                'address2',
+                'postcode',
+                'state',
+                'territory',
+                'telephone1',
+                'telephone2',
+                'fax_no',
+                'contact_person',
+                'customer_group',
+                'customer_type',
+                'lot_type',
+                'email',
+                'phone',
+                'avatar_url',
+                'payment_term',
+                'max_discount',
+                'segment',
+                'payment_type',
+                'name',
+                'address'
             ]));
             // Use custom response function for success
             return makeResponse(200, 'Customer updated successfully.', $customer);
@@ -197,4 +233,5 @@ class CustomerController extends Controller
             return makeResponse(500, 'Failed to delete customer.', ['error' => $e->getMessage()]);
         }
     }
+
 }
