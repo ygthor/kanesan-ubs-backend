@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Artran;
 use App\Models\ArTransItem;
+use App\Models\Icitem;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -72,8 +73,8 @@ class InvoiceItemController extends Controller
     private function saveInvoiceItem(Request $request, $id = null)
     {
         $validator = Validator::make($request->all(), [
-            'artran_id' => 'required|exists:artrans,id',
-            'product_id' => 'required|exists:products,id',
+            'reference_code' => 'required',
+            'product_code' => 'required',
             'quantity' => 'required|numeric|min:0.01',
             'unit_price' => 'required|numeric|min:0',
         ]);
@@ -85,12 +86,13 @@ class InvoiceItemController extends Controller
         DB::beginTransaction();
         try {
             // Find the parent invoice
-            $invoice = Artran::findOrFail($request->artran_id);
-            $product = Product::find($request->product_id);
+            $invoice = Artran::findOrFail($request->reference_code);
+            
+            $product = Icitem::find($request->product_code);
 
             $itemData = [
                 // IDs and Codes
-                'artrans_id' => $invoice->id,
+                'artrans_id' => $invoice->artrans_id,
                 'TRANCODE' => $product->product_no,
                 'DESP' => $product->product_name,
 

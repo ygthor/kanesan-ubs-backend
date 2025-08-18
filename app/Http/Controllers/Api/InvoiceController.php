@@ -102,14 +102,16 @@ class InvoiceController extends Controller
     {
         if ($id == null) {
             $validator = Validator::make($request->all(), [
-                'type' => 'required|string|max:2', // e.g., IV for Invoice, SO for Sales Order
-                'customer_id' => 'required|exists:customers,id',
+                'type' => 'required|string|max:3', // e.g., INV for Invoice, 
+                 'customer_id'   => 'required_without:customer_code|nullable|exists:customers,id',
+                'customer_code' => 'required_without:customer_id|nullable|string|max:50',
+    
                 'date' => 'nullable|date',
                 'remarks' => 'nullable|string',
-                'items' => 'required|array|min:1',
-                'items.*.product_id' => 'required|exists:products,id',
-                'items.*.quantity' => 'required|numeric|min:0',
-                'items.*.unit_price' => 'required|numeric|min:0',
+                // 'items' => 'required|array|min:1',
+                // 'items.*.product_id' => 'required|exists:products,id',
+                // 'items.*.quantity' => 'required|numeric|min:0',
+                // 'items.*.unit_price' => 'required|numeric|min:0',
             ]);
         } else {
             $validator = Validator::make($request->all(), [
@@ -145,7 +147,7 @@ class InvoiceController extends Controller
                 // Other header fields like 'tax1_percentage' can be added here
             ];
 
-            if($request->TYPE){
+            if($request->type){
                 $invoiceData['TYPE'] = $request->type;
             }
             
@@ -156,10 +158,8 @@ class InvoiceController extends Controller
                 $invoice->update($invoiceData);
             } else {
                 // CREATE MODE
+                $invoiceData['REFNO'] = Artran::generateReferenceNumber($invoiceData['TYPE']);
                 $invoice = Artran::create($invoiceData);
-                // Generate and save the reference number right after creation
-                $invoice->REFNO = $invoice->generateReferenceNumber();
-                $invoice->save();
             }
 
             // Before processing new items, remove old ones in update mode

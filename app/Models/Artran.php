@@ -109,13 +109,13 @@ class Artran extends BaseModel
     {
         // Sum the 'AMT_BIL' from all related items
         $grossTotal = $this->items()->sum('AMT_BIL');
-        $this->GROSS_BILL = $grossTotal;
+        // $GROSS_BILL = $grossTotal;
 
         // Example tax calculation. You might get percentage from config or customer.
         $taxPercentage = $this->tax1_percentage ?? 6.00; // Default to 6% if not set
-        $this->TAX1_BIL = $this->GROSS_BILL * ($taxPercentage / 100);
+        $this->TAX1_BIL = $grossTotal * ($taxPercentage / 100);
 
-        $this->GRAND_BIL = $this->GROSS_BILL + $this->TAX1_BIL;
+        $this->GRAND_BIL = $grossTotal + $this->TAX1_BIL;
 
         // Net amount after a potential header-level discount
         $headerDiscount = $this->discount ?? 0.00;
@@ -129,11 +129,11 @@ class Artran extends BaseModel
     /**
      * Generate a unique reference number (e.g., IV00001).
      */
-    public function generateReferenceNumber()
+    public static function generateReferenceNumber($type)
     {
         // Use a transaction to prevent race conditions if possible
-        $prefix = $this->TYPE;
-        $lastInvoice = self::where('TYPE', $prefix)->orderBy('id', 'desc')->first();
+        $prefix = $type;
+        $lastInvoice = self::where('TYPE', $prefix)->orderBy('REFNO', 'desc')->first();
         
         $number = 1;
         if ($lastInvoice && $lastInvoice->REFNO) {
