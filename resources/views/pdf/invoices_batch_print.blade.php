@@ -4,30 +4,16 @@
 <head>
     <title>Invoices</title>
     <style>
-        body { font-family: sans-serif; margin: 25px; }
-        .invoice-container {
-            border: 1px solid #ccc;
-            padding: 20px;
-            margin-bottom: 25px;
-        }
-        .page-break {
-            page-break-after: always;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
+        body { font-family: sans-serif; margin: 25px; font-size: 14px; }
+        .invoice-container { border: 1px solid #ccc; padding: 20px; margin-bottom: 25px; }
+        .page-break { page-break-after: always; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
-        .header, .footer { margin-bottom: 20px; }
         .header h1 { margin: 0; }
         .text-right { text-align: right; }
-        .totals { margin-top: 20px; float: right; width: 250px; }
+        .totals { margin-top: 20px; float: right; width: 300px; }
+        .totals table td { border: none; }
     </style>
 </head>
 <body>
@@ -40,8 +26,10 @@
                 <hr>
                 <p>
                     <strong>Bill To:</strong><br>
-                    {{ $invoice->customer->name ?? 'N/A' }} ({{ $invoice->CUSTNO }})<br>
-                    {!! nl2br(e($invoice->customer->address)) !!}
+                    {{ $invoice->customer->name ?? $invoice->NAME }}<br>
+                     @if($invoice->customer)
+                        {!! nl2br(e($invoice->customer->address)) !!}
+                    @endif
                 </p>
             </div>
 
@@ -62,7 +50,8 @@
                             <td>{{ $item->DESP }}</td>
                             <td class="text-right">{{ number_format($item->QTY, 2) }}</td>
                             <td class="text-right">{{ number_format($item->PRICE, 2) }}</td>
-                            <td class="text-right">{{ number_format($item->AMT, 2) }}</td>
+                            {{-- CORRECTED: Use AMT_BIL for the line item amount --}}
+                            <td class="text-right">{{ number_format($item->AMT_BIL, 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -70,23 +59,31 @@
 
             <div class="totals">
                  <table>
+                    {{-- CORRECTED: Use fields from your Artran model --}}
                     <tr>
                         <td><strong>Subtotal:</strong></td>
-                        <td class="text-right">RM {{ number_format($invoice->NETAMT, 2) }}</td>
+                        <td class="text-right">RM {{ number_format($invoice->GROSS_BILL, 2) }}</td>
                     </tr>
                      <tr>
-                        <td><strong>Total:</strong></td>
-                        <td class="text-right"><strong>RM {{ number_format($invoice->NETBIL, 2) }}</strong></td>
+                        <td><strong>Tax ({{ $invoice->GROSS_BILL > 0 ? number_format(($invoice->TAX1_BIL / $invoice->GROSS_BILL) * 100, 2) : '0.00' }}%):</strong></td>
+                        <td class="text-right">RM {{ number_format($invoice->TAX1_BIL, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Grand Total:</strong></td>
+                        <td class="text-right">RM {{ number_format($invoice->GRAND_BIL, 2) }}</td>
+                    </tr>
+                     <tr>
+                        <td><strong>Amount Due:</strong></td>
+                        <td class="text-right"><strong>RM {{ number_format($invoice->NET_BIL, 2) }}</strong></td>
                     </tr>
                 </table>
             </div>
             <div style="clear: both;"></div>
         </div>
 
-        {{-- Add a page break after each invoice, except for the last one --}}
         @if (!$loop->last)
             <div class="page-break"></div>
         @endif
-    @endforeach
+    @end-foreach
 </body>
 </html>

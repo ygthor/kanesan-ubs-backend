@@ -1,52 +1,20 @@
 {{-- resources/views/pdf/single_invoice.blade.php --}}
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>Invoice {{ $invoice->REFNO }}</title>
     <style>
-        body {
-            font-family: sans-serif;
-            margin: 25px;
-        }
-
-        .invoice-container {
-            padding: 10px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        th {
-            background-color: #f2f2f2;
-        }
-
-        .header h1 {
-            margin: 0;
-        }
-
-        .text-right {
-            text-align: right;
-        }
-
-        .totals {
-            margin-top: 20px;
-            float: right;
-            width: 250px;
-        }
+        body { font-family: sans-serif; margin: 25px; font-size: 14px; }
+        .invoice-container { padding: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .header h1 { margin: 0; }
+        .text-right { text-align: right; }
+        .totals { margin-top: 20px; float: right; width: 300px; }
+        .totals table td { border: none; }
     </style>
 </head>
-
 <body>
     <div class="invoice-container">
         <div class="header">
@@ -56,8 +24,10 @@
             <hr>
             <p>
                 <strong>Bill To:</strong><br>
-                {{ $invoice->customer->name ?? 'N/A' }} ({{ $invoice->CUSTNO }})<br>
-                {!! nl2br(e($invoice->customer->address)) !!}
+                {{ $invoice->customer->name ?? $invoice->NAME }}<br>
+                @if($invoice->customer)
+                    {!! nl2br(e($invoice->customer->address)) !!}
+                @endif
             </p>
         </div>
 
@@ -78,26 +48,35 @@
                         <td>{{ $item->DESP }}</td>
                         <td class="text-right">{{ number_format($item->QTY, 2) }}</td>
                         <td class="text-right">{{ number_format($item->PRICE, 2) }}</td>
-                        <td class="text-right">{{ number_format($item->AMT, 2) }}</td>
+                        {{-- CORRECTED: Use AMT_BIL for the line item amount --}}
+                        <td class="text-right">{{ number_format($item->AMT_BIL, 2) }}</td>
                     </tr>
                 @endforeach
             </tbody>
         </table>
 
         <div class="totals">
-            <table>
+             <table>
+                {{-- CORRECTED: Use fields from your Artran model --}}
                 <tr>
                     <td><strong>Subtotal:</strong></td>
-                    <td class="text-right">RM {{ number_format($invoice->NETAMT, 2) }}</td>
+                    <td class="text-right">RM {{ number_format($invoice->GROSS_BILL, 2) }}</td>
                 </tr>
                 <tr>
-                    <td><strong>Total:</strong></td>
-                    <td class="text-right"><strong>RM {{ number_format($invoice->NETBIL, 2) }}</strong></td>
+                    <td><strong>Tax ({{ number_format(($invoice->TAX1_BIL / $invoice->GROSS_BILL) * 100, 2) }}%):</strong></td>
+                    <td class="text-right">RM {{ number_format($invoice->TAX1_BIL, 2) }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Grand Total:</strong></td>
+                    <td class="text-right">RM {{ number_format($invoice->GRAND_BIL, 2) }}</td>
+                </tr>
+                 <tr>
+                    <td><strong>Amount Due:</strong></td>
+                    <td class="text-right"><strong>RM {{ number_format($invoice->NET_BIL, 2) }}</strong></td>
                 </tr>
             </table>
         </div>
         <div style="clear: both;"></div>
     </div>
 </body>
-
 </html>
