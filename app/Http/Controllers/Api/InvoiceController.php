@@ -25,9 +25,9 @@ class InvoiceController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
         $invoiceType = $request->input('invoice_type'); // e.g., 'SO', 'IV'
-        $paginate = $request->input('paginate'); 
-        
-        if($paginate === null){
+        $paginate = $request->input('paginate');
+
+        if ($paginate === null) {
             $paginate = true;
         }
 
@@ -38,7 +38,7 @@ class InvoiceController extends Controller
         if ($customerName) {
             $invoices->where('NAME', 'like', "%{$customerName}%");
         }
-        if($CUSTNO){
+        if ($CUSTNO) {
             $invoices->where('CUSTNO', 'like', "{$CUSTNO}");
         }
 
@@ -58,12 +58,12 @@ class InvoiceController extends Controller
 
         $invoices->orderBy('DATE', 'desc')->orderBy('REFNO', 'desc');
 
-        if($paginate){
+        if ($paginate) {
             $paginatedInvoices = $invoices->paginate($request->input('per_page', 15));
-        }else{
+        } else {
             $paginatedInvoices = $invoices->get();
         }
-        
+
 
         return makeResponse(200, 'Invoices retrieved successfully.', $paginatedInvoices);
     }
@@ -103,9 +103,9 @@ class InvoiceController extends Controller
         if ($id == null) {
             $validator = Validator::make($request->all(), [
                 'type' => 'required|string|max:3', // e.g., INV for Invoice, 
-                 'customer_id'   => 'required_without:customer_code|nullable|exists:customers,id',
+                'customer_id'   => 'required_without:customer_code|nullable|exists:customers,id',
                 'customer_code' => 'required_without:customer_id|nullable|string|max:50',
-    
+
                 'date' => 'nullable|date',
                 'remarks' => 'nullable|string',
                 // 'items' => 'required|array|min:1',
@@ -114,9 +114,7 @@ class InvoiceController extends Controller
                 // 'items.*.unit_price' => 'required|numeric|min:0',
             ]);
         } else {
-            $validator = Validator::make($request->all(), [
-               
-            ]);
+            $validator = Validator::make($request->all(), []);
         }
 
 
@@ -126,17 +124,17 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
-            if($request->customer_code){
+            if ($request->customer_code) {
                 $customer = Customer::fromCode($request->customer_code);
             }
-            if($request->customer_id){
+            if ($request->customer_id) {
                 $customer = Customer::find($request->customer_id);
             }
-            
+
 
             // Data for Artran (header)
             $invoiceData = [
-                
+
                 // 'branch_id' => $request->branch_id ?? 0,
                 'CUSTNO' => $customer->customer_code, // Map to legacy customer code
                 'NAME' => $customer->name, // Denormalized name
@@ -147,10 +145,10 @@ class InvoiceController extends Controller
                 // Other header fields like 'tax1_percentage' can be added here
             ];
 
-            if($request->type){
+            if ($request->type) {
                 $invoiceData['TYPE'] = $request->type;
             }
-            
+
 
             if ($id) {
                 // UPDATE MODE
@@ -249,5 +247,44 @@ class InvoiceController extends Controller
             \Log::error('Failed to delete invoice: ' . $e->getMessage());
             return makeResponse(500, 'Failed to delete invoice.', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Generate a batch PDF for a given list of invoice reference numbers.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function batchPrint(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ref_nos'   => 'required|array|min:1',
+            'ref_nos.*' => 'string|exists:artrans,REFNO', // Ensure each REFNO exists
+        ]);
+
+        if ($validator->fails()) {
+            return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
+        }
+
+        $validated = $validator->validated();
+
+        // Eager load relationships to avoid N+1 query problems
+        $invoices = Artran::with('items', 'customer')
+            ->whereIn('REFNO', $validated['ref_nos'])
+            ->orderBy('DATE', 'asc') // Order them consistently
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return makeResponse(404, 'No invoices found for the provided reference numbers.');
+        }
+
+        // Load the view and pass the data
+        $pdf = PDF::loadView('pdf.invoices_batch_print', ['invoices' => $invoices]);
+
+        // Set paper size and orientation if needed
+        $pdf->setPaper('a4', 'portrait');
+
+        // Return the PDF as a stream to the client
+        return $pdf->stream('invoices.pdf');
     }
 }

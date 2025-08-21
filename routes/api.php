@@ -113,6 +113,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('orders-items', OrderItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
     Route::apiResource('receipts', ReceiptController::class);
 
+    Route::post('invoices/batch-print', [InvoiceController::class, 'batchPrint']);
     Route::apiResource('invoices', InvoiceController::class)->only(['index', 'store', 'update', 'show']);
     Route::apiResource('invoices-items', InvoiceItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
 
