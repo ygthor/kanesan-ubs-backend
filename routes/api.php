@@ -76,6 +76,7 @@ Route::get('/script_to_run/update_customer_name',function(){
  * }
  * }
  */
+Route::get('invoices/{refNo}/print2', [InvoiceController::class, 'printInvoice']);
 Route::post('/test/api', function () {
     return response()->json([
         'status' => 200,
