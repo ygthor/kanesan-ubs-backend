@@ -287,4 +287,20 @@ class InvoiceController extends Controller
         // Return the PDF as a stream to the client
         return $pdf->stream('invoices.pdf');
     }
+
+    public function printInvoice($refNo)
+    {
+        // Find the invoice by its REFNO or fail with a 404 error
+        $invoice = Artran::with('items', 'customer')
+            ->where('REFNO', $refNo)
+            ->firstOrFail();
+
+        // Load the view and pass the single invoice object
+        $pdf = PDF::loadView('pdf.single_invoice', ['invoice' => $invoice]);
+
+        $pdf->setPaper('a4', 'portrait');
+
+        // Return the PDF to be viewed in the browser/client
+        return $pdf->stream("invoice-{$refNo}.pdf");
+    }
 }
