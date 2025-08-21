@@ -94,7 +94,7 @@ class InvoiceItemController extends Controller
             $itemData = [
                 // IDs and Codes
                 'artrans_id' => $invoice->artrans_id,
-                'TRANCODE' => $request->product_code,
+                'ITEMNO' => $request->product_code,
                 'DESP' => $product->DESP,
 
                 // Copied from Parent
