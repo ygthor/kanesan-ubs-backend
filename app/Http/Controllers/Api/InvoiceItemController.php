@@ -89,14 +89,13 @@ class InvoiceItemController extends Controller
             $invoice = Artran::findOrFail($request->reference_code);
             
             $product = Icitem::find($request->product_code);
-            dump($request->product_code);
-            dd($product);
+
 
             $itemData = [
                 // IDs and Codes
                 'artrans_id' => $invoice->artrans_id,
                 'TRANCODE' => $request->product_code,
-                'DESP' => $product->product_name,
+                'DESP' => $product->DESP,
 
                 // Copied from Parent
                 'REFNO' => $invoice->REFNO,
