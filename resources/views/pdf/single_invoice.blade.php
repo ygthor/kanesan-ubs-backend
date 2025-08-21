@@ -3,7 +3,8 @@
 <html>
 
 <head>
-    <title>Invoice {{ $invoice->REFNO }}</title>
+    {{-- UPDATED: The title is now dynamic --}}
+    <title>{{ $invoice->document_title }} {{ $invoice->REFNO }}</title>
     <style>
         body {
             font-family: sans-serif;
@@ -55,13 +56,13 @@
 <body>
     <div class="invoice-container">
         <div class="header">
-            <h1>Invoice</h1>
+            <h1>{{ $invoice->document_title }}</h1>
             <p><strong>Ref No:</strong> {{ $invoice->REFNO }}</p>
             <p><strong>Date:</strong> {{ \Carbon\Carbon::parse($invoice->DATE)->format('d M Y') }}</p>
             <hr>
             <p>
                 <strong>Bill To:</strong><br>
-                {{ $invoice->customer->name ?? $invoice->NAME }}<br>
+                {{ $invoice->customer->name ?? $invoice->NAME }} ({{ $invoice->CUSTNO  }})<br>
                 @if ($invoice->customer)
                     {!! nl2br(e($invoice->customer->address)) !!}
                 @endif

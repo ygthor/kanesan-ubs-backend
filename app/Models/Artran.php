@@ -11,13 +11,13 @@ class Artran extends BaseModel
 
     protected $table = 'artrans';
     // If your primary key is not 'id', uncomment and set it.
-    protected $primaryKey = 'REFNO'; 
+    protected $primaryKey = 'REFNO';
     public $incrementing = false;
     protected $keyType = 'string';
     const CREATED_AT = 'CREATED_ON';
     const UPDATED_AT = 'UPDATED_ON';
 
-    
+
     // Allow mass assignment for these fields
     protected $fillable = [
         'artrans_id',
@@ -29,30 +29,30 @@ class Artran extends BaseModel
         'DESP',  // Denormalized customer name for quick display
         'TRANCODE',
         'GROSS_BILL',         // e.g., 'pending', 'processing', 'completed', 'cancelled'
-        'NET_BIL',   
-        'TAX1_BIL',   
-        'GRAND_BIL',   
-        'DEBIT_BIL',   
-        'CREDIT_BIL',   
-        'INVGROSS',   
-        'NET',        
-        'GRAND',        
-        'DEBITAMT',        
-        'CREDITAMT',        
-        'CS_PM_WHT',        
-        'NOTE',        
-        'ISCASH',        
-        'AGE',        
-        'TERM',        
-        'PLA_DODATE',        
-        'NAME',        
-        'TRDATETIME',        
-        'USERID',        
-        'BDATE',        
-        'CREATED_BY',        
-        'UPDATED_BY',        
-        'CREATED_ON',        
-        'UPDATED_ON',  
+        'NET_BIL',
+        'TAX1_BIL',
+        'GRAND_BIL',
+        'DEBIT_BIL',
+        'CREDIT_BIL',
+        'INVGROSS',
+        'NET',
+        'GRAND',
+        'DEBITAMT',
+        'CREDITAMT',
+        'CS_PM_WHT',
+        'NOTE',
+        'ISCASH',
+        'AGE',
+        'TERM',
+        'PLA_DODATE',
+        'NAME',
+        'TRDATETIME',
+        'USERID',
+        'BDATE',
+        'CREATED_BY',
+        'UPDATED_BY',
+        'CREATED_ON',
+        'UPDATED_ON',
         // 'tax1_percentage' // Not a DB column, but useful for calculations
     ];
 
@@ -68,7 +68,7 @@ class Artran extends BaseModel
         'ISCASH' => 'boolean',
     ];
 
-     public function __construct(array $attributes = [])
+    public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
 
@@ -98,7 +98,7 @@ class Artran extends BaseModel
      */
     public function items()
     {
-        return $this->hasMany(ArTransItem::class, 'REFNO','REFNO');
+        return $this->hasMany(ArTransItem::class, 'REFNO', 'REFNO');
     }
 
     /**
@@ -134,7 +134,7 @@ class Artran extends BaseModel
         // Use a transaction to prevent race conditions if possible
         $prefix = $type;
         $lastInvoice = self::where('TYPE', $prefix)->orderBy('REFNO', 'desc')->first();
-        
+
         $number = 1;
         if ($lastInvoice && $lastInvoice->REFNO) {
             // Extract number part and increment
@@ -143,5 +143,21 @@ class Artran extends BaseModel
         }
 
         return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
+    }
+
+    public function getDocumentTitleAttribute()
+    {
+        switch ($this->TYPE) {
+            case 'INV':
+                return 'Invoice';
+            case 'CN':
+            case 'CR': // Handling both 'Credit Note' and 'Credit Return'
+                return 'Credit Note';
+            case 'CS':
+            case 'CB': // Handling both 'Cash Sale' and 'Cash Bill'
+                return 'Cash Bill';
+            default:
+                return 'Document'; // A fallback for any other types
+        }
     }
 }
