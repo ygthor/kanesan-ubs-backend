@@ -15,6 +15,7 @@ class Icitem extends BaseModel
     public $incrementing = false;
     protected $keyType = 'string';
     
+    
     // Allow mass assignment for these fields
     protected $fillable = [
         'ITEMNO',
