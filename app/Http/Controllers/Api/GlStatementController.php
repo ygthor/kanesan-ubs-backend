@@ -40,7 +40,7 @@ class GlStatementController extends Controller
         // Paginate the results to prevent loading too much data at once
         $glEntries = $query->paginate(20); // You can adjust the number per page
 
-        return response()->json($glEntries);
+        return makeResponse(200, 'GL Statement retrieved successfully.', $glEntries);
     }
 
     /**
