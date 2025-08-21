@@ -105,6 +105,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/orders/{id}', [OrderController::class, 'deleteOrder']);
     Route::delete('/order-items/{id}', [OrderController::class, 'deleteOrderItem']);
 
+    Route::apiResource('gl-statement', GlStatementController::class)->only(['index', 'store', 'update', 'show']);
+
     Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'update', 'show']);
     Route::apiResource('orders-items', OrderItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
     Route::apiResource('receipts', ReceiptController::class);
