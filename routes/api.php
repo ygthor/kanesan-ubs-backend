@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoiceItemController;
+use App\Http\Controllers\Api\ReportController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -76,7 +77,14 @@ Route::get('/script_to_run/update_customer_name',function(){
  * }
  * }
  */
+Route::get('/customer/invoices/print2', [InvoiceController::class, 'printInvoiceReport']);
 Route::get('invoices/{refNo}/print2', [InvoiceController::class, 'printInvoice']);
+
+Route::get('/business-summary', [ReportController::class, 'businessSummary']);
+Route::get('/report/orders', [ReportController::class, 'salesOrders']);
+
+
+
 Route::post('/test/api', function () {
     return response()->json([
         'status' => 200,

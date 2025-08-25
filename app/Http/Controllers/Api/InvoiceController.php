@@ -304,4 +304,61 @@ class InvoiceController extends Controller
         // Return the PDF to be viewed in the browser/client
         return $pdf->stream("invoice-{$refNo}.pdf");
     }
+
+
+    public function printInvoiceReport(Request $request)
+    {
+
+        $custNo    = $request->input('CUSTNO');
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
+
+        // Fetch invoices with items + customer in one go
+        $invoices = Artran::with('items', 'customer');
+        if (!empty($custNo)) {
+            $invoices->where('CUSTNO', $custNo);
+        }
+        if (!empty($startDate)) {
+            $invoices->whereDate('DATE', '>=', $startDate);
+        }
+        if (!empty($startDate)) {
+            $invoices->whereDate('DATE', '<=', $endDate);
+        }
+
+        $cusotmer = Customer::fromCode($custNo);
+
+
+        $invoices = $invoices
+            ->SelectRaw('
+                TYPE,
+                REFNO,
+                CUSTNO,
+                NAME,
+                DATE,
+                NOTE,
+                DEBIT_BIL,
+                CREDIT_BIL,
+                NET_BIL
+            ')
+            ->orderBy('DATE', 'asc')
+            ->orderBy('REFNO', 'asc')
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return makeResponse(404, 'No invoices found for this customer in the given date range.');
+        }
+        
+        // Load a Blade view for batch report
+        // Create `resources/views/pdf/invoices_report.blade.php`
+        $pdf = PDF::loadView('pdf.invoices_report', [
+            'invoices'   => $invoices,
+            'customer'   => $cusotmer,
+            'start_date' => $startDate,
+            'end_date'   => $endDate,
+        ]);
+
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream("invoices_report_{$custNo}_{$startDate}_to_{$endDate}.pdf");
+    }
 }

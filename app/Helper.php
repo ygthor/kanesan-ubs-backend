@@ -20,3 +20,8 @@ function timestamp() {
     $dt = new DateTime('now', new DateTimeZone('Asia/Kuala_Lumpur'));
     return $dt->format('Y-m-d H:i:s');
 }
+
+function displayDate($date){
+    if(empty($date)) return '';
+    return date('Y-m-d',strtotime($date));
+}

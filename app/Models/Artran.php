@@ -112,7 +112,7 @@ class Artran extends BaseModel
         // $GROSS_BILL = $grossTotal;
 
         // Example tax calculation. You might get percentage from config or customer.
-        $taxPercentage = $this->tax1_percentage ?? 6.00; // Default to 6% if not set
+        $taxPercentage = $this->tax1_percentage ?? 0.00; // Default to 6% if not set
         $this->TAX1_BIL = $grossTotal * ($taxPercentage / 100);
 
         $this->GRAND_BIL = $grossTotal + $this->TAX1_BIL;
@@ -122,8 +122,16 @@ class Artran extends BaseModel
         $this->NET_BIL = $this->GRAND_BIL - $headerDiscount;
 
         // For accounting: Invoices are typically debits
-        $this->DEBIT_BIL = $this->NET_BIL;
         $this->CREDIT_BIL = 0;
+        $this->DEBIT_BIL =0;
+        if( in_array($this->TYPE,['INV','SO','IV','CS','CB'])){
+            $this->DEBIT_BIL = $this->NET_BIL;
+        }
+        if( in_array($this->TYPE,['CN']) ){
+            $this->CREDIT_BIL = $this->NET_BIL;
+        }
+        
+        
     }
 
     /**
