@@ -36,13 +36,4 @@
 
         <button type="submit" class="btn btn-primary w-100">Sign In</button>
     </form>
-
-    <div class="mt-4 text-center text-muted">
-        <small>
-            <strong>Default Login Options:</strong><br>
-            Email: admin@example.com<br>
-            Username: admin<br>
-            Password: password123
-        </small>
-    </div>
 @endsection

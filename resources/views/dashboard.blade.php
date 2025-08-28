@@ -84,35 +84,4 @@
         </div>
     </div>
 
-    <!-- Permissions Section -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Your Permissions</h3>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        @foreach($user->getAllPermissions() as $permission)
-                            <div class="col-md-4 col-sm-6">
-                                <div class="info-box">
-                                    <span class="info-box-icon bg-info"><i class="fas fa-check"></i></span>
-                                    <div class="info-box-content">
-                                        <span class="info-box-text">{{ $permission->display_name }}</span>
-                                        <span class="info-box-number">{{ $permission->module }}</span>
-                                        <div class="progress">
-                                            <div class="progress-bar" style="width: 100%"></div>
-                                        </div>
-                                        <span class="progress-description">
-                                            {{ $permission->description ?? 'No description available' }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 @endsection

@@ -47,18 +47,6 @@ class Role extends Model
     }
 
     /**
-     * Check if the role has a specific permission.
-     */
-    public function hasPermission($permission)
-    {
-        if (is_string($permission)) {
-            return $this->permissions()->where('name', $permission)->exists();
-        }
-        
-        return $this->permissions()->where('id', $permission->id)->exists();
-    }
-
-    /**
      * Check if the role has any of the given permissions.
      */
     public function hasAnyPermission($permissions)

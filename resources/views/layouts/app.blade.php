@@ -71,7 +71,7 @@
                             </a>
                         </li>
                         
-                        @if(auth()->check() && auth()->user()->hasPermission('access_user_mgmt'))
+                        @if(auth()->check() && auth()->user()->hasRole('admin'))
                         <li class="nav-item">
                             <a href="/admin/users" class="nav-link {{ request()->is('admin/users*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-users"></i>
@@ -80,23 +80,6 @@
                         </li>
                         @endif
                         
-                        @if(auth()->check() && auth()->user()->hasPermission('access_role_mgmt'))
-                        <li class="nav-item">
-                            <a href="/admin/roles" class="nav-link {{ request()->is('admin/roles*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-user-tag"></i>
-                                <p>Role Management</p>
-                            </a>
-                        </li>
-                        @endif
-                        
-                        @if(auth()->check() && auth()->user()->hasPermission('access_permission_mgmt'))
-                        <li class="nav-item">
-                            <a href="/admin/permissions" class="nav-link {{ request()->is('admin/permissions*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-key"></i>
-                                <p>Permission Management</p>
-                            </a>
-                        </li>
-                        @endif
                     </ul>
                 </nav>
             </div>

@@ -58,14 +58,7 @@ class LoginController extends Controller
                             })
                         ];
                     }),
-                    'permissions' => $user->getAllPermissions()->map(function ($permission) {
-                        return [
-                            'id' => $permission->id,
-                            'name' => $permission->name,
-                            'display_name' => $permission->display_name,
-                            'module' => $permission->module,
-                        ];
-                    })->unique('id')->values()
+                    
                 ],
                 'token' => $token,
                 'token_type' => 'Bearer'
@@ -117,14 +110,7 @@ class LoginController extends Controller
                             })
                         ];
                     }),
-                    'permissions' => $user->getAllPermissions()->map(function ($permission) {
-                        return [
-                            'id' => $permission->id,
-                            'name' => $permission->name,
-                            'display_name' => $permission->display_name,
-                            'module' => $permission->module,
-                        ];
-                    })->unique('id')->values()
+                    
                 ]
             ]
         ]);

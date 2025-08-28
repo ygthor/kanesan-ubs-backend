@@ -26,22 +26,6 @@ function displayDate($date){
     return date('Y-m-d',strtotime($date));
 }
 
-if (!function_exists('can')) {
-    /**
-     * Check if the authenticated user has a specific permission.
-     *
-     * @param string $permission
-     * @return bool
-     */
-    function can($permission)
-    {
-        if (!auth()->check()) {
-            return false;
-        }
-        
-        return auth()->user()->hasPermission($permission);
-    }
-}
 
 if (!function_exists('hasRole')) {
     /**
