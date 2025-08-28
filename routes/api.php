@@ -47,6 +47,11 @@ Route::any('/test/response', function () {
 Route::post('/sync/local', [SyncController::class, 'syncLocalData']); // Recommended array syntax
 Route::post('/auth/token', [AuthController::class, 'get_token'])->name('auth.token'); // Recommended array syntax
 
+// Authentication routes
+Route::post('/auth/login', [\App\Http\Controllers\Auth\LoginController::class, 'login'])->name('auth.login');
+Route::post('/auth/logout', [\App\Http\Controllers\Auth\LoginController::class, 'logout'])->middleware('auth:sanctum')->name('auth.logout');
+Route::get('/auth/me', [\App\Http\Controllers\Auth\LoginController::class, 'me'])->middleware('auth:sanctum')->name('auth.me');
+
 Route::get('/script_to_run/update_customer_name',function(){
     DB::statement("
         UPDATE customers
@@ -98,6 +103,37 @@ Route::get('products', [ProductController::class,'index']);
 Route::get('icitem', [IcitemController::class,'index']);
 // Route::middleware([])->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
+    
+    // Admin Management Routes
+    Route::prefix('admin')->group(function () {
+        // User Management
+        Route::get('/users', [\App\Http\Controllers\Admin\UserManagementController::class, 'index'])->middleware('permission:access_user_mgmt')->name('admin.users.index');
+        Route::post('/users', [\App\Http\Controllers\Admin\UserManagementController::class, 'store'])->middleware('permission:create_user')->name('admin.users.store');
+        Route::get('/users/{user}', [\App\Http\Controllers\Admin\UserManagementController::class, 'show'])->middleware('permission:view_user')->name('admin.users.show');
+        Route::put('/users/{user}', [\App\Http\Controllers\Admin\UserManagementController::class, 'update'])->middleware('permission:edit_user')->name('admin.users.update');
+        Route::delete('/users/{user}', [\App\Http\Controllers\Admin\UserManagementController::class, 'destroy'])->middleware('permission:delete_user')->name('admin.users.destroy');
+        Route::get('/users/roles', [\App\Http\Controllers\Admin\UserManagementController::class, 'getRoles'])->name('admin.users.roles');
+        Route::get('/users/permissions', [\App\Http\Controllers\Admin\UserManagementController::class, 'getPermissions'])->name('admin.users.permissions');
+        
+        // Role Management
+        Route::get('/roles', [\App\Http\Controllers\Admin\RoleManagementController::class, 'index'])->middleware('permission:access_role_mgmt')->name('admin.roles.index');
+        Route::post('/roles', [\App\Http\Controllers\Admin\RoleManagementController::class, 'store'])->middleware('permission:create_role')->name('admin.roles.store');
+        Route::get('/roles/{role}', [\App\Http\Controllers\Admin\RoleManagementController::class, 'show'])->middleware('permission:view_role')->name('admin.roles.show');
+        Route::put('/roles/{role}', [\App\Http\Controllers\Admin\RoleManagementController::class, 'update'])->middleware('permission:edit_role')->name('admin.roles.update');
+        Route::delete('/roles/{role}', [\App\Http\Controllers\Admin\RoleManagementController::class, 'destroy'])->middleware('permission:delete_role')->name('admin.roles.destroy');
+        Route::get('/roles/permissions', [\App\Http\Controllers\Admin\RoleManagementController::class, 'getPermissions'])->name('admin.roles.permissions');
+        Route::get('/roles/stats', [\App\Http\Controllers\Admin\RoleManagementController::class, 'getStats'])->name('admin.roles.stats');
+        
+        // Permission Management
+        Route::get('/permissions', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'index'])->middleware('permission:access_permission_mgmt')->name('admin.permissions.index');
+        Route::post('/permissions', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'store'])->middleware('permission:create_permission')->name('admin.permissions.store');
+        Route::get('/permissions/{permission}', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'show'])->middleware('permission:view_permission')->name('admin.permissions.show');
+        Route::put('/permissions/{permission}', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'update'])->middleware('permission:edit_permission')->name('admin.permissions.update');
+        Route::delete('/permissions/{permission}', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'destroy'])->middleware('permission:delete_permission')->name('admin.permissions.destroy');
+        Route::get('/permissions/modules', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'getModules'])->name('admin.permissions.modules');
+        Route::get('/permissions/module/{module}', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'getByModule'])->name('admin.permissions.by-module');
+        Route::get('/permissions/stats', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'getStats'])->name('admin.permissions.stats');
+    });
 
     Route::any('/me', [UserController::class, 'info'])->name('user.info'); // Recommended array syntax
     // Route::get('/user', [UserController::class, 'info'])->name('user.info'); // This is redundant if /me is any HTTP verb
