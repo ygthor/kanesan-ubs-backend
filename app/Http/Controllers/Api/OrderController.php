@@ -196,6 +196,7 @@ class OrderController extends Controller
                     'is_free_good' => $itemData['is_free_good'] ?? false,
                     'is_trade_return' => $itemData['is_trade_return'] ?? false,
                     'trade_return_is_good' => $itemData['is_trade_return'] ? ($itemData['trade_return_is_good'] ?? true) : true,
+                    'item_group' => $itemData['item_group'] ?? null,
                 ]);
                 $orderItem->calculate();
                 $orderItem->save();

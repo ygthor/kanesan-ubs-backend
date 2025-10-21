@@ -29,6 +29,7 @@ class OrderItem extends BaseModel
         'is_free_good',
         'is_trade_return',
         'trade_return_is_good', // Condition if it's a trade return
+        'item_group',           // Item group type: Cash Sales, Invoice, etc.
         // 'sub_total', // Often calculated, not stored, or stored for historical pricing
     ];
 

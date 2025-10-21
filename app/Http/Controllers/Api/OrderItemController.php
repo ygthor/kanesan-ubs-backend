@@ -83,6 +83,10 @@ class OrderItemController extends Controller
                 'product_id',
                 'quantity',
                 'unit_price',
+                'item_group',
+                'is_free_good',
+                'is_trade_return',
+                'trade_return_is_good',
             ]);
 
             $order_id = $orderData['order_id'];
@@ -103,6 +107,13 @@ class OrderItemController extends Controller
             $product = Product::find($orderData['product_id']);
             $orderData['product_no'] = $product->Product_Id;
             $orderData['product_name'] = $product->Product_English_Name;
+            $orderData['sku_code'] = $product->sku_code ?? null;
+            $orderData['description'] = $product->Product_English_Name;
+
+            // Handle free goods
+            if (isset($orderData['is_free_good']) && $orderData['is_free_good']) {
+                $orderData['unit_price'] = 0;
+            }
 
             $orderData['amount'] = $orderData['quantity'] * $orderData['unit_price'];
             $orderData['updated_at'] = timestamp();

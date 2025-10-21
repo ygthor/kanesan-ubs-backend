@@ -31,10 +31,10 @@ endpoints:
         status: 201
         content: |-
           {
-            "message": "Tested",
-            "data": {
-              "message": "ok",
-            }
+          "message": "Tested",
+          "data": {
+          "message": "ok",
+          }
           }
         headers: []
         description: ''
@@ -43,10 +43,10 @@ endpoints:
         status: 400
         content: |-
           {
-            "message": "Validation errors",
-            "errors": {
-              "name": ["just error"]
-            }
+          "message": "Validation errors",
+          "errors": {
+          "name": ["just error"]
+          }
           }
         headers: []
         description: ''

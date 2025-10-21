@@ -1,0 +1,537 @@
+{
+	"info": {
+		"_postman_id": "rempah-api-collection",
+		"name": "Rempah API - Complete Collection",
+		"description": "Complete API collection for testing Rempah backend APIs including Customers, Orders, Order Items, Invoices, and more.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{auth_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.token) {",
+									"        pm.collectionVariables.set('auth_token', jsonData.data.token);",
+									"        console.log('Token saved:', jsonData.data.token);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login and get auth token. Token is automatically saved to collection variables."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "me"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👥 Customers",
+			"item": [
+				{
+					"name": "Get All Customers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/customers",
+							"host": ["{{base_url}}"],
+							"path": ["customers"]
+						},
+						"description": "Retrieve list of all customers"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Customer by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Customer",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_code\": \"C001\",\n    \"company_name\": \"ABC Trading\",\n    \"company_name2\": \"Sdn Bhd\",\n    \"address1\": \"123 Main Street\",\n    \"address2\": \"Suite 100\",\n    \"postcode\": \"50000\",\n    \"state\": \"Selangor\",\n    \"territory\": \"S01\",\n    \"telephone1\": \"0123456789\",\n    \"telephone2\": \"0187654321\",\n    \"email\": \"contact@abc.com\",\n    \"customer_group\": \"Restaurant\",\n    \"payment_type\": \"Invoice\",\n    \"payment_term\": \"30\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/customers",
+							"host": ["{{base_url}}"],
+							"path": ["customers"]
+						},
+						"description": "Create a new customer with all required fields including company_name2"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Customer",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_code\": \"C001\",\n    \"company_name\": \"ABC Trading Updated\",\n    \"company_name2\": \"Sdn Bhd\",\n    \"address1\": \"456 New Street\",\n    \"state\": \"Penang\",\n    \"telephone1\": \"0198765432\",\n    \"customer_group\": \"Sundry Shop\",\n    \"payment_type\": \"Cash Sales\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Customer",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📦 Orders",
+			"item": [
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": ["{{base_url}}"],
+							"path": ["orders"],
+							"query": [
+								{
+									"key": "customer_id",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "2025-01-01",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "2025-12-31",
+									"disabled": true
+								},
+								{
+									"key": "order_type",
+									"value": "SO",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get all orders with optional filters"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders/1",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Order (with items)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"branch_id\": \"0\",\n    \"customer_id\": \"1\",\n    \"order_date\": \"2025-10-21\",\n    \"remarks\": \"Rush order\",\n    \"discount\": 10.00,\n    \"tax1_percentage\": 6.00,\n    \"items\": [\n        {\n            \"product_id\": \"1\",\n            \"quantity\": 10,\n            \"unit_price\": 25.50,\n            \"discount\": 0,\n            \"is_free_good\": false,\n            \"is_trade_return\": false,\n            \"trade_return_is_good\": true,\n            \"item_group\": \"Cash Sales\"\n        },\n        {\n            \"product_id\": \"2\",\n            \"quantity\": 5,\n            \"unit_price\": 15.00,\n            \"is_free_good\": false,\n            \"item_group\": \"Invoice\"\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": ["{{base_url}}"],
+							"path": ["orders"]
+						},
+						"description": "Create a new order with items. Note: item_group field is now supported!"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Order (without items)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"branch_id\": \"0\",\n    \"customer_id\": \"1\",\n    \"order_date\": \"2025-10-21\",\n    \"remarks\": \"Order without items - will add items later\",\n    \"discount\": 0,\n    \"tax1_percentage\": 6.00\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders",
+							"host": ["{{base_url}}"],
+							"path": ["orders"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Order",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_id\": \"1\",\n    \"order_date\": \"2025-10-22\",\n    \"remarks\": \"Updated remarks\",\n    \"discount\": 15.00,\n    \"tax1_percentage\": 6.00\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders/1",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Order",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders/1",
+							"host": ["{{base_url}}"],
+							"path": ["orders", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📝 Order Items",
+			"item": [
+				{
+					"name": "Add Item to Order",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": \"1\",\n    \"product_id\": \"1\",\n    \"quantity\": 10,\n    \"unit_price\": 25.50,\n    \"is_free_good\": false,\n    \"is_trade_return\": false,\n    \"trade_return_is_good\": true,\n    \"item_group\": \"Cash Sales\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders-items",
+							"host": ["{{base_url}}"],
+							"path": ["orders-items"]
+						},
+						"description": "Add a new item to an existing order. Supports item_group field!"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Free Good Item",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": \"1\",\n    \"product_id\": \"3\",\n    \"quantity\": 2,\n    \"unit_price\": 0,\n    \"is_free_good\": true,\n    \"is_trade_return\": false,\n    \"item_group\": \"Cash Sales\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders-items",
+							"host": ["{{base_url}}"],
+							"path": ["orders-items"]
+						},
+						"description": "Add a free good item (price automatically set to 0)"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Trade Return Item (Good)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": \"1\",\n    \"product_id\": \"4\",\n    \"quantity\": 3,\n    \"unit_price\": 20.00,\n    \"is_free_good\": false,\n    \"is_trade_return\": true,\n    \"trade_return_is_good\": true,\n    \"item_group\": \"Invoice\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders-items",
+							"host": ["{{base_url}}"],
+							"path": ["orders-items"]
+						},
+						"description": "Add a trade return item in good condition"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Trade Return Item (Bad)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": \"1\",\n    \"product_id\": \"5\",\n    \"quantity\": 1,\n    \"unit_price\": 15.00,\n    \"is_free_good\": false,\n    \"is_trade_return\": true,\n    \"trade_return_is_good\": false,\n    \"item_group\": \"Invoice\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/orders-items",
+							"host": ["{{base_url}}"],
+							"path": ["orders-items"]
+						},
+						"description": "Add a trade return item in bad condition"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Order Item",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/orders-items/1",
+							"host": ["{{base_url}}"],
+							"path": ["orders-items", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📦 Products",
+			"item": [
+				{
+					"name": "Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": ["{{base_url}}"],
+							"path": ["products"]
+						},
+						"description": "Get all products (no auth required)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📊 Dashboard",
+			"item": [
+				{
+					"name": "Get Dashboard Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/dashboard",
+							"host": ["{{base_url}}"],
+							"path": ["dashboard"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📄 Invoices",
+			"item": [
+				{
+					"name": "Get All Invoices",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/invoices",
+							"host": ["{{base_url}}"],
+							"path": ["invoices"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Invoice by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/invoices/1",
+							"host": ["{{base_url}}"],
+							"path": ["invoices", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Print Invoice",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/invoices/INV00001/print",
+							"host": ["{{base_url}}"],
+							"path": ["invoices", "INV00001", "print"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💰 Receipts",
+			"item": [
+				{
+					"name": "Get All Receipts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/receipts",
+							"host": ["{{base_url}}"],
+							"path": ["receipts"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+

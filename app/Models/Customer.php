@@ -26,7 +26,8 @@ class Customer extends Model
     protected $fillable = [
         'customer_code',
         'name',             // General name for the customer (individual or company)
-        'company_name',     // Specific company name if different from 'name'
+        'company_name',     // Company name line 1
+        'company_name2',    // Company name line 2
         'contact_person',
         'email',
         'phone',            // Primary general phone number

@@ -1,0 +1,728 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Rempah API Documentation",
+    "description": "Complete API documentation for the Rempah backend system including Customers, Orders, Order Items, Invoices, Receipts, and more.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "email": "support@rempah.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api",
+      "description": "Local Development Server"
+    },
+    {
+      "url": "https://your-production-url.com/api",
+      "description": "Production Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "Login, logout, and token management"
+    },
+    {
+      "name": "Customers",
+      "description": "Customer management endpoints"
+    },
+    {
+      "name": "Orders",
+      "description": "Sales order management"
+    },
+    {
+      "name": "Order Items",
+      "description": "Order line items management"
+    },
+    {
+      "name": "Invoices",
+      "description": "Invoice management"
+    },
+    {
+      "name": "Receipts",
+      "description": "Receipt management"
+    },
+    {
+      "name": "Products",
+      "description": "Product catalog"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Dashboard and statistics"
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User login",
+        "description": "Authenticate user and receive access token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "admin@example.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "password123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "integer", "example": 200},
+                    "message": {"type": "string", "example": "Login successful"},
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {"type": "string", "example": "1|abc123..."},
+                        "user": {"$ref": "#/components/schemas/User"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User logout",
+        "description": "Revoke the current access token",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Logout successful"
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Get current user",
+        "description": "Get authenticated user information",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "User information retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers": {
+      "get": {
+        "tags": ["Customers"],
+        "summary": "Get all customers",
+        "description": "Retrieve list of all customers",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Customers retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "integer", "example": 200},
+                    "message": {"type": "string", "example": "Customers retrieved successfully."},
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Customer"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Customers"],
+        "summary": "Create new customer",
+        "description": "Create a new customer record",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["customer_code", "company_name", "address1", "territory", "telephone1", "customer_group", "payment_type"],
+                "properties": {
+                  "customer_code": {"type": "string", "example": "C001"},
+                  "company_name": {"type": "string", "example": "ABC Trading"},
+                  "company_name2": {"type": "string", "example": "Sdn Bhd"},
+                  "address1": {"type": "string", "example": "123 Main Street"},
+                  "address2": {"type": "string", "example": "Suite 100"},
+                  "postcode": {"type": "string", "example": "50000"},
+                  "state": {"type": "string", "example": "Selangor"},
+                  "territory": {"type": "string", "example": "S01"},
+                  "telephone1": {"type": "string", "example": "0123456789"},
+                  "telephone2": {"type": "string", "example": "0187654321"},
+                  "email": {"type": "string", "format": "email", "example": "contact@abc.com"},
+                  "customer_group": {"type": "string", "example": "Restaurant"},
+                  "payment_type": {"type": "string", "example": "Invoice"},
+                  "payment_term": {"type": "string", "example": "30"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Customer created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation errors"
+          }
+        }
+      }
+    },
+    "/customers/{customer}": {
+      "get": {
+        "tags": ["Customers"],
+        "summary": "Get customer by ID",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "customer",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"},
+            "example": "1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {"$ref": "#/components/schemas/ApiResponse"},
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {"$ref": "#/components/schemas/Customer"}
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Customers"],
+        "summary": "Update customer",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "customer",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Customer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Customer updated successfully"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Customers"],
+        "summary": "Delete customer",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "customer",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer deleted successfully"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get all orders",
+        "description": "Retrieve list of orders with optional filters",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by customer ID"
+          },
+          {
+            "name": "customer_code",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by customer code"
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "schema": {"type": "string", "format": "date"},
+            "description": "Start date for filtering"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "schema": {"type": "string", "format": "date"},
+            "description": "End date for filtering"
+          },
+          {
+            "name": "order_type",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by order type (SO, DO, etc.)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {"$ref": "#/components/schemas/ApiResponse"},
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {"$ref": "#/components/schemas/Order"}
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Create new order",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["customer_id"],
+                "properties": {
+                  "branch_id": {"type": "string", "example": "0"},
+                  "customer_id": {"type": "string", "example": "1"},
+                  "order_date": {"type": "string", "format": "date", "example": "2025-10-21"},
+                  "remarks": {"type": "string", "example": "Rush order"},
+                  "discount": {"type": "number", "example": 10.00},
+                  "tax1_percentage": {"type": "number", "example": 6.00},
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "product_id": {"type": "string", "example": "1"},
+                        "quantity": {"type": "number", "example": 10},
+                        "unit_price": {"type": "number", "example": 25.50},
+                        "discount": {"type": "number", "example": 0},
+                        "is_free_good": {"type": "boolean", "example": false},
+                        "is_trade_return": {"type": "boolean", "example": false},
+                        "trade_return_is_good": {"type": "boolean", "example": true},
+                        "item_group": {"type": "string", "example": "Cash Sales"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {"$ref": "#/components/schemas/ApiResponse"},
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {"$ref": "#/components/schemas/Order"}
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{order}": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get order by ID",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "order",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {"$ref": "#/components/schemas/ApiResponse"},
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {"$ref": "#/components/schemas/Order"}
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Orders"],
+        "summary": "Update order",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "order",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customer_id": {"type": "string"},
+                  "order_date": {"type": "string", "format": "date"},
+                  "remarks": {"type": "string"},
+                  "discount": {"type": "number"},
+                  "tax1_percentage": {"type": "number"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order updated successfully"
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "delete": {
+        "tags": ["Orders"],
+        "summary": "Delete order",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order deleted successfully"
+          }
+        }
+      }
+    },
+    "/orders-items": {
+      "post": {
+        "tags": ["Order Items"],
+        "summary": "Add item to order",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["order_id", "product_id", "quantity", "unit_price"],
+                "properties": {
+                  "order_id": {"type": "string", "example": "1"},
+                  "product_id": {"type": "string", "example": "1"},
+                  "quantity": {"type": "number", "example": 10},
+                  "unit_price": {"type": "number", "example": 25.50},
+                  "is_free_good": {"type": "boolean", "example": false},
+                  "is_trade_return": {"type": "boolean", "example": false},
+                  "trade_return_is_good": {"type": "boolean", "example": true},
+                  "item_group": {"type": "string", "example": "Cash Sales"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order item created successfully"
+          }
+        }
+      }
+    },
+    "/orders-items/{orders_item}": {
+      "delete": {
+        "tags": ["Order Items"],
+        "summary": "Delete order item",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "orders_item",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order item deleted successfully"
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get all products",
+        "description": "Retrieve list of all products",
+        "responses": {
+          "200": {
+            "description": "Products retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {"$ref": "#/components/schemas/ApiResponse"},
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {"$ref": "#/components/schemas/Product"}
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get dashboard summary",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Dashboard data retrieved successfully"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Sanctum Token"
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "integer", "example": 200},
+          "message": {"type": "string", "example": "Success"},
+          "data": {"type": "object"}
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "email": {"type": "string", "format": "email"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "customer_code": {"type": "string"},
+          "company_name": {"type": "string"},
+          "company_name2": {"type": "string"},
+          "name": {"type": "string"},
+          "address": {"type": "string"},
+          "address1": {"type": "string"},
+          "address2": {"type": "string"},
+          "postcode": {"type": "string"},
+          "state": {"type": "string"},
+          "territory": {"type": "string"},
+          "telephone1": {"type": "string"},
+          "telephone2": {"type": "string"},
+          "email": {"type": "string"},
+          "customer_group": {"type": "string"},
+          "payment_type": {"type": "string"},
+          "payment_term": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "type": {"type": "string", "example": "SO"},
+          "reference_no": {"type": "string"},
+          "branch_id": {"type": "string"},
+          "customer_id": {"type": "string"},
+          "customer_code": {"type": "string"},
+          "customer_name": {"type": "string"},
+          "order_date": {"type": "string", "format": "date"},
+          "status": {"type": "string", "example": "pending"},
+          "gross_amount": {"type": "number"},
+          "tax1": {"type": "number"},
+          "tax1_percentage": {"type": "number"},
+          "grand_amount": {"type": "number"},
+          "net_amount": {"type": "number"},
+          "discount": {"type": "number"},
+          "remarks": {"type": "string"},
+          "items": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/OrderItem"}
+          },
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "unique_key": {"type": "string"},
+          "reference_no": {"type": "string"},
+          "order_id": {"type": "integer"},
+          "item_count": {"type": "integer"},
+          "product_id": {"type": "integer"},
+          "product_no": {"type": "string"},
+          "product_name": {"type": "string"},
+          "description": {"type": "string"},
+          "sku_code": {"type": "string"},
+          "quantity": {"type": "number"},
+          "unit_price": {"type": "number"},
+          "discount": {"type": "number"},
+          "amount": {"type": "number"},
+          "is_free_good": {"type": "boolean"},
+          "is_trade_return": {"type": "boolean"},
+          "trade_return_is_good": {"type": "boolean"},
+          "item_group": {"type": "string", "example": "Cash Sales"}
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "Id": {"type": "integer"},
+          "ProductName": {"type": "string"},
+          "Product_Id": {"type": "string"},
+          "Product_English_Name": {"type": "string"},
+          "sku_code": {"type": "string"},
+          "price": {"type": "number"}
+        }
+      }
+    }
+  }
+}
+

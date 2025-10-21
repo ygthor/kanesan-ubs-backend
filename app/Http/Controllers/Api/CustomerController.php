@@ -50,6 +50,7 @@ class CustomerController extends Controller
         $validator = Validator::make($request->all(), [
             'customer_code' => 'required|string|max:255|unique:customers,customer_code',
             'company_name' => 'required|string|max:255',
+            'company_name2' => 'nullable|string|max:255',
             'address1' => 'required|string|max:255',
             'address2' => 'nullable|string|max:255',
             'postcode' => 'nullable|string|max:20',
@@ -85,6 +86,7 @@ class CustomerController extends Controller
             $customer = Customer::create($request->only([
                 'customer_code',
                 'company_name',
+                'company_name2',
                 'address1',
                 'address2',
                 'postcode',
@@ -149,6 +151,7 @@ class CustomerController extends Controller
                 Rule::unique('customers')->ignore($customer->id),
             ],
             'company_name' => 'sometimes|required|string|max:255',
+            'company_name2' => 'sometimes|nullable|string|max:255',
             'address1' => 'sometimes|string|max:255', // Made 'sometimes' to allow partial updates
             'address2' => 'nullable|string|max:255',
             'postcode' => 'nullable|string|max:20',
@@ -184,6 +187,7 @@ class CustomerController extends Controller
             $customer->update($request->only([
                 'customer_code',
                 'company_name',
+                'company_name2',
                 'address1',
                 'address2',
                 'postcode',
