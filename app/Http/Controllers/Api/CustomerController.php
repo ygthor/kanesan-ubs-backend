@@ -63,6 +63,8 @@ class CustomerController extends Controller
      */
     public function store(Request $request)
     {
+        $user = auth()->user();
+        
         $validator = Validator::make($request->all(), [
             'customer_code' => 'required|string|max:255|unique:customers,customer_code',
             'company_name' => 'required|string|max:255',
@@ -131,7 +133,11 @@ class CustomerController extends Controller
 
             // Handle user assignment using many-to-many relationship
             if ($request->has('assigned_user_id') && $request->assigned_user_id) {
+                // Admin assigned a specific user
                 $customer->users()->attach($request->assigned_user_id);
+            } else {
+                // Automatically assign to the user who created the customer
+                $customer->users()->attach($user->id);
             }
 
             // Use custom response function for success
