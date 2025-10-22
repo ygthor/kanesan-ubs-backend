@@ -49,7 +49,7 @@ class CustomerController extends Controller
             }
         }
         
-        $customers = $query->get();
+        $customers = $query->with('users')->get();
         return makeResponse(200, 'Customers retrieved successfully.', $customers);
     }
 
@@ -89,6 +89,7 @@ class CustomerController extends Controller
             'payment_type' => 'nullable|string|max:255',
             'name' => 'nullable|string|max:255', // General name field if used
             'address' => 'nullable|string|max:1000', // General address field if used
+            'assigned_user_id' => 'nullable|integer|exists:users,id',
         ]);
 
         if ($validator->fails()) {
@@ -128,6 +129,11 @@ class CustomerController extends Controller
                 // and the fields sent from your Flutter "Detailed Form".
             ]));
 
+            // Handle user assignment using many-to-many relationship
+            if ($request->has('assigned_user_id') && $request->assigned_user_id) {
+                $customer->users()->attach($request->assigned_user_id);
+            }
+
             // Use custom response function for success
             return makeResponse(201, 'Customer created successfully.', $customer);
         } catch (\Exception $e) {
@@ -152,6 +158,7 @@ class CustomerController extends Controller
             return makeResponse(403, 'Access denied. You do not have permission to view this customer.', null);
         }
         
+        $customer->load('users');
         return makeResponse(200, 'Customer retrieved successfully.', $customer);
     }
 
@@ -203,6 +210,7 @@ class CustomerController extends Controller
             'payment_type' => 'sometimes|nullable|string|max:255',
             'name' => 'sometimes|nullable|string|max:255',
             'address' => 'sometimes|nullable|string|max:1000',
+            'assigned_user_id' => 'sometimes|nullable|integer|exists:users,id',
         ]);
 
         if ($validator->fails()) {
@@ -239,6 +247,18 @@ class CustomerController extends Controller
                 'name',
                 'address'
             ]));
+
+            // Handle user assignment using many-to-many relationship
+            if ($request->has('assigned_user_id')) {
+                if ($request->assigned_user_id) {
+                    // Sync the user assignment (replace existing assignments)
+                    $customer->users()->sync([$request->assigned_user_id]);
+                } else {
+                    // Remove all user assignments if assigned_user_id is null/empty
+                    $customer->users()->detach();
+                }
+            }
+
             // Use custom response function for success
             return makeResponse(200, 'Customer updated successfully.', $customer);
         } catch (\Exception $e) {

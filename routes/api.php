@@ -137,6 +137,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::any('/me', [UserController::class, 'info'])->name('user.info'); // Recommended array syntax
     // Route::get('/user', [UserController::class, 'info'])->name('user.info'); // This is redundant if /me is any HTTP verb
+    Route::get('/users', [UserController::class, 'list'])->name('users.list');
 
     Route::get('/dashboard', [DashboardController::class, 'getSummary'])->name('dashboard.summary');
 

@@ -104,6 +104,7 @@ class Customer extends Model
     }
 
 
+
     public static function fromCode($cpde){
         return self::where('customer_code',$cpde)->first();
 
