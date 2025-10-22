@@ -32,8 +32,24 @@ class CustomerController extends Controller
      */
     public function index(Request $request)
     {
-        $customers = Customer::orderBy('company_name', 'asc')->get();
-        // Use custom response function
+        $user = auth()->user();
+        
+        $query = Customer::orderBy('company_name', 'asc');
+        
+        // KBS user has full access to all customers
+        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            // No filtering needed for KBS user
+        } else {
+            // Filter by allowed customer IDs if middleware has set them
+            if ($request->has('allowed_customer_ids') && !empty($request->allowed_customer_ids)) {
+                $query->whereIn('id', $request->allowed_customer_ids);
+            } else {
+                // If no allowed customer IDs, return empty result
+                return makeResponse(200, 'No customers accessible.', []);
+            }
+        }
+        
+        $customers = $query->get();
         return makeResponse(200, 'Customers retrieved successfully.', $customers);
     }
 
@@ -129,7 +145,13 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
-        // Use custom response function
+        $user = auth()->user();
+        
+        // Check if user has access to this customer
+        if (!$this->userHasAccessToCustomer($user, $customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to view this customer.', null);
+        }
+        
         return makeResponse(200, 'Customer retrieved successfully.', $customer);
     }
 
@@ -142,6 +164,13 @@ class CustomerController extends Controller
      */
     public function update(Request $request, Customer $customer)
     {
+        $user = auth()->user();
+        
+        // Check if user has access to this customer
+        if (!$this->userHasAccessToCustomer($user, $customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to update this customer.', null);
+        }
+        
         $validator = Validator::make($request->all(), [
             'customer_code' => [
                 'sometimes',
@@ -227,6 +256,13 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
+        $user = auth()->user();
+        
+        // Check if user has access to this customer
+        if (!$this->userHasAccessToCustomer($user, $customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to delete this customer.', null);
+        }
+        
         try {
             $customer->delete();
             // Use custom response function for success, data can be null or an empty array
@@ -236,6 +272,28 @@ class CustomerController extends Controller
             // Use custom response function for server errors
             return makeResponse(500, 'Failed to delete customer.', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Check if user has access to a specific customer
+     *
+     * @param  \App\Models\User|null  $user
+     * @param  \App\Models\Customer  $customer
+     * @return bool
+     */
+    private function userHasAccessToCustomer($user, Customer $customer)
+    {
+        // KBS user has full access to all customers
+        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            return true;
+        }
+        
+        // Check if user is assigned to this customer
+        if ($user && $user->customers()->where('customers.id', $customer->id)->exists()) {
+            return true;
+        }
+        
+        return false;
     }
 
 }

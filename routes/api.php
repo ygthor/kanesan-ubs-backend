@@ -147,7 +147,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // GET      /api/customers/{customer}  -> customers.show    (CustomerController@show)
     // PUT/PATCH /api/customers/{customer} -> customers.update  (CustomerController@update)
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
-    Route::apiResource('customers', CustomerController::class);
+    Route::apiResource('customers', CustomerController::class)->middleware('filter.customer');
     
     Route::delete('/orders/{id}', [OrderController::class, 'deleteOrder']);
     Route::delete('/order-items/{id}', [OrderController::class, 'deleteOrderItem']);
@@ -163,7 +163,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('invoices', InvoiceController::class)->only(['index', 'store', 'update', 'show']);
     Route::apiResource('invoices-items', InvoiceItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
 
-    Route::get('/debts', [DebtController::class, 'index'])->name('debts.index');
+    Route::get('/debts', [DebtController::class, 'index'])->name('debts.index')->middleware('filter.customer');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
 
     // The route below for '/customer' (singular) pointing to index would be redundant

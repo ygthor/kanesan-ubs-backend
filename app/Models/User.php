@@ -90,6 +90,24 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the customers assigned to the user.
+     */
+    public function customers()
+    {
+        return $this->belongsToMany(Customer::class, 'user_customers', 'user_id', 'customer_id')
+            ->withPivot('created_at', 'updated_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the user-customer assignments.
+     */
+    public function userCustomers()
+    {
+        return $this->hasMany(UserCustomer::class);
+    }
+
+    /**
      * Check if the user has a specific role.
      */
     public function hasRole($role)

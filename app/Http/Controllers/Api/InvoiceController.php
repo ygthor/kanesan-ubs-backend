@@ -21,6 +21,8 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
+        $user = auth()->user();
+        
         $CUSTNO = $request->input('CUSTNO');
         $customerName = $request->input('customer_name');
         $startDate = $request->input('start_date');
@@ -34,6 +36,17 @@ class InvoiceController extends Controller
 
         // Start building the query on the Artran model
         $invoices = Artran::with('items', 'customer');
+        
+        // Filter by user's assigned customers (unless KBS user)
+        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
+            if (empty($allowedCustomerIds)) {
+                // User has no assigned customers, return empty result
+                return makeResponse(200, 'No invoices accessible.', $paginate ? ['data' => [], 'total' => 0] : []);
+            }
+            // Filter by customer IDs - assuming Artran has a customer_id field or CUSTNO field
+            $invoices->whereIn('CUSTNO', $user->customers()->pluck('customers.customer_code')->toArray());
+        }
 
         // Filter by customer name (using the 'NAME' column in 'artrans')
         if ($customerName) {
@@ -101,6 +114,8 @@ class InvoiceController extends Controller
      */
     private function saveInvoice(Request $request, $id = null)
     {
+        $user = auth()->user();
+        
         if ($id == null) {
             $validator = Validator::make($request->all(), [
                 'type' => 'required|string|max:3', // e.g., INV for Invoice, 
@@ -130,6 +145,11 @@ class InvoiceController extends Controller
             }
             if ($request->customer_id) {
                 $customer = Customer::find($request->customer_id);
+            }
+            
+            // Check if user has access to this customer
+            if (!$this->userHasAccessToCustomer($user, $customer)) {
+                return makeResponse(403, 'Access denied. You do not have permission to create/update invoices for this customer.', null);
             }
 
 
@@ -224,7 +244,14 @@ class InvoiceController extends Controller
      */
     public function show($id)
     {
+        $user = auth()->user();
         $invoice = Artran::with('items.item', 'customer')->findOrFail($id);
+        
+        // Check if user has access to this invoice's customer
+        if (!$this->userHasAccessToCustomer($user, $invoice->customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to view this invoice.', null);
+        }
+        
         return makeResponse(200, 'Invoice retrieved successfully.', $invoice);
     }
 
@@ -360,5 +387,27 @@ class InvoiceController extends Controller
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->stream("invoices_report_{$custNo}_{$startDate}_to_{$endDate}.pdf");
+    }
+
+    /**
+     * Check if user has access to a specific customer
+     *
+     * @param  \App\Models\User|null  $user
+     * @param  \App\Models\Customer  $customer
+     * @return bool
+     */
+    private function userHasAccessToCustomer($user, Customer $customer)
+    {
+        // KBS user has full access to all customers
+        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            return true;
+        }
+        
+        // Check if user is assigned to this customer
+        if ($user && $user->customers()->where('customers.id', $customer->id)->exists()) {
+            return true;
+        }
+        
+        return false;
     }
 }

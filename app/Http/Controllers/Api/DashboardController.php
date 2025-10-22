@@ -21,6 +21,8 @@ class DashboardController extends Controller
      */
     public function getSummary(Request $request)
     {
+        $user = auth()->user();
+        
         // Validate request parameters for date range
         $request->validate([
             'date_from' => 'nullable|date_format:Y-m-d',
@@ -32,40 +34,86 @@ class DashboardController extends Controller
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
 
-        // Note: The 'branchId' filter is not applied in these queries yet.
-        // You would add ->where('branch_id', $request->input('branchId')) to each query if applicable.
+        // Get user's allowed customer IDs (unless KBS user)
+        $allowedCustomerIds = null;
+        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
+            if (empty($allowedCustomerIds)) {
+                // User has no assigned customers, return empty dashboard
+                return makeResponse(200, 'Dashboard summary retrieved successfully.', [
+                    'totalRevenue' => 'RM 0.00',
+                    'nettSales' => 'RM 0.00',
+                    'totalCollections' => 'RM 0.00',
+                    'outstandingDebt' => 'RM 0.00',
+                    'inventoryValue' => 'RM 0.00',
+                    'invoicesIssued' => '0',
+                    'receiptsIssued' => '0',
+                    'newCustomers' => '0',
+                    'pendingOrders' => '0',
+                    'lowStockItems' => '0',
+                ]);
+            }
+        }
 
         // --- Calculations based on date range ---
 
         // Total Collections: Sum of all paid amounts from receipts in the date range.
-        $totalCollections = Receipt::whereBetween('receipt_date', [$dateFrom, $dateTo])->sum('paid_amount');
+        $totalCollectionsQuery = Receipt::whereBetween('receipt_date', [$dateFrom, $dateTo]);
+        if ($allowedCustomerIds) {
+            $totalCollectionsQuery->whereIn('customer_id', $allowedCustomerIds);
+        }
+        $totalCollections = $totalCollectionsQuery->sum('paid_amount');
 
         // Nett Sales / Revenue: Sum of completed/shipped order totals in the date range.
-        // This assumes 'completed' or 'shipped' are your final order statuses.
-        $nettSales = Order::whereIn('status', ['completed', 'shipped', 'processing']) // Adjust statuses as needed
-            ->whereBetween('order_date', [$dateFrom, $dateTo])
-            ->sum('net_amount');
+        $nettSalesQuery = Order::whereIn('status', ['completed', 'shipped', 'processing'])
+            ->whereBetween('order_date', [$dateFrom, $dateTo]);
+        if ($allowedCustomerIds) {
+            $nettSalesQuery->whereIn('customer_id', $allowedCustomerIds);
+        }
+        $nettSales = $nettSalesQuery->sum('net_amount');
 
         // Invoices Issued: Count of all orders in the date range.
-        $invoicesIssued = Order::whereBetween('order_date', [$dateFrom, $dateTo])->count();
+        $invoicesQuery = Order::whereBetween('order_date', [$dateFrom, $dateTo]);
+        if ($allowedCustomerIds) {
+            $invoicesQuery->whereIn('customer_id', $allowedCustomerIds);
+        }
+        $invoicesIssued = $invoicesQuery->count();
 
         // Receipts Issued: Count of all receipts in the date range.
-        $receiptsIssued = Receipt::whereBetween('receipt_date', [$dateFrom, $dateTo])->count();
+        $receiptsQuery = Receipt::whereBetween('receipt_date', [$dateFrom, $dateTo]);
+        if ($allowedCustomerIds) {
+            $receiptsQuery->whereIn('customer_id', $allowedCustomerIds);
+        }
+        $receiptsIssued = $receiptsQuery->count();
 
         // New Customers: Count of customers created in the date range.
-        $newCustomers = Customer::whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $newCustomersQuery = Customer::whereBetween('created_at', [$dateFrom, $dateTo]);
+        if ($allowedCustomerIds) {
+            $newCustomersQuery->whereIn('id', $allowedCustomerIds);
+        }
+        $newCustomers = $newCustomersQuery->count();
 
         // Pending Orders: Count of orders with a 'pending' status in the date range.
-        $pendingOrders = Order::where('status', 'pending')
-            ->whereBetween('order_date', [$dateFrom, $dateTo])
-            ->count();
+        $pendingOrdersQuery = Order::where('status', 'pending')
+            ->whereBetween('order_date', [$dateFrom, $dateTo]);
+        if ($allowedCustomerIds) {
+            $pendingOrdersQuery->whereIn('customer_id', $allowedCustomerIds);
+        }
+        $pendingOrders = $pendingOrdersQuery->count();
 
         // --- Calculations NOT based on date range (total/current values) ---
 
         // Outstanding Debt: A simplified calculation of total order amounts minus total collections.
-        // A more complex ledger system would be needed for perfect accuracy.
-        $totalOrderedAmount = Order::sum('net_amount');
-        $totalCollectedAmount = Receipt::sum('paid_amount');
+        $totalOrderedQuery = Order::query();
+        $totalCollectedQuery = Receipt::query();
+        
+        if ($allowedCustomerIds) {
+            $totalOrderedQuery->whereIn('customer_id', $allowedCustomerIds);
+            $totalCollectedQuery->whereIn('customer_id', $allowedCustomerIds);
+        }
+        
+        $totalOrderedAmount = $totalOrderedQuery->sum('net_amount');
+        $totalCollectedAmount = $totalCollectedQuery->sum('paid_amount');
         $outstandingDebt = $totalOrderedAmount - $totalCollectedAmount;
 
         // Inventory Value: Total value of all products in stock. Requires `CurrentStock` column.

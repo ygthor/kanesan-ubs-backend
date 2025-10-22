@@ -17,6 +17,8 @@ class DebtController extends Controller
      */
     public function index(Request $request)
     {
+        $user = auth()->user();
+        
         $request->validate([
             'search' => 'nullable|string|max:255',
         ]);
@@ -25,6 +27,19 @@ class DebtController extends Controller
 
         // Start querying customers
         $customersQuery = Customer::query();
+
+        // KBS user has full access to all customers
+        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            // No filtering needed for KBS user
+        } else {
+            // Filter by allowed customer IDs if middleware has set them
+            if ($request->has('allowed_customer_ids') && !empty($request->allowed_customer_ids)) {
+                $customersQuery->whereIn('id', $request->allowed_customer_ids);
+            } else {
+                // If no allowed customer IDs, return empty result
+                return makeResponse(200, 'No customers accessible.', []);
+            }
+        }
 
         // If a search term is provided, filter customers by code or name
         if ($searchTerm) {

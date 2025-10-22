@@ -85,6 +85,24 @@ class Customer extends Model
         return $this->hasMany(Order::class);
     }
 
+    /**
+     * Get the users assigned to this customer.
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'user_customers', 'customer_id', 'user_id')
+            ->withPivot('created_at', 'updated_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the user-customer assignments for this customer.
+     */
+    public function userCustomers()
+    {
+        return $this->hasMany(UserCustomer::class);
+    }
+
 
     public static function fromCode($cpde){
         return self::where('customer_code',$cpde)->first();

@@ -15,9 +15,22 @@ class ReceiptController extends Controller
      */
     public function index(Request $request)
     {
-        $receipts = Receipt::with('customer:id,customer_code,company_name') // Eager load customer info
-                         ->orderBy('receipt_date', 'desc')
-                         ->paginate($request->input('per_page', 15));
+        $user = auth()->user();
+        
+        $receiptsQuery = Receipt::with('customer:id,customer_code,company_name');
+        
+        // Filter by user's assigned customers (unless KBS user)
+        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
+            if (empty($allowedCustomerIds)) {
+                // User has no assigned customers, return empty result
+                return makeResponse(200, 'No receipts accessible.', ['data' => [], 'total' => 0]);
+            }
+            $receiptsQuery->whereIn('customer_id', $allowedCustomerIds);
+        }
+        
+        $receipts = $receiptsQuery->orderBy('receipt_date', 'desc')
+                                 ->paginate($request->input('per_page', 15));
 
         return makeResponse(200, 'Receipts retrieved successfully.', $receipts);
     }
@@ -47,6 +60,13 @@ class ReceiptController extends Controller
             return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
         }
 
+        // Check if user has access to this customer
+        $user = auth()->user();
+        $customer = \App\Models\Customer::find($request->customer_id);
+        if (!$this->userHasAccessToCustomer($user, $customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to create receipts for this customer.', null);
+        }
+
         try {
             $receipt = Receipt::create($validator->validated());
             return makeResponse(201, 'Receipt created successfully.', $receipt);
@@ -61,6 +81,13 @@ class ReceiptController extends Controller
      */
     public function show(Receipt $receipt)
     {
+        $user = auth()->user();
+        
+        // Check if user has access to this receipt's customer
+        if (!$this->userHasAccessToCustomer($user, $receipt->customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to view this receipt.', null);
+        }
+        
         $receipt->load('customer'); // Load related customer
         return makeResponse(200, 'Receipt retrieved successfully.', $receipt);
     }
@@ -111,5 +138,27 @@ class ReceiptController extends Controller
             // Log::error('Receipt deletion failed: ' . $e->getMessage());
             return makeResponse(500, 'Failed to delete receipt.', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Check if user has access to a specific customer
+     *
+     * @param  \App\Models\User|null  $user
+     * @param  \App\Models\Customer  $customer
+     * @return bool
+     */
+    private function userHasAccessToCustomer($user, Customer $customer)
+    {
+        // KBS user has full access to all customers
+        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            return true;
+        }
+        
+        // Check if user is assigned to this customer
+        if ($user && $user->customers()->where('customers.id', $customer->id)->exists()) {
+            return true;
+        }
+        
+        return false;
     }
 }

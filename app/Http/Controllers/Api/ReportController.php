@@ -11,6 +11,8 @@ class ReportController extends Controller
 {
     public function businessSummary(Request $request)
     {
+        $user = auth()->user();
+        
         $fromDate = $request->input('from_date');
         $toDate   = $request->input('to_date');
 
@@ -21,54 +23,90 @@ class ReportController extends Controller
             $toDate = date('Y-m-d');
         }
 
-
         if (!$fromDate || !$toDate) {
             return response()->json(['error' => 'from_date and to_date are required'], 422);
+        }
+        
+        // Get user's allowed customer codes (unless KBS user)
+        $allowedCustomerCodes = null;
+        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            $allowedCustomerCodes = $user->customers()->pluck('customers.customer_code')->toArray();
+            if (empty($allowedCustomerCodes)) {
+                // User has no assigned customers, return empty report
+                return makeResponse(200, 'Business summary retrieved successfully.', [
+                    'totalSales' => 0,
+                    'nettSales' => 0,
+                    'collections' => 0,
+                    'outstandingDebt' => 0,
+                    'invoicesIssued' => 0,
+                    'receiptsIssued' => 0,
+                ]);
+            }
         }
 
         // Example tables: invoices, receipts (adjust to your schema!)
 
         // --- Sales ---
-        $caSales = DB::table('artrans')
+        $caSalesQuery = DB::table('artrans')
             ->whereBetween('DATE', [$fromDate, $toDate])
-            ->where('TYPE', 'CS')
-            ->sum('NET_BIL');
+            ->where('TYPE', 'CS');
+        if ($allowedCustomerCodes) {
+            $caSalesQuery->whereIn('CUSTNO', $allowedCustomerCodes);
+        }
+        $caSales = $caSalesQuery->sum('NET_BIL');
 
-        $crSales = DB::table('artrans')
+        $crSalesQuery = DB::table('artrans')
             ->whereBetween('DATE', [$fromDate, $toDate])
-            ->where('TYPE', 'INV')
-            ->sum('NET_BIL');
+            ->where('TYPE', 'INV');
+        if ($allowedCustomerCodes) {
+            $crSalesQuery->whereIn('CUSTNO', $allowedCustomerCodes);
+        }
+        $crSales = $crSalesQuery->sum('NET_BIL');
 
         $totalSales = $caSales + $crSales;
 
-        $returns = DB::table('artrans')
+        $returnsQuery = DB::table('artrans')
             ->whereBetween('DATE', [$fromDate, $toDate])
-            ->where('TYPE', 'CN')
-            ->sum('NET_BIL');
+            ->where('TYPE', 'CN');
+        if ($allowedCustomerCodes) {
+            $returnsQuery->whereIn('CUSTNO', $allowedCustomerCodes);
+        }
+        $returns = $returnsQuery->sum('NET_BIL');
 
         $nettSales = $totalSales - $returns;
 
         // --- Collections ---
-        $totalCrCollect = DB::table('receipts')
+        $totalCrCollectQuery = DB::table('receipts')
             ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Card')
-            ->sum('paid_amount');
+            ->where('payment_type', 'Card');
+        if ($allowedCustomerCodes) {
+            $totalCrCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
+        }
+        $totalCrCollect = $totalCrCollectQuery->sum('paid_amount');
 
-        $totalCashCollect = DB::table('receipts')
+        $totalCashCollectQuery = DB::table('receipts')
             ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Cash')
-            ->sum('paid_amount');
+            ->where('payment_type', 'Cash');
+        if ($allowedCustomerCodes) {
+            $totalCashCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
+        }
+        $totalCashCollect = $totalCashCollectQuery->sum('paid_amount');
 
-
-        $totalBankCollect = DB::table('receipts')
+        $totalBankCollectQuery = DB::table('receipts')
             ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Online Transfer')
-            ->sum('paid_amount');
+            ->where('payment_type', 'Online Transfer');
+        if ($allowedCustomerCodes) {
+            $totalBankCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
+        }
+        $totalBankCollect = $totalBankCollectQuery->sum('paid_amount');
 
-        $chequeCollect = DB::table('receipts')
+        $chequeCollectQuery = DB::table('receipts')
             ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Cheque')
-            ->sum('paid_amount');
+            ->where('payment_type', 'Cheque');
+        if ($allowedCustomerCodes) {
+            $chequeCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
+        }
+        $chequeCollect = $chequeCollectQuery->sum('paid_amount');
 
 
         $totalCollection = $totalCrCollect + $totalCashCollect + $chequeCollect + $totalBankCollect;

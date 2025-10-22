@@ -18,6 +18,8 @@ class GlStatementController extends Controller
      */
     public function index(Request $request)
     {
+        $user = auth()->user();
+        
         // Validate that a customer number is provided
         $validator = Validator::make($request->all(), [
             'CUSTNO' => 'required|string|max:255',
@@ -28,6 +30,16 @@ class GlStatementController extends Controller
         }
 
         $customerCode = $request->query('CUSTNO');
+        
+        // Check if user has access to this customer
+        $customer = Customer::where('customer_code', $customerCode)->first();
+        if (!$customer) {
+            return makeResponse(404, 'Customer not found.', null);
+        }
+        
+        if (!$this->userHasAccessToCustomer($user, $customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to view this customer\'s GL statement.', null);
+        }
 
         // IMPORTANT: Replace 'gldata' with your actual table name for General Ledger data.
         // IMPORTANT: Replace 'ACCNO' with the actual column name that stores the customer code.
@@ -137,5 +149,27 @@ class GlStatementController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to update GL entry.', 'message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Check if user has access to a specific customer
+     *
+     * @param  \App\Models\User|null  $user
+     * @param  \App\Models\Customer  $customer
+     * @return bool
+     */
+    private function userHasAccessToCustomer($user, Customer $customer)
+    {
+        // KBS user has full access to all customers
+        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            return true;
+        }
+        
+        // Check if user is assigned to this customer
+        if ($user && $user->customers()->where('customers.id', $customer->id)->exists()) {
+            return true;
+        }
+        
+        return false;
     }
 }

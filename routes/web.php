@@ -28,6 +28,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // User Management
     Route::resource('users', \App\Http\Controllers\Admin\UserManagementController::class);
     
+    // User Customer Assignment Management (user-centric)
+    Route::get('users/{user}/customers', [\App\Http\Controllers\UserCustomerController::class, 'userCustomers'])->name('users.customers');
+    Route::post('users/{user}/customers', [\App\Http\Controllers\UserCustomerController::class, 'storeUserCustomers'])->name('users.customers.store');
+    Route::delete('users/{user}/customers/{userCustomer}', [\App\Http\Controllers\UserCustomerController::class, 'destroyUserCustomer'])->name('users.customers.destroy');
+    
     // Role Management (to be implemented)
     Route::resource('roles', \App\Http\Controllers\Admin\RoleManagementController::class);
     

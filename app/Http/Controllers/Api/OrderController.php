@@ -20,6 +20,8 @@ class OrderController extends Controller
      */
     public function index(Request $request)
     {
+        $user = auth()->user();
+        
         // Retrieve all filter parameters from the request
         $customerId = $request->input('customer_id');
         $customerCode = $request->input('customer_code');
@@ -35,6 +37,16 @@ class OrderController extends Controller
 
         // Start building the query
         $orders = Order::with('items', 'customer');
+        
+        // Filter by user's assigned customers (unless KBS user)
+        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
+            if (empty($allowedCustomerIds)) {
+                // User has no assigned customers, return empty result
+                return makeResponse(200, 'No orders accessible.', $paginate ? ['data' => [], 'total' => 0] : []);
+            }
+            $orders->whereIn('customer_id', $allowedCustomerIds);
+        }
 
         // --- Apply filters conditionally ---
 
@@ -225,6 +237,13 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
+        $user = auth()->user();
+        
+        // Check if user has access to this order's customer
+        if (!$this->userHasAccessToCustomer($user, $order->customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to view this order.', null);
+        }
+        
         // Load items and customer relationship for detailed view
         $order->load('items.product', 'customer');
         return makeResponse(200, 'Order retrieved successfully.', $order);
@@ -233,10 +252,17 @@ class OrderController extends Controller
 
     public function deleteOrder($id)
     {
+        $user = auth()->user();
+        
         try {
             DB::beginTransaction();
 
-            $order = Order::with('items')->findOrFail($id);
+            $order = Order::with('items', 'customer')->findOrFail($id);
+            
+            // Check if user has access to this order's customer
+            if (!$this->userHasAccessToCustomer($user, $order->customer)) {
+                return makeResponse(403, 'Access denied. You do not have permission to delete this order.', null);
+            }
 
             // Delete all items
             $order->items()->delete();
@@ -251,5 +277,27 @@ class OrderController extends Controller
             \Log::error('Failed to delete order: ' . $e->getMessage());
             return makeResponse(500, 'Failed to delete order.', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Check if user has access to a specific customer
+     *
+     * @param  \App\Models\User|null  $user
+     * @param  \App\Models\Customer  $customer
+     * @return bool
+     */
+    private function userHasAccessToCustomer($user, Customer $customer)
+    {
+        // KBS user has full access to all customers
+        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+            return true;
+        }
+        
+        // Check if user is assigned to this customer
+        if ($user && $user->customers()->where('customers.id', $customer->id)->exists()) {
+            return true;
+        }
+        
+        return false;
     }
 }

@@ -90,6 +90,12 @@
                                title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
+                            <a href="{{ route('admin.users.customers', $user->id) }}" 
+                               class="btn btn-success btn-sm" 
+                               data-toggle="tooltip" 
+                               title="Manage Customer Assignments">
+                                <i class="fas fa-users-cog"></i>
+                            </a>
                             <form method="POST" action="{{ route('admin.users.destroy', $user->id) }}" 
                                   style="display: inline;" class="d-inline">
                                 @csrf

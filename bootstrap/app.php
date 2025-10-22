@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register permission middleware
         $middleware->alias([
             'permission' => \App\Http\Middleware\CheckPermission::class,
+            'filter.customer' => \App\Http\Middleware\FilterCustomerData::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

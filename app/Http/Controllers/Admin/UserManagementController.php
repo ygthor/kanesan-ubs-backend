@@ -8,7 +8,7 @@ use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-
+use DB;
 class UserManagementController extends Controller
 {
     /**
@@ -102,7 +102,22 @@ class UserManagementController extends Controller
         }
 
         if ($request->has('roles')) {
-            $user->roles()->sync($request->roles);
+            $roles = $request->roles; // e.g. ['admin', 'user', 'editor']
+
+            // Delete existing roles
+            DB::table('user_roles')->where('user_id', $user->id)->delete();
+
+            // Insert new roles
+            
+            foreach ($roles as $roleId) {
+                $insertData = [
+                    'user_id' => $user->id,
+                    'role_id' => $roleId, // string OK
+                ];
+                
+                DB::table('user_roles')->insert($insertData);
+            }
+            
         }
 
         return redirect()->route('admin.users.index')
