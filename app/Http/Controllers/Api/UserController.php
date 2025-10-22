@@ -13,7 +13,12 @@ class UserController extends Controller
 
     public function info(Request $request){
         $user = $request->user();  // This assumes authentication is handled via Sanctum or JWT
-        return makeResponse(200,'success',$user);
+        
+        // Add admin status to user data
+        $userData = $user->toArray();
+        $userData['is_admin'] = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
+        
+        return makeResponse(200,'success',$userData);
     }
 
     /**
