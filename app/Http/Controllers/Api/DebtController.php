@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Artran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class DebtController extends Controller
 {
     /**
-     * Retrieve a list of customers with their outstanding debts (pending/postponed orders).
+     * Retrieve a list of customers with their outstanding debts (invoices with type = INV).
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
@@ -49,31 +50,31 @@ class DebtController extends Controller
             });
         }
 
-        // Eager load only the relevant orders (pending or postponed)
-        $customersWithDebts = $customersQuery->with(['orders' => function ($query) {
-            $query->whereIn('status', ['pending', 'postponed'])
-                  ->orderBy('order_date', 'asc'); // Order debts by date
+        // Eager load only the relevant invoices (TYPE = 'INV')
+        $customersWithDebts = $customersQuery->with(['artrans' => function ($query) {
+            $query->where('TYPE', 'INV')
+                  ->orderBy('DATE', 'asc'); // Order debts by date
         }])->get();
 
         // Transform the data to match the Flutter UI's expected structure
         $formattedData = $customersWithDebts->map(function ($customer) {
             
-            // Map the orders to the 'debtItems' structure
-            $debtItems = $customer->orders->map(function ($order) use ($customer) {
+            // Map the invoices to the 'debtItems' structure
+            $debtItems = $customer->artrans->map(function ($invoice) use ($customer) {
                 
-                // Simple logic to calculate due date based on a payment term string
-                $dueDate = $this->calculateDueDate($order->order_date, $customer->payment_term);
+                // Calculate due date based on payment term
+                $dueDate = $this->calculateDueDate($invoice->DATE, $customer->payment_term);
 
                 return [
-                    'salesNo' => 'ORD-' . str_pad($order->id, 5, '0', STR_PAD_LEFT), // Example: ORD-00001
-                    'salesDate' => $order->order_date->toIso8601String(),
+                    'salesNo' => $invoice->REFNO, // Invoice reference number
+                    'salesDate' => $invoice->DATE->toIso8601String(),
                     'paymentType' => $customer->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $customer->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toIso8601String(),
-                    'outstandingAmount' => (float) $order->net_amount,
-                    'salesAmount' => (float) $order->net_amount, // Sales amount is same as net amount
-                    'creditAmount' => 0.0, // Credit amount - can be calculated based on payments made
-                    'currency' => 'RM', // Example currency
+                    'outstandingAmount' => (float) $invoice->NET_BIL, // Net amount outstanding
+                    'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
+                    'creditAmount' => (float) $invoice->CREDIT_BIL, // Credit amount if any
+                    'currency' => 'RM', // Default currency
                 ];
             });
 
@@ -82,7 +83,7 @@ class DebtController extends Controller
                 'outletsCode' => $customer->customer_code, // Outlets code is same as customer code
                 'companyName' => $customer->company_name,
                 'debtItems' => $debtItems,
-                'totalOutstandingAmount' => $customer->orders->sum('net_amount'),
+                'totalOutstandingAmount' => $customer->artrans->sum('NET_BIL'),
             ];
         });
 

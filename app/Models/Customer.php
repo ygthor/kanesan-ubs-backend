@@ -86,6 +86,15 @@ class Customer extends Model
     }
 
     /**
+     * Get the invoices (artrans) for this customer.
+     * The foreign key on 'artrans' is 'CUSTNO', the local key is 'customer_code'.
+     */
+    public function artrans()
+    {
+        return $this->hasMany(Artran::class, 'CUSTNO', 'customer_code');
+    }
+
+    /**
      * Get the users assigned to this customer.
      */
     public function users()
