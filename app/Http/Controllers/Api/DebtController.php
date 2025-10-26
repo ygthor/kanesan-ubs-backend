@@ -50,8 +50,10 @@ class DebtController extends Controller
             });
         }
 
-        // Eager load only the relevant invoices (TYPE = 'INV')
-        $customersWithDebts = $customersQuery->with(['artrans' => function ($query) {
+        // Only get customers who have invoices (TYPE = 'INV')
+        $customersWithDebts = $customersQuery->whereHas('artrans', function ($query) {
+            $query->where('TYPE', 'INV');
+        })->with(['artrans' => function ($query) {
             $query->where('TYPE', 'INV')
                   ->orderBy('DATE', 'asc'); // Order debts by date
         }])->get();
