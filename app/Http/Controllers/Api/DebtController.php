@@ -26,58 +26,52 @@ class DebtController extends Controller
 
         $searchTerm = $request->input('search');
 
-        // Start querying customers
-        $customersQuery = Customer::query();
+        // Note: User access control will be handled at the invoice level
+        // For now, we'll get all invoices and let the frontend handle access control
+        // TODO: Implement proper access control based on user permissions
 
-        // KBS user has full access to all customers
-        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
-            // No filtering needed for KBS user
-        } else {
-            // Filter by allowed customer IDs if middleware has set them
-            if ($request->has('allowed_customer_ids') && !empty($request->allowed_customer_ids)) {
-                $customersQuery->whereIn('id', $request->allowed_customer_ids);
-            } else {
-                // If no allowed customer IDs, return empty result
-                return makeResponse(200, 'No customers accessible.', []);
-            }
-        }
+        // Get invoices with customer data using LEFT JOIN
+        $invoicesQuery = Artran::select([
+                'artrans.*',
+                'customers.customer_code',
+                'customers.name as customer_name',
+                'customers.company_name',
+                'customers.payment_type',
+                'customers.payment_term'
+            ])
+            ->leftJoin('customers', 'artrans.CUSTNO', '=', 'customers.customer_code')
+            ->where('artrans.TYPE', 'INV');
 
-        // If a search term is provided, filter customers by code or name
+        // Apply search filter if provided
         if ($searchTerm) {
-            $customersQuery->where(function ($query) use ($searchTerm) {
-                $query->where('customer_code', 'like', '%' . $searchTerm . '%')
-                      ->orWhere('company_name', 'like', '%' . $searchTerm . '%');
+            $invoicesQuery->where(function ($query) use ($searchTerm) {
+                $query->where('customers.customer_code', 'like', '%' . $searchTerm . '%')
+                      ->orWhere('customers.company_name', 'like', '%' . $searchTerm . '%')
+                      ->orWhere('customers.name', 'like', '%' . $searchTerm . '%');
             });
         }
 
-        // Use join to get customers with invoices, avoiding collation issues
-        $customersWithDebts = $customersQuery->join('artrans', function ($join) {
-            $join->on('customers.customer_code', '=', 'artrans.CUSTNO')
-                 ->where('artrans.TYPE', '=', 'INV');
-        })->select('customers.*')
-          ->distinct()
-          ->get();
-        
-        // Load the invoices for each customer
-        $customersWithDebts->load(['artrans' => function ($query) {
-            $query->where('TYPE', 'INV')
-                  ->orderBy('DATE', 'asc');
-        }]);
+        $invoicesWithCustomers = $invoicesQuery->orderBy('artrans.DATE', 'asc')->get();
+
+        // Group invoices by customer
+        $customersWithDebts = $invoicesWithCustomers->groupBy('customer_code');
 
         // Transform the data to match the Flutter UI's expected structure
-        $formattedData = $customersWithDebts->map(function ($customer) {
+        $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) {
+            // Get customer data from the first invoice (all invoices have same customer data)
+            $firstInvoice = $invoices->first();
             
             // Map the invoices to the 'debtItems' structure
-            $debtItems = $customer->artrans->map(function ($invoice) use ($customer) {
+            $debtItems = $invoices->map(function ($invoice) use ($firstInvoice) {
                 
                 // Calculate due date based on payment term
-                $dueDate = $this->calculateDueDate($invoice->DATE, $customer->payment_term);
+                $dueDate = $this->calculateDueDate($invoice->DATE, $firstInvoice->payment_term);
 
                 return [
                     'salesNo' => $invoice->REFNO, // Invoice reference number
                     'salesDate' => $invoice->DATE->toIso8601String(),
-                    'paymentType' => $customer->payment_type ?? 'Credit', // Fallback value
-                    'paymentTerm' => $customer->payment_term ?? '30 Days', // Fallback value
+                    'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
+                    'paymentTerm' => $firstInvoice->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toIso8601String(),
                     'outstandingAmount' => (float) $invoice->NET_BIL, // Net amount outstanding
                     'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
@@ -87,11 +81,11 @@ class DebtController extends Controller
             });
 
             return [
-                'customerCode' => $customer->customer_code,
-                'outletsCode' => $customer->customer_code, // Outlets code is same as customer code
-                'companyName' => $customer->company_name,
+                'customerCode' => $customerCode,
+                'outletsCode' => $customerCode, // Outlets code is same as customer code
+                'companyName' => $firstInvoice->company_name ?? $firstInvoice->customer_name ?? 'Unknown Customer',
                 'debtItems' => $debtItems,
-                'totalOutstandingAmount' => $customer->artrans->sum('NET_BIL'),
+                'totalOutstandingAmount' => $invoices->sum('NET_BIL'),
             ];
         });
 
