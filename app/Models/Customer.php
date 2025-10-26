@@ -95,6 +95,15 @@ class Customer extends Model
     }
 
     /**
+     * Get invoices with explicit collation handling
+     */
+    public function invoices()
+    {
+        return $this->hasMany(Artran::class, 'CUSTNO', 'customer_code')
+            ->where('TYPE', 'INV');
+    }
+
+    /**
      * Get the users assigned to this customer.
      */
     public function users()

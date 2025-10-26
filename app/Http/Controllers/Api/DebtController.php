@@ -50,13 +50,19 @@ class DebtController extends Controller
             });
         }
 
-        // Only get customers who have invoices (TYPE = 'INV')
-        $customersWithDebts = $customersQuery->whereHas('artrans', function ($query) {
-            $query->where('TYPE', 'INV');
-        })->with(['artrans' => function ($query) {
+        // Use join to get customers with invoices, avoiding collation issues
+        $customersWithDebts = $customersQuery->join('artrans', function ($join) {
+            $join->on('customers.customer_code', '=', 'artrans.CUSTNO')
+                 ->where('artrans.TYPE', '=', 'INV');
+        })->select('customers.*')
+          ->distinct()
+          ->get();
+        
+        // Load the invoices for each customer
+        $customersWithDebts->load(['artrans' => function ($query) {
             $query->where('TYPE', 'INV')
-                  ->orderBy('DATE', 'asc'); // Order debts by date
-        }])->get();
+                  ->orderBy('DATE', 'asc');
+        }]);
 
         // Transform the data to match the Flutter UI's expected structure
         $formattedData = $customersWithDebts->map(function ($customer) {
