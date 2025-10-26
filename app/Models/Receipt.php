@@ -27,6 +27,7 @@ class Receipt extends Model
         'paid_amount',
         'cheque_no',
         'cheque_type',
+        'cheque_date',
         'bank_name',
         'payment_reference_no',
     ];
@@ -38,6 +39,7 @@ class Receipt extends Model
      */
     protected $casts = [
         'receipt_date' => 'datetime',
+        'cheque_date' => 'datetime',
         'debt_amount' => 'decimal:2',
         'transaction_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',

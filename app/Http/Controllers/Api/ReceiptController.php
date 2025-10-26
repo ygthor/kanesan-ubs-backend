@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Receipt;
+use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -51,9 +52,10 @@ class ReceiptController extends Controller
             'transaction_amount' => 'required|numeric|min:0',
             'paid_amount' => 'required|numeric|min:0',
             'payment_reference_no' => 'nullable|string|max:255',
-            'cheque_no' => 'nullable|required_if:payment_type,Cheque|string|max:255',
-            'cheque_type' => 'nullable|required_if:payment_type,Cheque|string|max:255',
-            'bank_name' => 'nullable|required_if:payment_type,Cheque|string|max:255',
+            'cheque_no' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
+            'cheque_type' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
+            'cheque_date' => 'nullable|required_if:payment_type,CHEQUE|date',
+            'bank_name' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -108,9 +110,10 @@ class ReceiptController extends Controller
             'transaction_amount' => 'sometimes|required|numeric|min:0',
             'paid_amount' => 'sometimes|required|numeric|min:0',
             'payment_reference_no' => 'nullable|string|max:255',
-            'cheque_no' => 'nullable|required_if:payment_type,Cheque|string|max:255',
-            'cheque_type' => 'nullable|required_if:payment_type,Cheque|string|max:255',
-            'bank_name' => 'nullable|required_if:payment_type,Cheque|string|max:255',
+            'cheque_no' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
+            'cheque_type' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
+            'cheque_date' => 'nullable|required_if:payment_type,CHEQUE|date',
+            'bank_name' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -147,7 +150,7 @@ class ReceiptController extends Controller
      * @param  \App\Models\Customer  $customer
      * @return bool
      */
-    private function userHasAccessToCustomer($user, Customer $customer)
+    private function userHasAccessToCustomer($user, \App\Models\Customer $customer)
     {
         // KBS user has full access to all customers
         if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
