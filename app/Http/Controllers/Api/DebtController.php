@@ -53,18 +53,12 @@ class DebtController extends Controller
 
         $invoicesWithCustomers = $invoicesQuery->orderBy('artrans.DATE', 'asc')->get();
 
-        // Debug: Log the number of invoices found
-        \Log::info('DebtController: Found ' . $invoicesWithCustomers->count() . ' invoices');
-
         // Filter out invoices without customer data and group by customer
         $customersWithDebts = $invoicesWithCustomers
             ->filter(function ($invoice) {
                 return !empty($invoice->customer_code);
             })
             ->groupBy('customer_code');
-
-        // Debug: Log the number of customers found
-        \Log::info('DebtController: Found ' . $customersWithDebts->count() . ' customers with invoices');
 
         // Transform the data to match the Flutter UI's expected structure
         $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) {
@@ -99,13 +93,7 @@ class DebtController extends Controller
             ];
         });
 
-        $result = $formattedData->values()->toArray();
-        
-        // Debug: Log the final result structure
-        \Log::info('DebtController: Final result count: ' . count($result));
-        \Log::info('DebtController: Sample result: ' . json_encode(array_slice($result, 0, 1)));
-        
-        return makeResponse(200, 'Customer debts retrieved successfully.', $result);
+        return makeResponse(200, 'Customer debts retrieved successfully.', $formattedData->values()->toArray());
     }
 
     /**
