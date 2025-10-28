@@ -20,6 +20,14 @@ class ReceiptController extends Controller
         
         $receiptsQuery = Receipt::with('customer:id,customer_code,company_name');
         
+        // Debug logging for filter parameters
+        \Log::info('Receipt filter parameters:', [
+            'customer_id' => $request->input('customer_id'),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+            'per_page' => $request->input('per_page', 15),
+        ]);
+        
         // Filter by user's assigned customers (unless KBS user)
         if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
             $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
@@ -30,8 +38,27 @@ class ReceiptController extends Controller
             $receiptsQuery->whereIn('customer_id', $allowedCustomerIds);
         }
         
+        // Apply customer filter if provided
+        if ($request->has('customer_id') && $request->customer_id) {
+            $receiptsQuery->where('customer_id', $request->customer_id);
+            \Log::info('Applied customer filter:', ['customer_id' => $request->customer_id]);
+        }
+        
+        // Apply date range filters if provided
+        if ($request->has('date_from') && $request->date_from) {
+            $receiptsQuery->whereDate('receipt_date', '>=', $request->date_from);
+            \Log::info('Applied date_from filter:', ['date_from' => $request->date_from]);
+        }
+        
+        if ($request->has('date_to') && $request->date_to) {
+            $receiptsQuery->whereDate('receipt_date', '<=', $request->date_to);
+            \Log::info('Applied date_to filter:', ['date_to' => $request->date_to]);
+        }
+        
         $receipts = $receiptsQuery->orderBy('receipt_date', 'desc')
                                  ->paginate($request->input('per_page', 15));
+
+        \Log::info('Receipt query result count:', ['count' => $receipts->count()]);
 
         return makeResponse(200, 'Receipts retrieved successfully.', $receipts);
     }
