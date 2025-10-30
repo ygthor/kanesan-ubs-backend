@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\Artran;
 use App\Models\Product;
 use App\Models\Receipt;
 use Illuminate\Http\Request;
@@ -64,18 +65,31 @@ class DashboardController extends Controller
         }
         $totalCollections = $totalCollectionsQuery->sum('paid_amount');
 
-        // Nett Sales / Revenue: Sum of completed/shipped order totals in the date range.
-        $nettSalesQuery = Order::whereIn('status', ['completed', 'shipped', 'processing'])
-            ->whereBetween('order_date', [$dateFrom, $dateTo]);
+        // Revenue: Sum of invoice grand amounts (gross + tax) in the date range.
+        $revenueQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
+            ->whereIn('TYPE', ['INV','CB','CS','DN']);
         if ($allowedCustomerIds) {
-            $nettSalesQuery->whereIn('customer_id', $allowedCustomerIds);
+            // Map allowed customer ids to customer codes if needed; if Customer has customer_code matching Artran CUSTNO
+            $customerCodes = Customer::whereIn('id', $allowedCustomerIds)->pluck('customer_code');
+            $revenueQuery->whereIn('CUSTNO', $customerCodes);
         }
-        $nettSales = $nettSalesQuery->sum('net_amount');
+        $revenue = $revenueQuery->sum('GRAND_BIL');
 
-        // Invoices Issued: Count of all orders in the date range.
-        $invoicesQuery = Order::whereBetween('order_date', [$dateFrom, $dateTo]);
+        // Nett Sales: Sum of invoice net amounts (after discount) in the date range.
+        $nettSalesQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
+            ->whereIn('TYPE', ['INV','CB','CS','DN']);
         if ($allowedCustomerIds) {
-            $invoicesQuery->whereIn('customer_id', $allowedCustomerIds);
+            $customerCodes = Customer::whereIn('id', $allowedCustomerIds)->pluck('customer_code');
+            $nettSalesQuery->whereIn('CUSTNO', $customerCodes);
+        }
+        $nettSales = $nettSalesQuery->sum('NET_BIL');
+
+        // Invoices Issued: Count of invoices in the date range.
+        $invoicesQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
+            ->whereIn('TYPE', ['INV','CB','CS','DN']);
+        if ($allowedCustomerIds) {
+            $customerCodes = Customer::whereIn('id', $allowedCustomerIds)->pluck('customer_code');
+            $invoicesQuery->whereIn('CUSTNO', $customerCodes);
         }
         $invoicesIssued = $invoicesQuery->count();
 
@@ -126,7 +140,7 @@ class DashboardController extends Controller
 
         // Prepare the data payload
         $data = [
-            'totalRevenue' => 'RM ' . number_format($nettSales, 2),
+            'totalRevenue' => 'RM ' . number_format($revenue, 2),
             'nettSales' => 'RM ' . number_format($nettSales, 2),
             'totalCollections' => 'RM ' . number_format($totalCollections, 2),
             'outstandingDebt' => 'RM ' . number_format($outstandingDebt, 2),
