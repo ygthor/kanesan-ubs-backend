@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -35,5 +36,28 @@ class UserController extends Controller
         } catch (\Exception $e) {
             return makeResponse(500, 'Error retrieving users: ' . $e->getMessage(), []);
         }
+    }
+
+    /**
+     * Get authenticated user's assigned branches
+     */
+    public function branches(Request $request)
+    {
+        $user = $request->user();
+        $rows = DB::table('users_branches as ub')
+            ->join('branches as b', 'b.branch_id', '=', 'ub.branch_id')
+            ->where('ub.user_id', $user->id)
+            ->select('b.branch_id', 'b.branch_name')
+            ->orderBy('b.branch_name')
+            ->get();
+
+        $branches = $rows->map(function ($r) {
+            return [
+                'branch_id' => $r->branch_id,
+                'branch_name' => $r->branch_name,
+            ];
+        });
+
+        return makeResponse(200, 'Branches retrieved successfully.', $branches);
     }
 }
