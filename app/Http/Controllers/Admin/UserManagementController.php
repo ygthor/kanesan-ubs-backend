@@ -17,7 +17,26 @@ class UserManagementController extends Controller
     public function index()
     {
         $users = User::with(['roles'])->paginate(15);
-        return view('admin.users.index', compact('users'));
+
+        // Load branches for listed users
+        $userIds = $users->pluck('id');
+        $branchesByUser = DB::table('users_branches as ub')
+            ->join('branches as b', 'b.branch_id', '=', 'ub.branch_id')
+            ->whereIn('ub.user_id', $userIds)
+            ->select('ub.user_id', 'b.branch_id', 'b.branch_name')
+            ->orderBy('b.branch_name')
+            ->get()
+            ->groupBy('user_id');
+
+        // Map user_id => list of branches [ ['id'=>..., 'name'=>...], ...]
+        $userBranchesMap = [];
+        foreach ($branchesByUser as $uid => $rows) {
+            $userBranchesMap[$uid] = $rows->map(function($r){
+                return ['id' => $r->branch_id, 'name' => $r->branch_name];
+            })->values()->all();
+        }
+
+        return view('admin.users.index', compact('users', 'userBranchesMap'));
     }
 
     /**
