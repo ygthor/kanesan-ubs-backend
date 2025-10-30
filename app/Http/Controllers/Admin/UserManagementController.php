@@ -26,7 +26,11 @@ class UserManagementController extends Controller
     public function create()
     {
         $roles = Role::all();
-        return view('admin.users.create', compact('roles'));
+        $branches = DB::table('branches')
+            ->select('branch_id', 'branch_name')
+            ->orderBy('branch_name')
+            ->get();
+        return view('admin.users.create', compact('roles', 'branches'));
     }
 
     /**
@@ -40,7 +44,9 @@ class UserManagementController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'roles' => 'array',
-            'roles.*' => 'exists:roles,role_id'
+            'roles.*' => 'exists:roles,role_id',
+            'branches' => 'array',
+            'branches.*' => 'exists:branches,branch_id'
         ]);
 
         $user = User::create([
@@ -52,6 +58,16 @@ class UserManagementController extends Controller
 
         if ($request->has('roles')) {
             $user->roles()->attach($request->roles);
+        }
+
+        if ($request->has('branches')) {
+            $branches = $request->branches; // e.g. ['Ipoh', 'Penang'] ids
+            foreach ($branches as $branchId) {
+                DB::table('users_branches')->insert([
+                    'user_id' => $user->id,
+                    'branch_id' => $branchId,
+                ]);
+            }
         }
 
         return redirect()->route('admin.users.index')
@@ -74,7 +90,15 @@ class UserManagementController extends Controller
     {
         $roles = Role::all();
         $user->load(['roles']);
-        return view('admin.users.edit', compact('user', 'roles'));
+        $branches = DB::table('branches')
+            ->select('branch_id', 'branch_name')
+            ->orderBy('branch_name')
+            ->get();
+        $userBranchIds = DB::table('users_branches')
+            ->where('user_id', $user->id)
+            ->pluck('branch_id')
+            ->toArray();
+        return view('admin.users.edit', compact('user', 'roles', 'branches', 'userBranchIds'));
     }
 
     /**
@@ -88,7 +112,9 @@ class UserManagementController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:8|confirmed',
             'roles' => 'array',
-            'roles.*' => 'exists:roles,role_id'
+            'roles.*' => 'exists:roles,role_id',
+            'branches' => 'array',
+            'branches.*' => 'exists:branches,branch_id'
         ]);
 
         $user->update([
@@ -118,6 +144,19 @@ class UserManagementController extends Controller
                 DB::table('user_roles')->insert($insertData);
             }
             
+        }
+
+        if ($request->has('branches')) {
+            $branches = $request->branches; // array of branch_ids (varchar)
+            // Delete existing branches
+            DB::table('users_branches')->where('user_id', $user->id)->delete();
+            // Insert new branches
+            foreach ($branches as $branchId) {
+                DB::table('users_branches')->insert([
+                    'user_id' => $user->id,
+                    'branch_id' => $branchId,
+                ]);
+            }
         }
 
         return redirect()->route('admin.users.index')

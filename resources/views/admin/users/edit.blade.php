@@ -97,6 +97,23 @@
         @enderror
         <div class="help-text">Hold Ctrl/Cmd to select multiple roles</div>
     </div>
+
+    <div class="form-group">
+        <label for="branches" class="form-label">Branches</label>
+        <select class="form-select @error('branches') is-invalid @enderror" 
+                id="branches" name="branches[]" multiple>
+            @foreach(($branches ?? []) as $branch)
+                <option value="{{ $branch->branch_id }}" 
+                        {{ in_array($branch->branch_id, old('branches', $userBranchIds ?? [])) ? 'selected' : '' }}>
+                    {{ $branch->branch_name }} ({{ $branch->branch_id }})
+                </option>
+            @endforeach
+        </select>
+        @error('branches')
+            <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
+        <div class="help-text">Hold Ctrl/Cmd to select multiple branches</div>
+    </div>
 @endsection
 
 @section('form-sidebar')
