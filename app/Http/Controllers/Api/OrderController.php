@@ -38,8 +38,8 @@ class OrderController extends Controller
         // Start building the query
         $orders = Order::with('items', 'customer');
         
-        // Filter by user's assigned customers (unless KBS user)
-        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+        // Filter by user's assigned customers (unless KBS user or admin role)
+        if ($user && !hasFullAccess()) {
             $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
             if (empty($allowedCustomerIds)) {
                 // User has no assigned customers, return empty result
@@ -288,8 +288,8 @@ class OrderController extends Controller
      */
     private function userHasAccessToCustomer($user, Customer $customer)
     {
-        // KBS user has full access to all customers
-        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+        // KBS user or admin role has full access to all customers
+        if ($user && hasFullAccess()) {
             return true;
         }
         

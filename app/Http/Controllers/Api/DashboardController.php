@@ -35,9 +35,9 @@ class DashboardController extends Controller
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
 
-        // Get user's allowed customer IDs (unless KBS user)
+        // Get user's allowed customer IDs (unless KBS user or admin role)
         $allowedCustomerIds = null;
-        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+        if ($user && !hasFullAccess()) {
             $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
             if (empty($allowedCustomerIds)) {
                 // User has no assigned customers, return empty dashboard

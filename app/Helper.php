@@ -111,3 +111,28 @@ if (!function_exists('hasAllPermissions')) {
         return auth()->user()->hasAllPermissions($permissions);
     }
 }
+
+if (!function_exists('hasFullAccess')) {
+    /**
+     * Check if the authenticated user has full access (KBS user or admin/super_admin role).
+     * KBS users and admin/super_admin role users have access to all data.
+     *
+     * @return bool
+     */
+    function hasFullAccess()
+    {
+        if (!auth()->check()) {
+            return false;
+        }
+        
+        $user = auth()->user();
+        
+        // Check if user is KBS
+        if ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my') {
+            return true;
+        }
+        
+        // Check if user has admin or super_admin role
+        return $user->hasAnyRole(['admin', 'super_admin']);
+    }
+}
