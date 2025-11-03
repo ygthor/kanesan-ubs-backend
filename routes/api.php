@@ -52,7 +52,7 @@ Route::post('/auth/login', [\App\Http\Controllers\Auth\LoginController::class, '
 Route::post('/auth/logout', [\App\Http\Controllers\Auth\LoginController::class, 'logout'])->middleware('auth:sanctum')->name('auth.logout');
 Route::get('/auth/me', [\App\Http\Controllers\Auth\LoginController::class, 'me'])->middleware('auth:sanctum')->name('auth.me');
 
-Route::get('/script_to_run/update_customer_name',function(){
+Route::get('/script_to_run/update_customer_name', function () {
     DB::statement("
         UPDATE customers
         SET company_name = name
@@ -99,11 +99,15 @@ Route::post('/test/api', function () {
         ]
     ]);
 })->name('test.api');
-Route::get('products', [ProductController::class,'index']);
-Route::get('icitem', [IcitemController::class,'index']);
+Route::get('products', [ProductController::class, 'index']);
+Route::get('icitem', [IcitemController::class, 'index']);
+
+// Territory API routes
+Route::get('/territories', [\App\Http\Controllers\Api\TerritoryController::class, 'index'])->name('territories.index');
+
 // Route::middleware([])->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
-    
+
     // Admin Management Routes
     Route::prefix('admin')->group(function () {
         // User Management
@@ -114,7 +118,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/users/{user}', [\App\Http\Controllers\Admin\UserManagementController::class, 'destroy'])->middleware('permission:delete_user')->name('admin.users.destroy');
         Route::get('/users/roles', [\App\Http\Controllers\Admin\UserManagementController::class, 'getRoles'])->name('admin.users.roles');
         Route::get('/users/permissions', [\App\Http\Controllers\Admin\UserManagementController::class, 'getPermissions'])->name('admin.users.permissions');
-        
+
         // Role Management
         Route::get('/roles', [\App\Http\Controllers\Admin\RoleManagementController::class, 'index'])->middleware('permission:access_role_mgmt')->name('admin.roles.index');
         Route::post('/roles', [\App\Http\Controllers\Admin\RoleManagementController::class, 'store'])->middleware('permission:create_role')->name('admin.roles.store');
@@ -123,7 +127,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/roles/{role}', [\App\Http\Controllers\Admin\RoleManagementController::class, 'destroy'])->middleware('permission:delete_role')->name('admin.roles.destroy');
         Route::get('/roles/permissions', [\App\Http\Controllers\Admin\RoleManagementController::class, 'getPermissions'])->name('admin.roles.permissions');
         Route::get('/roles/stats', [\App\Http\Controllers\Admin\RoleManagementController::class, 'getStats'])->name('admin.roles.stats');
-        
+
         // Permission Management
         Route::get('/permissions', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'index'])->middleware('permission:access_permission_mgmt')->name('admin.permissions.index');
         Route::post('/permissions', [\App\Http\Controllers\Admin\PermissionManagementController::class, 'store'])->middleware('permission:create_permission')->name('admin.permissions.store');
@@ -151,24 +155,23 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class)->middleware('filter.customer');
     Route::get('/customers/states', [CustomerController::class, 'getStates'])->name('customers.states');
-    
-    // Territory API routes
-    Route::get('/territories', [\App\Http\Controllers\Api\TerritoryController::class, 'index'])->name('territories.index');
+
+
     Route::get('/territories/{id}', [\App\Http\Controllers\Api\TerritoryController::class, 'show'])->name('territories.show');
-    
+
     Route::delete('/orders/{id}', [OrderController::class, 'deleteOrder']);
     Route::delete('/order-items/{id}', [OrderController::class, 'deleteOrderItem']);
 
     Route::apiResource('gl-statement', GlStatementController::class)->only(['index', 'store', 'update', 'show']);
 
     Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'update', 'show']);
-    Route::apiResource('orders-items', OrderItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
+    Route::apiResource('orders-items', OrderItemController::class)->only(['index', 'store', 'update', 'show', 'destroy']);
     Route::apiResource('receipts', ReceiptController::class);
 
     Route::post('invoices/batch-print', [InvoiceController::class, 'batchPrint']);
     Route::get('invoices/{refNo}/print', [InvoiceController::class, 'printInvoice']);
     Route::apiResource('invoices', InvoiceController::class)->only(['index', 'store', 'update', 'show']);
-    Route::apiResource('invoices-items', InvoiceItemController::class)->only(['index', 'store', 'update', 'show','destroy']);
+    Route::apiResource('invoices-items', InvoiceItemController::class)->only(['index', 'store', 'update', 'show', 'destroy']);
 
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index')->middleware('filter.customer');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
@@ -195,4 +198,4 @@ Route::middleware(['auth:sanctum'])->group(function () {
 Route::post('developer/create', [DeveloperController::class, 'create'])->name('developer.create');
 
 
-Route::post('data_sync/',[SyncController::class, 'fetchTableData']);
+Route::post('data_sync/', [SyncController::class, 'fetchTableData']);
