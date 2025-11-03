@@ -150,6 +150,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // PUT/PATCH /api/customers/{customer} -> customers.update  (CustomerController@update)
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class)->middleware('filter.customer');
+    Route::get('/customers/states', [CustomerController::class, 'getStates'])->name('customers.states');
+    
+    // Territory API routes
+    Route::get('/territories', [\App\Http\Controllers\Api\TerritoryController::class, 'index'])->name('territories.index');
+    Route::get('/territories/{id}', [\App\Http\Controllers\Api\TerritoryController::class, 'show'])->name('territories.show');
     
     Route::delete('/orders/{id}', [OrderController::class, 'deleteOrder']);
     Route::delete('/order-items/{id}', [OrderController::class, 'deleteOrderItem']);

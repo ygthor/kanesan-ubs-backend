@@ -28,12 +28,15 @@ class DashboardController extends Controller
         $request->validate([
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d',
-            'branchId' => 'nullable|string', // Or 'integer' depending on what it is
+            'state' => 'nullable|string', // Customer state filter
         ]);
 
         // Determine date range. Default to the current month if not provided.
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
+        
+        // Get state filter
+        $selectedState = $request->input('state');
 
         // Get user's allowed customer IDs (unless KBS user or admin role)
         $allowedCustomerIds = null;
@@ -55,63 +58,86 @@ class DashboardController extends Controller
                 ]);
             }
         }
+        
+        // Build customer filter query for state
+        $customerFilterQuery = Customer::query();
+        if ($allowedCustomerIds) {
+            $customerFilterQuery->whereIn('id', $allowedCustomerIds);
+        }
+        if ($selectedState) {
+            $customerFilterQuery->where('state', $selectedState);
+        }
+        $filteredCustomerIds = $customerFilterQuery->pluck('id')->toArray();
+        $filteredCustomerCodes = $customerFilterQuery->pluck('customer_code')->toArray();
+        
+        // If state filter is applied but no customers found, return empty dashboard
+        if ($selectedState && empty($filteredCustomerIds)) {
+            return makeResponse(200, 'Dashboard summary retrieved successfully.', [
+                'totalRevenue' => 'RM 0.00',
+                'nettSales' => 'RM 0.00',
+                'totalCollections' => 'RM 0.00',
+                'outstandingDebt' => 'RM 0.00',
+                'inventoryValue' => 'RM 0.00',
+                'invoicesIssued' => '0',
+                'receiptsIssued' => '0',
+                'newCustomers' => '0',
+                'pendingOrders' => '0',
+                'lowStockItems' => '0',
+            ]);
+        }
 
         // --- Calculations based on date range ---
 
         // Total Collections: Sum of all paid amounts from receipts in the date range.
         $totalCollectionsQuery = Receipt::whereBetween('receipt_date', [$dateFrom, $dateTo]);
-        if ($allowedCustomerIds) {
-            $totalCollectionsQuery->whereIn('customer_id', $allowedCustomerIds);
+        if (!empty($filteredCustomerIds)) {
+            $totalCollectionsQuery->whereIn('customer_id', $filteredCustomerIds);
         }
         $totalCollections = $totalCollectionsQuery->sum('paid_amount');
 
         // Revenue: Sum of invoice grand amounts (gross + tax) in the date range.
         $revenueQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
             ->whereIn('TYPE', ['INV','CB','CS','DN']);
-        if ($allowedCustomerIds) {
-            // Map allowed customer ids to customer codes if needed; if Customer has customer_code matching Artran CUSTNO
-            $customerCodes = Customer::whereIn('id', $allowedCustomerIds)->pluck('customer_code');
-            $revenueQuery->whereIn('CUSTNO', $customerCodes);
+        if (!empty($filteredCustomerCodes)) {
+            $revenueQuery->whereIn('CUSTNO', $filteredCustomerCodes);
         }
         $revenue = $revenueQuery->sum('GRAND_BIL');
 
         // Nett Sales: Sum of invoice net amounts (after discount) in the date range.
         $nettSalesQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
             ->whereIn('TYPE', ['INV','CB','CS','DN']);
-        if ($allowedCustomerIds) {
-            $customerCodes = Customer::whereIn('id', $allowedCustomerIds)->pluck('customer_code');
-            $nettSalesQuery->whereIn('CUSTNO', $customerCodes);
+        if (!empty($filteredCustomerCodes)) {
+            $nettSalesQuery->whereIn('CUSTNO', $filteredCustomerCodes);
         }
         $nettSales = $nettSalesQuery->sum('NET_BIL');
 
         // Invoices Issued: Count of invoices in the date range.
         $invoicesQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
             ->whereIn('TYPE', ['INV','CB','CS','DN']);
-        if ($allowedCustomerIds) {
-            $customerCodes = Customer::whereIn('id', $allowedCustomerIds)->pluck('customer_code');
-            $invoicesQuery->whereIn('CUSTNO', $customerCodes);
+        if (!empty($filteredCustomerCodes)) {
+            $invoicesQuery->whereIn('CUSTNO', $filteredCustomerCodes);
         }
         $invoicesIssued = $invoicesQuery->count();
 
         // Receipts Issued: Count of all receipts in the date range.
         $receiptsQuery = Receipt::whereBetween('receipt_date', [$dateFrom, $dateTo]);
-        if ($allowedCustomerIds) {
-            $receiptsQuery->whereIn('customer_id', $allowedCustomerIds);
+        if (!empty($filteredCustomerIds)) {
+            $receiptsQuery->whereIn('customer_id', $filteredCustomerIds);
         }
         $receiptsIssued = $receiptsQuery->count();
 
         // New Customers: Count of customers created in the date range.
         $newCustomersQuery = Customer::whereBetween('created_at', [$dateFrom, $dateTo]);
-        if ($allowedCustomerIds) {
-            $newCustomersQuery->whereIn('id', $allowedCustomerIds);
+        if (!empty($filteredCustomerIds)) {
+            $newCustomersQuery->whereIn('id', $filteredCustomerIds);
         }
         $newCustomers = $newCustomersQuery->count();
 
         // Pending Orders: Count of orders with a 'pending' status in the date range.
         $pendingOrdersQuery = Order::where('status', 'pending')
             ->whereBetween('order_date', [$dateFrom, $dateTo]);
-        if ($allowedCustomerIds) {
-            $pendingOrdersQuery->whereIn('customer_id', $allowedCustomerIds);
+        if (!empty($filteredCustomerIds)) {
+            $pendingOrdersQuery->whereIn('customer_id', $filteredCustomerIds);
         }
         $pendingOrders = $pendingOrdersQuery->count();
 
@@ -121,9 +147,9 @@ class DashboardController extends Controller
         $totalOrderedQuery = Order::query();
         $totalCollectedQuery = Receipt::query();
         
-        if ($allowedCustomerIds) {
-            $totalOrderedQuery->whereIn('customer_id', $allowedCustomerIds);
-            $totalCollectedQuery->whereIn('customer_id', $allowedCustomerIds);
+        if (!empty($filteredCustomerIds)) {
+            $totalOrderedQuery->whereIn('customer_id', $filteredCustomerIds);
+            $totalCollectedQuery->whereIn('customer_id', $filteredCustomerIds);
         }
         
         $totalOrderedAmount = $totalOrderedQuery->sum('net_amount');

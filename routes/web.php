@@ -38,6 +38,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     
     // Permission Management (to be implemented)
     Route::resource('permissions', \App\Http\Controllers\Admin\PermissionManagementController::class);
+    
+    // Territory Management
+    Route::resource('territories', \App\Http\Controllers\Admin\TerritoryManagementController::class);
 });
 
 

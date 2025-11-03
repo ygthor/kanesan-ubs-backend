@@ -54,6 +54,37 @@ class CustomerController extends Controller
     }
 
     /**
+     * Get distinct customer states
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getStates(Request $request)
+    {
+        $user = auth()->user();
+        
+        $query = Customer::select('state')
+            ->whereNotNull('state')
+            ->where('state', '!=', '')
+            ->distinct()
+            ->orderBy('state', 'asc');
+        
+        // Filter by user's assigned customers (unless KBS user or admin role)
+        if ($user && !hasFullAccess()) {
+            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
+            if (!empty($allowedCustomerIds)) {
+                $query->whereIn('id', $allowedCustomerIds);
+            } else {
+                // User has no assigned customers, return empty result
+                return makeResponse(200, 'No states accessible.', []);
+            }
+        }
+        
+        $states = $query->pluck('state')->toArray();
+        return makeResponse(200, 'Customer states retrieved successfully.', $states);
+    }
+
+    /**
      * Store a newly created customer in storage.
      *
      * @bodyParam customer_code string required The unique code for the customer. Example: "CUST001"
