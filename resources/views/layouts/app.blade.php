@@ -78,6 +78,12 @@
                                 <p>User Management</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a href="/admin/territories" class="nav-link {{ request()->is('admin/territories*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-map-marker-alt"></i>
+                                <p>Territory Management</p>
+                            </a>
+                        </li>
                         @endif
                         
                     </ul>

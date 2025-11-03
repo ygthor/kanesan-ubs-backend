@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Territory;
 use Illuminate\Http\Request;
-use App\Helper;
 
 class TerritoryController extends Controller
 {
@@ -17,17 +16,9 @@ class TerritoryController extends Controller
         try {
             $territories = Territory::orderBy('area')->get();
 
-            return Helper::makeResponse([
-                'status' => 200,
-                'message' => 'Territories retrieved successfully',
-                'data' => $territories
-            ]);
+            return makeResponse(200, 'Territories retrieved successfully', $territories);
         } catch (\Exception $e) {
-            return Helper::makeResponse([
-                'status' => 500,
-                'message' => 'Failed to retrieve territories: ' . $e->getMessage(),
-                'data' => null
-            ], 500);
+            return makeResponse(500, 'Failed to retrieve territories: ' . $e->getMessage(), []);
         }
     }
 
@@ -39,17 +30,9 @@ class TerritoryController extends Controller
         try {
             $territory = Territory::findOrFail($id);
 
-            return Helper::makeResponse([
-                'status' => 200,
-                'message' => 'Territory retrieved successfully',
-                'data' => $territory
-            ]);
+            return makeResponse(200, 'Territory retrieved successfully', $territory);
         } catch (\Exception $e) {
-            return Helper::makeResponse([
-                'status' => 404,
-                'message' => 'Territory not found',
-                'data' => null
-            ], 404);
+            return makeResponse(404, 'Territory not found', []);
         }
     }
 }
