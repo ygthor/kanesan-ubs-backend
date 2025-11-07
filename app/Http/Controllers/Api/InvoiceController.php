@@ -7,6 +7,9 @@ use App\Models\Artran; // Changed from Order
 use App\Models\ArTransItem; // Changed from OrderItem
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Icitem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -223,12 +226,70 @@ class InvoiceController extends Controller
             // $invoice->calculate();
             // $invoice->save();
 
-            // Link invoice to order if order_id is provided (only in create mode)
+            // Link invoice to order and create invoice items from order items if order_id is provided (only in create mode)
             if (!$id && $request->order_id) {
-                $order = \App\Models\Order::find($request->order_id);
+                $order = Order::with('items')->find($request->order_id);
                 if ($order) {
-                    // Use attach to create the relationship in the pivot table
+                    // Link invoice to order in pivot table
                     $invoice->orders()->attach($order->id);
+                    
+                    // Create invoice items from order items
+                    $itemCount = 1;
+                    foreach ($order->items as $orderItem) {
+                        // Skip free goods if needed (optional - you can remove this if you want to include them)
+                        // if ($orderItem->is_free_good) {
+                        //     continue;
+                        // }
+                        
+                        // Get product info from Icitem table using product_no
+                        // OrderItem.product_no should match Icitem.ITEMNO
+                        $product = Icitem::find($orderItem->product_no);
+                        
+                        if (!$product) {
+                            \Log::warning("Product not found for order item. Order Item ID: {$orderItem->id}, Product No: {$orderItem->product_no}");
+                            // Continue with next item, or skip this one
+                            continue;
+                        }
+                        
+                        // Verify that OrderItem.product_no matches ArTransItem.ITEMNO/TRANCODE (both reference Icitem.ITEMNO)
+                        // This ensures invoice items and order items refer to the same product
+                        
+                        // Map OrderItem to ArTransItem
+                        $invoiceItemData = [
+                            'artrans_id' => $invoice->artrans_id ?? null, // May be auto-generated
+                            'ITEMNO' => $orderItem->product_no, // Product code/item number - references Icitem.ITEMNO
+                            'TRANCODE' => $orderItem->product_no, // Product code (same as ITEMNO) - references Icitem.ITEMNO
+                            'DESP' => $orderItem->product_name ?? $product->DESP ?? $orderItem->description ?? 'Unknown Product',
+                            
+                            // Copied from parent invoice
+                            'REFNO' => $invoice->REFNO,
+                            'TYPE' => $invoice->TYPE,
+                            'CUSTNO' => $invoice->CUSTNO,
+                            'DATE' => $invoice->DATE,
+                            'ITEMCOUNT' => $itemCount,
+                            
+                            // Item specific data from order item
+                            'QTY' => $orderItem->quantity,
+                            'PRICE' => $orderItem->unit_price,
+                            
+                            // Note: Discount from order item is not directly mapped to ArTransItem
+                            // as ArTransItem doesn't have a discount field at line level
+                            // The discount would be applied at invoice header level if needed
+                        ];
+                        
+                        // Create the invoice item
+                        $invoiceItem = ArTransItem::create($invoiceItemData);
+                        
+                        // Calculate amounts for the line item
+                        $invoiceItem->calculate();
+                        $invoiceItem->save();
+                        
+                        $itemCount++;
+                    }
+                    
+                    // Recalculate totals for the invoice after adding all items
+                    $invoice->calculate();
+                    $invoice->save();
                 }
             }
 

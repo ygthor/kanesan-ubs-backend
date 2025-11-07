@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Customer; // To fetch customer details if needed
-use App\Models\Product;  // To fetch product details if needed
+use App\Models\Icitem;  // To fetch item details from icitem table
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -36,7 +36,7 @@ class OrderItemController extends Controller
      * @bodyParam order_date string nullable The date of the order (YYYY-MM-DD HH:MM:SS). Defaults to now. Example: "2025-05-20 10:00:00"
      * @bodyParam remarks string nullable Any remarks for the order.
      * @bodyParam items array required An array of order items.
-     * @bodyParam items.*.product_id string required The ID of the product. Example: "p1" (or integer ID from your products table)
+     * @bodyParam items.*.product_no string required The ITEMNO of the item from icitem table. Example: "ITEM001"
      * @bodyParam items.*.quantity float required The quantity of the product. Example: 2
      * @bodyParam items.*.unit_price float required The unit price of the product. Example: 10.00
      * @bodyParam items.*.discount float nullable The discount for this item. Example: 1.00
@@ -60,10 +60,10 @@ class OrderItemController extends Controller
     public function saveOrderItem(Request $request, $id = null)
     {
         $validator = Validator::make($request->all(), [
-            'product_id' => 'required',
+            'product_no' => 'required|string', // Changed from product_id to product_no
             'quantity' => 'required|min:1',
             // 'items' => 'required|array|min:1',
-            // 'items.*.product_id' => 'required|exists:product,id',
+            // 'items.*.product_no' => 'required|exists:icitem,ITEMNO',
             // 'items.*.quantity' => 'required|numeric|min:0',
             // 'items.*.unit_price' => 'required|numeric|min:0',
             // 'items.*.discount' => 'nullable|numeric|min:0',
@@ -80,7 +80,7 @@ class OrderItemController extends Controller
         try {
             $orderData = $request->only([
                 'order_id',
-                'product_id',
+                'product_no', // Changed from product_id
                 'quantity',
                 'unit_price',
                 'item_group',
@@ -104,11 +104,17 @@ class OrderItemController extends Controller
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
             $orderData['type'] = $orderData['type'] ?? 'SO';
 
-            $product = Product::find($orderData['product_id']);
-            $orderData['product_no'] = $product->Product_Id;
-            $orderData['product_name'] = $product->Product_English_Name;
-            $orderData['sku_code'] = $product->sku_code ?? null;
-            $orderData['description'] = $product->Product_English_Name;
+            // Use Icitem instead of Product
+            $item = Icitem::find($orderData['product_no']); // product_no is ITEMNO in icitem table
+            if (!$item) {
+                DB::rollBack();
+                return makeResponse(404, 'Item not found with ITEMNO: ' . $orderData['product_no']);
+            }
+            
+            $orderData['product_no'] = $item->ITEMNO;
+            $orderData['product_name'] = $item->DESP;
+            $orderData['sku_code'] = $item->ITEMNO; // Use ITEMNO as SKU if no separate SKU field
+            $orderData['description'] = $item->DESP;
 
             // Handle free goods
             if (isset($orderData['is_free_good']) && $orderData['is_free_good']) {
@@ -153,7 +159,8 @@ class OrderItemController extends Controller
     public function show(Order $order)
     {
         // Load items and customer relationship for detailed view
-        $order->load('items.product', 'customer');
+        // Note: items now reference icitem via product_no (ITEMNO), not product
+        $order->load('items', 'customer');
         return makeResponse(200, 'Order item retrieved successfully.', $order);
     }
 
