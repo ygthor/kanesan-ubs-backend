@@ -26,14 +26,11 @@ class DebtController extends Controller
 
         $searchTerm = $request->input('search');
 
-        // Note: User access control will be handled at the invoice level
-        // For now, we'll get all invoices and let the frontend handle access control
-        // TODO: Implement proper access control based on user permissions
-
         // Get invoices with customer data using LEFT JOIN
         $invoicesQuery = Artran::select([
                 'artrans.*',
                 'customers.customer_code',
+                'customers.id as customer_id',
                 'customers.name as customer_name',
                 'customers.company_name',
                 'customers.payment_type',
@@ -41,6 +38,16 @@ class DebtController extends Controller
             ])
             ->leftJoin('customers', 'artrans.CUSTNO', '=', 'customers.customer_code')
             ->where('artrans.TYPE', 'INV');
+
+        // Filter by user's assigned customers (unless KBS user or admin role)
+        if ($user && !hasFullAccess()) {
+            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
+            if (empty($allowedCustomerIds)) {
+                // User has no assigned customers, return empty result
+                return makeResponse(200, 'No debts accessible.', []);
+            }
+            $invoicesQuery->whereIn('customers.id', $allowedCustomerIds);
+        }
 
         // Apply search filter if provided
         if ($searchTerm) {

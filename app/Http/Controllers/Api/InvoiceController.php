@@ -121,6 +121,7 @@ class InvoiceController extends Controller
                 'type' => 'required|string|max:3', // e.g., INV for Invoice, 
                 'customer_id'   => 'required_without:customer_code|nullable|exists:customers,id',
                 'customer_code' => 'required_without:customer_id|nullable|string|max:50',
+                'order_id' => 'nullable|exists:orders,id', // Optional: link to order if invoice created from order
 
                 'date' => 'nullable|date',
                 'remarks' => 'nullable|string',
@@ -222,12 +223,21 @@ class InvoiceController extends Controller
             // $invoice->calculate();
             // $invoice->save();
 
+            // Link invoice to order if order_id is provided (only in create mode)
+            if (!$id && $request->order_id) {
+                $order = \App\Models\Order::find($request->order_id);
+                if ($order) {
+                    // Use attach to create the relationship in the pivot table
+                    $invoice->orders()->attach($order->id);
+                }
+            }
+
             DB::commit();
 
             return makeResponse(
                 $id ? 200 : 201,
                 $id ? 'Invoice updated successfully.' : 'Invoice created successfully.',
-                $invoice->load('items', 'customer')
+                $invoice->load('items', 'customer', 'orders')
             );
         } catch (\Exception $e) {
             DB::rollBack();

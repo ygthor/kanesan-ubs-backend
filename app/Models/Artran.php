@@ -77,6 +77,7 @@ class Artran extends BaseModel
             ...$this->fillable, // The spread operator unpacks the fillable array
             'items',
             'customer',
+            'orders', // Include orders relationship
             // $this->getKeyName(), // The getKeyName() method gets the primary key column name (e.g., 'id')
         ];
     }
@@ -99,6 +100,15 @@ class Artran extends BaseModel
     public function items()
     {
         return $this->hasMany(ArTransItem::class, 'REFNO', 'REFNO');
+    }
+
+    /**
+     * Get the orders that this invoice was created from.
+     * Many-to-many relationship through invoice_orders pivot table.
+     */
+    public function orders()
+    {
+        return $this->belongsToMany(Order::class, 'invoice_orders', 'invoice_refno', 'order_id', 'REFNO', 'id');
     }
 
     /**

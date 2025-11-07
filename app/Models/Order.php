@@ -58,6 +58,15 @@ class Order extends BaseModel
     }
 
     /**
+     * Get the invoices that were created from this order.
+     * Many-to-many relationship through invoice_orders pivot table.
+     */
+    public function invoices()
+    {
+        return $this->belongsToMany(Artran::class, 'invoice_orders', 'order_id', 'invoice_refno', 'id', 'REFNO');
+    }
+
+    /**
      * Calculate the total amount for the order based on its items.
      * This can be called before saving or used as an accessor.
      */
