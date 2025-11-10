@@ -18,33 +18,15 @@
 @endsection
 
 @section('admin-content')
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            {{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
     <!-- Tabs for different views -->
     <ul class="nav nav-tabs" id="stockTabs" role="tablist">
         <li class="nav-item">
-            <a class="nav-link active" id="summary-tab" data-toggle="tab" href="#summary" role="tab" aria-controls="summary" aria-selected="true">
+            <a class="nav-link active" id="summary-tab" data-bs-toggle="tab" href="#summary" role="tab" aria-controls="summary" aria-selected="true">
                 <i class="fas fa-list"></i> Stock Summary
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" id="transactions-tab" data-toggle="tab" href="#transactions" role="tab" aria-controls="transactions" aria-selected="false">
+            <a class="nav-link" id="transactions-tab" data-bs-toggle="tab" href="#transactions" role="tab" aria-controls="transactions" aria-selected="false">
                 <i class="fas fa-history"></i> Transaction History
             </a>
         </li>
@@ -76,20 +58,26 @@
                                 <th>Current Stock</th>
                                 <th>Unit</th>
                                 <th>Price</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($inventory as $item)
-                                <tr style="cursor: pointer;" onclick="viewItemTransactions('{{ $item['ITEMNO'] }}')" title="Click to view transactions for this item">
+                                <tr>
                                     <td><strong>{{ $item['ITEMNO'] }}</strong></td>
                                     <td>{{ $item['DESP'] ?? 'N/A' }}</td>
                                     <td><strong>{{ number_format($item['current_stock'], 2) }}</strong></td>
                                     <td>{{ $item['UNIT'] ?? 'N/A' }}</td>
                                     <td>{{ number_format($item['PRICE'] ?? 0, 2) }}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-info" onclick="viewItemTransactions('{{ $item['ITEMNO'] }}')" title="View transactions for this item">
+                                            <i class="fas fa-history"></i> View Transactions
+                                        </button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted">No items found</td>
+                                    <td colspan="6" class="text-center text-muted">No items found</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -103,7 +91,7 @@
             <div class="mt-3">
                 <form method="GET" action="{{ route('inventory.stock-management') }}" class="row mb-3">
                     <div class="col-md-4">
-                        <select class="form-control" name="transaction_type" onchange="this.form.submit()">
+                        <select class="form-control select2" name="transaction_type" id="transactionTypeFilter" style="width: 100%;">
                             <option value="">All Transaction Types</option>
                             <option value="in" {{ request('transaction_type') == 'in' ? 'selected' : '' }}>Stock In</option>
                             <option value="out" {{ request('transaction_type') == 'out' ? 'selected' : '' }}>Stock Out</option>
@@ -111,7 +99,14 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <input type="text" class="form-control" name="itemno" placeholder="Filter by Item Code..." value="{{ request('itemno') }}">
+                        <select class="form-control select2" name="itemno" id="itemnoFilter" style="width: 100%;" data-placeholder="Filter by Item Code...">
+                            <option value=""></option>
+                            @foreach($inventory as $item)
+                                <option value="{{ $item['ITEMNO'] }}" {{ request('itemno') == $item['ITEMNO'] ? 'selected' : '' }}>
+                                    {{ $item['ITEMNO'] }} - {{ $item['DESP'] }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <button type="submit" class="btn btn-primary">Filter</button>
@@ -194,6 +189,22 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+    // Initialize Select2
+    $('.select2').select2({
+        theme: 'bootstrap-5',
+        allowClear: true
+    });
+    
+    // Auto-submit form when transaction type changes
+    $('#transactionTypeFilter').on('change', function() {
+        $(this).closest('form').submit();
+    });
+    
+    // Auto-submit form when item filter changes
+    $('#itemnoFilter').on('change', function() {
+        $(this).closest('form').submit();
+    });
+    
     // Search functionality
     $('#searchStockInput').on('keyup', function() {
         const value = $(this).val().toLowerCase();
@@ -204,12 +215,15 @@ $(document).ready(function() {
 });
 
 function viewItemTransactions(itemno) {
-    // Switch to transactions tab
-    $('#transactions-tab').tab('show');
+    // Switch to transactions tab using Bootstrap 5 API
+    const transactionsTab = document.querySelector('#transactions-tab');
+    const tab = new bootstrap.Tab(transactionsTab);
+    tab.show();
     
-    // Set the item filter and submit
-    $('input[name="itemno"]').val(itemno);
-    $('form[method="GET"]').submit();
+    // Set the item filter and submit after a short delay to ensure tab is shown
+    setTimeout(function() {
+        $('#itemnoFilter').val(itemno).trigger('change');
+    }, 300);
 }
 </script>
 @endpush

@@ -41,8 +41,8 @@
                     <div class="card-body">
                         <div class="form-group">
                             <label for="transactionType" class="required">Transaction Type *</label>
-                            <select class="form-control @error('transaction_type') is-invalid @enderror" 
-                                    id="transactionType" name="transaction_type" required onchange="updateTransactionForm()">
+                            <select class="form-control select2 @error('transaction_type') is-invalid @enderror" 
+                                    id="transactionType" name="transaction_type" required style="width: 100%;">
                                 <option value="">Select Type</option>
                                 <option value="in" {{ old('transaction_type') == 'in' ? 'selected' : '' }}>Stock In</option>
                                 <option value="out" {{ old('transaction_type') == 'out' ? 'selected' : '' }}>Stock Out</option>
@@ -55,8 +55,8 @@
 
                         <div class="form-group">
                             <label for="transactionItemCode" class="required">Item Code *</label>
-                            <select class="form-control @error('ITEMNO') is-invalid @enderror" 
-                                    id="transactionItemCode" name="ITEMNO" required>
+                            <select class="form-control select2 @error('ITEMNO') is-invalid @enderror" 
+                                    id="transactionItemCode" name="ITEMNO" required style="width: 100%;">
                                 <option value="">Select Item</option>
                                 @foreach($items as $item)
                                     <option value="{{ $item->ITEMNO }}" {{ old('ITEMNO') == $item->ITEMNO ? 'selected' : '' }}>
@@ -71,8 +71,7 @@
                             
                             <input type="text" class="form-control mt-2" 
                                    id="transactionItemCodeManual" 
-                                   placeholder="Or enter item code manually"
-                                   onchange="document.getElementById('transactionItemCode').value = this.value">
+                                   placeholder="Or enter item code manually">
                         </div>
 
                         <div class="form-group">
@@ -149,13 +148,31 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+    // Initialize Select2
+    $('.select2').select2({
+        theme: 'bootstrap-5',
+        allowClear: true
+    });
+    
+    // Update transaction form when type changes
+    $('#transactionType').on('change', function() {
+        updateTransactionForm();
+    });
+    
     updateTransactionForm();
     
     // Update current stock when item is selected
-    $('#transactionItemCode, #transactionItemCodeManual').on('change', function() {
-        const itemno = $('#transactionItemCode').val() || $('#transactionItemCodeManual').val();
+    $('#transactionItemCode').on('change', function() {
+        const itemno = $(this).val();
         if (itemno) {
             loadCurrentStock(itemno);
+        }
+    });
+    
+    $('#transactionItemCodeManual').on('change', function() {
+        const itemno = $(this).val();
+        if (itemno) {
+            $('#transactionItemCode').val(itemno).trigger('change');
         }
     });
 });
