@@ -82,15 +82,22 @@
                                 <th>Current Stock</th>
                                 <th>Unit</th>
                                 <th>Price</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="stockSummaryBody">
-                            <tr>
-                                <td colspan="6" class="text-center">
-                                    <i class="fas fa-spinner fa-spin"></i> Loading stock data...
-                                </td>
-                            </tr>
+                        <tbody>
+                            @forelse($inventory as $item)
+                                <tr>
+                                    <td>{{ $item['ITEMNO'] }}</td>
+                                    <td>{{ $item['DESP'] ?? 'N/A' }}</td>
+                                    <td><strong>{{ number_format($item['current_stock'], 2) }}</strong></td>
+                                    <td>{{ $item['UNIT'] ?? 'N/A' }}</td>
+                                    <td>{{ number_format($item['PRICE'] ?? 0, 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">No items found</td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -100,22 +107,26 @@
         <!-- Transaction History Tab -->
         <div class="tab-pane fade" id="transactions" role="tabpanel" aria-labelledby="transactions-tab">
             <div class="mt-3">
-                <div class="row mb-3">
+                <form method="GET" action="{{ route('inventory.stock-management') }}" class="row mb-3">
                     <div class="col-md-4">
-                        <select class="form-control" id="transactionTypeFilter">
+                        <select class="form-control" name="transaction_type" onchange="this.form.submit()">
                             <option value="">All Transaction Types</option>
-                            <option value="in">Stock In</option>
-                            <option value="out">Stock Out</option>
-                            <option value="adjustment">Adjustment</option>
+                            <option value="in" {{ request('transaction_type') == 'in' ? 'selected' : '' }}>Stock In</option>
+                            <option value="out" {{ request('transaction_type') == 'out' ? 'selected' : '' }}>Stock Out</option>
+                            <option value="adjustment" {{ request('transaction_type') == 'adjustment' ? 'selected' : '' }}>Adjustment</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <input type="text" class="form-control" id="itemCodeFilter" placeholder="Filter by Item Code...">
+                        <input type="text" class="form-control" name="itemno" placeholder="Filter by Item Code..." value="{{ request('itemno') }}">
                     </div>
-                </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                        <a href="{{ route('inventory.stock-management') }}" class="btn btn-secondary">Clear</a>
+                    </div>
+                </form>
 
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover" id="transactionsTable">
+                    <table class="table table-striped table-hover">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -128,15 +139,46 @@
                                 <th>Notes</th>
                             </tr>
                         </thead>
-                        <tbody id="transactionsBody">
-                            <tr>
-                                <td colspan="8" class="text-center">
-                                    <i class="fas fa-spinner fa-spin"></i> Loading transactions...
-                                </td>
-                            </tr>
+                        <tbody>
+                            @forelse($transactions as $trans)
+                                <tr>
+                                    <td>{{ $trans->CREATED_ON ? \Carbon\Carbon::parse($trans->CREATED_ON)->format('M d, Y H:i') : 'N/A' }}</td>
+                                    <td>{{ $trans->ITEMNO }}</td>
+                                    <td>
+                                        @if($trans->transaction_type == 'in')
+                                            <span class="badge badge-success">Stock In</span>
+                                        @elseif($trans->transaction_type == 'out')
+                                            <span class="badge badge-danger">Stock Out</span>
+                                        @else
+                                            <span class="badge badge-warning">Adjustment</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ number_format($trans->quantity, 2) }}</td>
+                                    <td>{{ number_format($trans->stock_before ?? 0, 2) }}</td>
+                                    <td>{{ number_format($trans->stock_after ?? 0, 2) }}</td>
+                                    <td>{{ $trans->reference_id ?? 'N/A' }}</td>
+                                    <td>{{ $trans->notes ?? '-' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">No transactions found</td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination -->
+                @if($transactions->hasPages())
+                    <div class="pagination-wrapper mt-3">
+                        <div>
+                            Showing {{ $transactions->firstItem() }} to {{ $transactions->lastItem() }} of {{ $transactions->total() }} results
+                        </div>
+                        <div>
+                            {{ $transactions->links() }}
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -151,19 +193,20 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form id="stockInForm">
+                <form method="POST" action="{{ route('inventory.stock-management.stock-in') }}">
+                    @csrf
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="stockInItemCode">Item Code *</label>
-                            <input type="text" class="form-control" id="stockInItemCode" required>
+                            <input type="text" class="form-control" id="stockInItemCode" name="ITEMNO" required>
                         </div>
                         <div class="form-group">
                             <label for="stockInQuantity">Quantity *</label>
-                            <input type="number" class="form-control" id="stockInQuantity" step="0.01" min="0.01" required>
+                            <input type="number" class="form-control" id="stockInQuantity" name="quantity" step="0.01" min="0.01" required>
                         </div>
                         <div class="form-group">
                             <label for="stockInNotes">Notes</label>
-                            <textarea class="form-control" id="stockInNotes" rows="3"></textarea>
+                            <textarea class="form-control" id="stockInNotes" name="notes" rows="3"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -185,19 +228,20 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form id="stockOutForm">
+                <form method="POST" action="{{ route('inventory.stock-management.stock-out') }}">
+                    @csrf
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="stockOutItemCode">Item Code *</label>
-                            <input type="text" class="form-control" id="stockOutItemCode" required>
+                            <input type="text" class="form-control" id="stockOutItemCode" name="ITEMNO" required>
                         </div>
                         <div class="form-group">
                             <label for="stockOutQuantity">Quantity *</label>
-                            <input type="number" class="form-control" id="stockOutQuantity" step="0.01" min="0.01" required>
+                            <input type="number" class="form-control" id="stockOutQuantity" name="quantity" step="0.01" min="0.01" required>
                         </div>
                         <div class="form-group">
                             <label for="stockOutNotes">Notes</label>
-                            <textarea class="form-control" id="stockOutNotes" rows="3"></textarea>
+                            <textarea class="form-control" id="stockOutNotes" name="notes" rows="3"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -219,20 +263,21 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form id="stockAdjustmentForm">
+                <form method="POST" action="{{ route('inventory.stock-management.stock-adjustment') }}">
+                    @csrf
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="adjustmentItemCode">Item Code *</label>
-                            <input type="text" class="form-control" id="adjustmentItemCode" required>
+                            <input type="text" class="form-control" id="adjustmentItemCode" name="ITEMNO" required>
                         </div>
                         <div class="form-group">
                             <label for="adjustmentQuantity">Quantity Adjustment *</label>
-                            <input type="number" class="form-control" id="adjustmentQuantity" step="0.01" required>
+                            <input type="number" class="form-control" id="adjustmentQuantity" name="quantity" step="0.01" required>
                             <small class="form-text text-muted">Positive value to increase, negative to decrease</small>
                         </div>
                         <div class="form-group">
                             <label for="adjustmentNotes">Notes *</label>
-                            <textarea class="form-control" id="adjustmentNotes" rows="3" required></textarea>
+                            <textarea class="form-control" id="adjustmentNotes" name="notes" rows="3" required></textarea>
                             <small class="form-text text-muted">Reason for adjustment is required</small>
                         </div>
                     </div>
@@ -249,210 +294,6 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
-    const apiBaseUrl = '/api/inventory';
-    const token = '{{ csrf_token() }}';
-
-    // Load stock summary
-    function loadStockSummary() {
-        $.ajax({
-            url: apiBaseUrl + '/summary',
-            method: 'GET',
-            headers: {
-                'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
-                'X-CSRF-TOKEN': token
-            },
-            success: function(response) {
-                if (response.error === 0 && response.data) {
-                    renderStockSummary(response.data);
-                } else {
-                    $('#stockSummaryBody').html('<tr><td colspan="6" class="text-center text-danger">Error loading stock data</td></tr>');
-                }
-            },
-            error: function() {
-                $('#stockSummaryBody').html('<tr><td colspan="6" class="text-center text-danger">Error loading stock data</td></tr>');
-            }
-        });
-    }
-
-    function renderStockSummary(data) {
-        let html = '';
-        if (data.length === 0) {
-            html = '<tr><td colspan="6" class="text-center text-muted">No items found</td></tr>';
-        } else {
-            data.forEach(function(item) {
-                html += `
-                    <tr>
-                        <td>${item.ITEMNO || 'N/A'}</td>
-                        <td>${item.DESP || 'N/A'}</td>
-                        <td><strong>${item.current_stock || 0}</strong></td>
-                        <td>${item.UNIT || 'N/A'}</td>
-                        <td>${item.PRICE || '0.00'}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info" onclick="viewItemStock('${item.ITEMNO}')">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-        $('#stockSummaryBody').html(html);
-    }
-
-    // Load transactions
-    function loadTransactions() {
-        $.ajax({
-            url: apiBaseUrl + '/transactions',
-            method: 'GET',
-            headers: {
-                'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
-                'X-CSRF-TOKEN': token
-            },
-            success: function(response) {
-                if (response.error === 0 && response.data) {
-                    renderTransactions(response.data.data || response.data);
-                } else {
-                    $('#transactionsBody').html('<tr><td colspan="8" class="text-center text-danger">Error loading transactions</td></tr>');
-                }
-            },
-            error: function() {
-                $('#transactionsBody').html('<tr><td colspan="8" class="text-center text-danger">Error loading transactions</td></tr>');
-            }
-        });
-    }
-
-    function renderTransactions(data) {
-        let html = '';
-        if (data.length === 0) {
-            html = '<tr><td colspan="8" class="text-center text-muted">No transactions found</td></tr>';
-        } else {
-            data.forEach(function(trans) {
-                const typeBadge = trans.transaction_type === 'in' ? 'success' : 
-                                 trans.transaction_type === 'out' ? 'danger' : 'warning';
-                const typeLabel = trans.transaction_type === 'in' ? 'Stock In' : 
-                                 trans.transaction_type === 'out' ? 'Stock Out' : 'Adjustment';
-                html += `
-                    <tr>
-                        <td>${trans.CREATED_ON ? new Date(trans.CREATED_ON).toLocaleDateString() : 'N/A'}</td>
-                        <td>${trans.ITEMNO || 'N/A'}</td>
-                        <td><span class="badge badge-${typeBadge}">${typeLabel}</span></td>
-                        <td>${trans.quantity || 0}</td>
-                        <td>${trans.stock_before || 0}</td>
-                        <td>${trans.stock_after || 0}</td>
-                        <td>${trans.reference_id || 'N/A'}</td>
-                        <td>${trans.notes || '-'}</td>
-                    </tr>
-                `;
-            });
-        }
-        $('#transactionsBody').html(html);
-    }
-
-    // Stock In Form
-    $('#stockInForm').on('submit', function(e) {
-        e.preventDefault();
-        const data = {
-            ITEMNO: $('#stockInItemCode').val(),
-            quantity: $('#stockInQuantity').val(),
-            notes: $('#stockInNotes').val()
-        };
-
-        $.ajax({
-            url: apiBaseUrl + '/stock-in',
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
-                'X-CSRF-TOKEN': token,
-                'Content-Type': 'application/json'
-            },
-            data: JSON.stringify(data),
-            success: function(response) {
-                if (response.error === 0) {
-                    alert('Stock added successfully!');
-                    $('#stockInModal').modal('hide');
-                    $('#stockInForm')[0].reset();
-                    loadStockSummary();
-                    loadTransactions();
-                } else {
-                    alert('Error: ' + (response.message || 'Failed to add stock'));
-                }
-            },
-            error: function(xhr) {
-                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to add stock'));
-            }
-        });
-    });
-
-    // Stock Out Form
-    $('#stockOutForm').on('submit', function(e) {
-        e.preventDefault();
-        const data = {
-            ITEMNO: $('#stockOutItemCode').val(),
-            quantity: $('#stockOutQuantity').val(),
-            notes: $('#stockOutNotes').val()
-        };
-
-        $.ajax({
-            url: apiBaseUrl + '/stock-out',
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
-                'X-CSRF-TOKEN': token,
-                'Content-Type': 'application/json'
-            },
-            data: JSON.stringify(data),
-            success: function(response) {
-                if (response.error === 0) {
-                    alert('Stock removed successfully!');
-                    $('#stockOutModal').modal('hide');
-                    $('#stockOutForm')[0].reset();
-                    loadStockSummary();
-                    loadTransactions();
-                } else {
-                    alert('Error: ' + (response.message || 'Failed to remove stock'));
-                }
-            },
-            error: function(xhr) {
-                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to remove stock'));
-            }
-        });
-    });
-
-    // Stock Adjustment Form
-    $('#stockAdjustmentForm').on('submit', function(e) {
-        e.preventDefault();
-        const data = {
-            ITEMNO: $('#adjustmentItemCode').val(),
-            quantity: $('#adjustmentQuantity').val(),
-            notes: $('#adjustmentNotes').val()
-        };
-
-        $.ajax({
-            url: apiBaseUrl + '/stock-adjustment',
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
-                'X-CSRF-TOKEN': token,
-                'Content-Type': 'application/json'
-            },
-            data: JSON.stringify(data),
-            success: function(response) {
-                if (response.error === 0) {
-                    alert('Stock adjusted successfully!');
-                    $('#stockAdjustmentModal').modal('hide');
-                    $('#stockAdjustmentForm')[0].reset();
-                    loadStockSummary();
-                    loadTransactions();
-                } else {
-                    alert('Error: ' + (response.message || 'Failed to adjust stock'));
-                }
-            },
-            error: function(xhr) {
-                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to adjust stock'));
-            }
-        });
-    });
-
     // Search functionality
     $('#searchStockInput').on('keyup', function() {
         const value = $(this).val().toLowerCase();
@@ -460,24 +301,6 @@ $(document).ready(function() {
             $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
         });
     });
-
-    // Load data on tab switch
-    $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-        if (e.target.id === 'transactions-tab') {
-            loadTransactions();
-        } else if (e.target.id === 'summary-tab') {
-            loadStockSummary();
-        }
-    });
-
-    // Initial load
-    loadStockSummary();
 });
-
-function viewItemStock(itemno) {
-    alert('Viewing stock for item: ' + itemno);
-    // You can implement a detailed view modal here
-}
 </script>
 @endpush
-

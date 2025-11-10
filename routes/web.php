@@ -21,6 +21,9 @@ Route::get('/dashboard', [\App\Http\Controllers\Auth\AuthController::class, 'das
 // Stock Management routes (requires authentication and admin/KBS access - checked in controller)
 Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'index'])->name('stock-management');
+    Route::post('/stock-management/stock-in', [\App\Http\Controllers\Admin\StockManagementController::class, 'stockIn'])->name('stock-management.stock-in');
+    Route::post('/stock-management/stock-out', [\App\Http\Controllers\Admin\StockManagementController::class, 'stockOut'])->name('stock-management.stock-out');
+    Route::post('/stock-management/stock-adjustment', [\App\Http\Controllers\Admin\StockManagementController::class, 'stockAdjustment'])->name('stock-management.stock-adjustment');
 });
 
 // Demo route for testing
