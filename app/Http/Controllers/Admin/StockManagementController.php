@@ -75,96 +75,61 @@ class StockManagementController extends Controller
     }
     
     /**
-     * Handle stock in
+     * Handle stock transaction (combined for in/out/adjustment)
      */
-    public function stockIn(Request $request)
+    public function store(Request $request)
     {
         $request->validate([
             'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
+            'transaction_type' => 'required|string|in:in,out,adjustment',
             'quantity' => 'required|numeric|min:0.01',
             'notes' => 'nullable|string',
         ]);
         
-        try {
-            $this->processStockTransaction(
-                $request->ITEMNO,
-                'in',
-                abs($request->quantity),
-                null,
-                null,
-                $request->notes
-            );
-            
+        // Additional validation for adjustment
+        if ($request->transaction_type === 'adjustment' && empty($request->notes)) {
             return redirect()->route('inventory.stock-management')
-                ->with('success', 'Stock added successfully!');
-        } catch (\Exception $e) {
-            return redirect()->route('inventory.stock-management')
-                ->with('error', 'Failed to add stock: ' . $e->getMessage());
+                ->with('error', 'Notes are required for stock adjustments.')
+                ->withInput();
         }
-    }
-    
-    /**
-     * Handle stock out
-     */
-    public function stockOut(Request $request)
-    {
-        $request->validate([
-            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
-            'quantity' => 'required|numeric|min:0.01',
-            'notes' => 'nullable|string',
-        ]);
         
         try {
-            // Check if sufficient stock is available
-            $currentStock = $this->calculateCurrentStock($request->ITEMNO);
-            if ($currentStock < $request->quantity) {
-                return redirect()->route('inventory.stock-management')
-                    ->with('error', 'Insufficient stock. Available: ' . $currentStock);
+            $itemno = $request->ITEMNO;
+            $transactionType = $request->transaction_type;
+            $quantity = $request->quantity;
+            
+            // For stock out, check if sufficient stock is available
+            if ($transactionType === 'out') {
+                $currentStock = $this->calculateCurrentStock($itemno);
+                if ($currentStock < $quantity) {
+                    return redirect()->route('inventory.stock-management')
+                        ->with('error', 'Insufficient stock. Available: ' . number_format($currentStock, 2))
+                        ->withInput();
+                }
+                $quantity = -abs($quantity); // Make negative for stock out
+            } elseif ($transactionType === 'in') {
+                $quantity = abs($quantity); // Ensure positive for stock in
             }
+            // For adjustment, quantity can be positive or negative as provided
             
             $this->processStockTransaction(
-                $request->ITEMNO,
-                'out',
-                -abs($request->quantity),
-                null,
+                $itemno,
+                $transactionType,
+                $quantity,
+                $transactionType === 'adjustment' ? 'adjustment' : null,
                 null,
                 $request->notes
             );
             
-            return redirect()->route('inventory.stock-management')
-                ->with('success', 'Stock removed successfully!');
-        } catch (\Exception $e) {
-            return redirect()->route('inventory.stock-management')
-                ->with('error', 'Failed to remove stock: ' . $e->getMessage());
-        }
-    }
-    
-    /**
-     * Handle stock adjustment
-     */
-    public function stockAdjustment(Request $request)
-    {
-        $request->validate([
-            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
-            'quantity' => 'required|numeric',
-            'notes' => 'required|string|min:3',
-        ]);
-        
-        try {
-            $this->processStockTransaction(
-                $request->ITEMNO,
-                'adjustment',
-                $request->quantity,
-                'adjustment',
-                null,
-                $request->notes
-            );
+            $message = $transactionType === 'in' ? 'Stock added successfully!' : 
+                      ($transactionType === 'out' ? 'Stock removed successfully!' : 'Stock adjusted successfully!');
             
-            return redirect()->route('inventory.stock-management')
-                ->with('success', 'Stock adjusted successfully!');
+            return redirect()->route('inventory.stock-management', ['itemno' => $itemno])
+                ->with('success', $message);
         } catch (\Exception $e) {
             return redirect()->route('inventory.stock-management')
-                ->with('error', 'Failed to adjust stock: ' . $e->getMessage());
+                ->with('error', 'Failed to process stock transaction: ' . $e->getMessage())
+                ->withInput();
         }
     }
     
