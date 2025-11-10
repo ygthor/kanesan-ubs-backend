@@ -10,7 +10,7 @@ class Icitem extends BaseModel
     use HasFactory;
 
     protected $table = 'icitem';
-    // If your primary key is not 'id', uncomment and set it.
+    // If your primary key is not 'id', uncomment sand set it.
     protected $primaryKey = 'ITEMNO'; 
     public $incrementing = false;
     protected $keyType = 'string';
