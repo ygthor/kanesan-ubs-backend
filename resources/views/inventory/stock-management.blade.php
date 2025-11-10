@@ -12,9 +12,9 @@
 @section('card-title', 'Stock Management')
 
 @section('card-tools')
-    <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#stockTransactionModal">
+    <a href="{{ route('inventory.stock-management.create') }}" class="btn btn-primary btn-sm">
         <i class="fas fa-plus"></i> Create Stock Transaction
-    </button>
+    </a>
 @endsection
 
 @section('admin-content')
@@ -189,55 +189,6 @@
         </div>
     </div>
 
-    <!-- Combined Stock Transaction Modal -->
-    <div class="modal fade" id="stockTransactionModal" tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Create Stock Transaction</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <form method="POST" action="{{ route('inventory.stock-management.store') }}" id="stockTransactionForm">
-                    @csrf
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label for="transactionType">Transaction Type *</label>
-                            <select class="form-control" id="transactionType" name="transaction_type" required onchange="updateTransactionForm()">
-                                <option value="">Select Type</option>
-                                <option value="in">Stock In</option>
-                                <option value="out">Stock Out</option>
-                                <option value="adjustment">Stock Adjustment</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="transactionItemCode">Item Code *</label>
-                            <input type="text" class="form-control" id="transactionItemCode" name="ITEMNO" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="transactionQuantity">Quantity *</label>
-                            <input type="number" class="form-control" id="transactionQuantity" name="quantity" step="0.01" min="0.01" required>
-                            <small class="form-text text-muted" id="quantityHelp">
-                                Enter quantity to add/remove
-                            </small>
-                        </div>
-                        <div class="form-group">
-                            <label for="transactionNotes">Notes <span id="notesRequired" style="display:none;">*</span></label>
-                            <textarea class="form-control" id="transactionNotes" name="notes" rows="3"></textarea>
-                            <small class="form-text text-muted" id="notesHelp">
-                                Optional notes for this transaction
-                            </small>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="submitButton">Create Transaction</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 @endsection
 
 @push('scripts')
@@ -250,52 +201,7 @@ $(document).ready(function() {
             $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
         });
     });
-    
-    // Reset form when modal is closed
-    $('#stockTransactionModal').on('hidden.bs.modal', function () {
-        $('#stockTransactionForm')[0].reset();
-        updateTransactionForm();
-    });
 });
-
-function updateTransactionForm() {
-    const type = $('#transactionType').val();
-    const quantityInput = $('#transactionQuantity');
-    const notesInput = $('#transactionNotes');
-    const notesRequired = $('#notesRequired');
-    const quantityHelp = $('#quantityHelp');
-    const notesHelp = $('#notesHelp');
-    const submitButton = $('#submitButton');
-    
-    if (type === 'in') {
-        quantityInput.attr('min', '0.01');
-        quantityHelp.text('Enter quantity to add to stock');
-        notesInput.prop('required', false);
-        notesRequired.hide();
-        notesHelp.text('Optional notes for this transaction');
-        submitButton.removeClass('btn-warning btn-info').addClass('btn-success').text('Add Stock');
-    } else if (type === 'out') {
-        quantityInput.attr('min', '0.01');
-        quantityHelp.text('Enter quantity to remove from stock');
-        notesInput.prop('required', false);
-        notesRequired.hide();
-        notesHelp.text('Optional notes for this transaction');
-        submitButton.removeClass('btn-success btn-info').addClass('btn-warning').text('Remove Stock');
-    } else if (type === 'adjustment') {
-        quantityInput.removeAttr('min');
-        quantityHelp.text('Enter positive value to increase, negative to decrease stock');
-        notesInput.prop('required', true);
-        notesRequired.show();
-        notesHelp.text('Reason for adjustment is required');
-        submitButton.removeClass('btn-success btn-warning').addClass('btn-info').text('Adjust Stock');
-    } else {
-        quantityHelp.text('Enter quantity to add/remove');
-        notesInput.prop('required', false);
-        notesRequired.hide();
-        notesHelp.text('Optional notes for this transaction');
-        submitButton.removeClass('btn-success btn-warning btn-info').addClass('btn-primary').text('Create Transaction');
-    }
-}
 
 function viewItemTransactions(itemno) {
     // Switch to transactions tab

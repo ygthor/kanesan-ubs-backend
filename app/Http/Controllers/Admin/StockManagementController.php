@@ -60,6 +60,26 @@ class StockManagementController extends Controller
     }
     
     /**
+     * Show the form for creating a new stock transaction.
+     */
+    public function create()
+    {
+        $user = auth()->user();
+        
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            abort(403, 'Unauthorized access. Stock Management is only available for administrators and KBS users.');
+        }
+        
+        // Get all items for dropdown
+        $items = Icitem::select('ITEMNO', 'DESP')
+            ->orderBy('ITEMNO')
+            ->get();
+        
+        return view('inventory.stock-transaction-create', compact('items'));
+    }
+    
+    /**
      * Calculate current stock from transactions
      */
     private function calculateCurrentStock($itemno)
