@@ -23,6 +23,7 @@ Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(func
     Route::get('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'index'])->name('stock-management');
     Route::get('/stock-management/create', [\App\Http\Controllers\Admin\StockManagementController::class, 'create'])->name('stock-management.create');
     Route::post('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'store'])->name('stock-management.store');
+    Route::get('/stock-management/item/{itemno}/transactions', [\App\Http\Controllers\Admin\StockManagementController::class, 'showItemTransactions'])->name('stock-management.item.transactions');
 });
 
 // Demo route for testing

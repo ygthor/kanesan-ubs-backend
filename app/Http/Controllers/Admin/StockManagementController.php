@@ -40,23 +40,7 @@ class StockManagementController extends Controller
             ];
         });
         
-        // Get transactions with pagination
-        $transactionsQuery = ItemTransaction::with('item')
-            ->orderBy('CREATED_ON', 'desc');
-        
-        // Filter by transaction type if provided
-        if ($request->has('transaction_type') && $request->transaction_type) {
-            $transactionsQuery->where('transaction_type', $request->transaction_type);
-        }
-        
-        // Filter by item code if provided
-        if ($request->has('itemno') && $request->itemno) {
-            $transactionsQuery->where('ITEMNO', $request->itemno);
-        }
-        
-        $transactions = $transactionsQuery->paginate(50);
-        
-        return view('inventory.stock-management', compact('inventory', 'transactions'));
+        return view('inventory.stock-management', compact('inventory'));
     }
     
     /**
@@ -202,6 +186,43 @@ class StockManagementController extends Controller
             DB::rollBack();
             throw $e;
         }
+    }
+    
+    /**
+     * Show item transactions page
+     */
+    public function showItemTransactions(Request $request, $itemno)
+    {
+        $user = auth()->user();
+        
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            abort(403, 'Unauthorized access. Stock Management is only available for administrators and KBS users.');
+        }
+        
+        // Get item details
+        $item = Icitem::find($itemno);
+        
+        if (!$item) {
+            return redirect()->route('inventory.stock-management')
+                ->with('error', 'Item not found.');
+        }
+        
+        // Calculate current stock
+        $currentStock = $this->calculateCurrentStock($itemno);
+        
+        // Get transactions with pagination and filters
+        $transactionsQuery = ItemTransaction::where('ITEMNO', $itemno)
+            ->orderBy('CREATED_ON', 'desc');
+        
+        // Filter by transaction type if provided
+        if ($request->has('transaction_type') && $request->transaction_type) {
+            $transactionsQuery->where('transaction_type', $request->transaction_type);
+        }
+        
+        $transactions = $transactionsQuery->paginate(50);
+        
+        return view('inventory.item-transactions', compact('item', 'currentStock', 'transactions'));
     }
 }
 
