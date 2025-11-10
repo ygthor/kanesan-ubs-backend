@@ -67,8 +67,13 @@ class DashboardController extends Controller
         if ($selectedState) {
             $customerFilterQuery->where('state', $selectedState);
         }
-        $filteredCustomerIds = $customerFilterQuery->pluck('id')->toArray();
-        $filteredCustomerCodes = $customerFilterQuery->pluck('customer_code')->toArray();
+        $filteredCustomerIds = $customerFilterQuery->pluck('id')->filter()->toArray();
+        $filteredCustomerCodes = $customerFilterQuery->pluck('customer_code')
+            ->filter(function($code) {
+                return !empty($code) && $code !== null;
+            })
+            ->values()
+            ->toArray(); // Filter out null/empty codes and re-index array
         
         // If state filter is applied but no customers found, return empty dashboard
         if ($selectedState && empty($filteredCustomerIds)) {
@@ -85,6 +90,17 @@ class DashboardController extends Controller
                 'lowStockItems' => '0',
             ]);
         }
+        
+        // Debug: Log the filtered customer codes to help diagnose
+        \Log::info('Dashboard Query', [
+            'selectedState' => $selectedState,
+            'allowedCustomerIds' => $allowedCustomerIds ? count($allowedCustomerIds) : 'all',
+            'filteredCustomerIds' => count($filteredCustomerIds),
+            'filteredCustomerCodes' => count($filteredCustomerCodes),
+            'sampleCodes' => array_slice($filteredCustomerCodes, 0, 5),
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+        ]);
 
         // --- Calculations based on date range ---
 
