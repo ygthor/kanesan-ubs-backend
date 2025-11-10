@@ -18,19 +18,6 @@
 @endsection
 
 @section('admin-content')
-    <div class="row mb-3">
-        <div class="col-md-6">
-            <div class="input-group">
-                <input type="text" class="form-control" id="searchStockInput" placeholder="Search items by code or description...">
-                <div class="input-group-append">
-                    <button class="btn btn-outline-secondary" type="button">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="table-responsive">
         <table class="table table-striped table-hover" id="stockSummaryTable">
             <thead>
@@ -71,12 +58,38 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
-    // Search functionality
-    $('#searchStockInput').on('keyup', function() {
-        const value = $(this).val().toLowerCase();
-        $('#stockSummaryTable tbody tr').filter(function() {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
-        });
+    // Initialize DataTables
+    $('#stockSummaryTable').DataTable({
+        responsive: true,
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        order: [[0, 'asc']], // Sort by Item Code by default
+        columnDefs: [
+            {
+                targets: [5], // Actions column
+                orderable: false,
+                searchable: false
+            },
+            {
+                targets: [2, 4], // Current Stock and Price columns
+                type: 'num' // Treat as numbers for proper sorting
+            }
+        ],
+        language: {
+            search: "Search items:",
+            lengthMenu: "Show _MENU_ items per page",
+            info: "Showing _START_ to _END_ of _TOTAL_ items",
+            infoEmpty: "No items to show",
+            infoFiltered: "(filtered from _MAX_ total items)",
+            zeroRecords: "No matching items found",
+            paginate: {
+                first: "First",
+                last: "Last",
+                next: "Next",
+                previous: "Previous"
+            }
+        },
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
     });
 });
 </script>
