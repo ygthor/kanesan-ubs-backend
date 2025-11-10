@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\UBS\AccArCust;
+use App\Models\Icitem;
+use App\Models\ItemTransaction;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -73,4 +76,64 @@ Route::get('/update', function(){
 
 Route::get('/delete', function(){
     AccArCust::find('3000/TEST292')->delete();
+});
+
+// Test route: Add 10 quantity to all icitem
+Route::get('/test/add-stock-all', function(){
+    DB::beginTransaction();
+    try {
+        $items = Icitem::all();
+        $count = 0;
+        $quantity = 10;
+        
+        foreach ($items as $item) {
+            // Calculate current stock from transactions
+            $stockBefore = ItemTransaction::where('ITEMNO', $item->ITEMNO)->sum('quantity');
+            if ($stockBefore === null) {
+                $stockBefore = $item->QTY ?? 0;
+            }
+            
+            // Calculate new stock
+            $stockAfter = $stockBefore + $quantity;
+            
+            // Create transaction record
+            ItemTransaction::create([
+                'ITEMNO' => $item->ITEMNO,
+                'transaction_type' => 'in',
+                'quantity' => $quantity,
+                'reference_type' => 'test',
+                'reference_id' => 'bulk-add-test',
+                'notes' => 'Bulk test: Added 10 quantity to all items',
+                'stock_before' => $stockBefore,
+                'stock_after' => $stockAfter,
+                'CREATED_BY' => auth()->user()->id ?? null,
+                'UPDATED_BY' => auth()->user()->id ?? null,
+                'CREATED_ON' => now(),
+                'UPDATED_ON' => now(),
+            ]);
+            
+            // Update icitem QTY field
+            $item->QTY = $stockAfter;
+            $item->UPDATED_BY = auth()->user()->id ?? null;
+            $item->UPDATED_ON = now();
+            $item->save();
+            
+            $count++;
+        }
+        
+        DB::commit();
+        
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully added {$quantity} quantity to {$count} items",
+            'items_updated' => $count,
+            'quantity_added' => $quantity
+        ]);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ], 500);
+    }
 });
