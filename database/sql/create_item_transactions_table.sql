@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS `item_transactions` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `ITEMNO` VARCHAR(50) NOT NULL COMMENT 'Item number from icitem table',
-  `transaction_type` ENUM('in', 'out', 'adjustment') NOT NULL COMMENT 'Type of transaction: in (stock in), out (stock out), adjustment (manual adjustment)',
+  `transaction_type` ENUM('in', 'out', 'adjustment', 'invoice_sale', 'invoice_return') NOT NULL COMMENT 'Type of transaction: in (stock in), out (stock out), adjustment (manual adjustment), invoice_sale (stock out for invoice), invoice_return (stock return for credit note/refund)',
   `quantity` DECIMAL(10, 2) NOT NULL COMMENT 'Quantity: positive for in, negative for out, can be positive/negative for adjustment',
   `reference_type` VARCHAR(50) NULL DEFAULT NULL COMMENT 'Type of reference: invoice, adjustment, purchase, etc.',
   `reference_id` VARCHAR(100) NULL DEFAULT NULL COMMENT 'Reference ID (e.g., invoice REFNO, adjustment id)',

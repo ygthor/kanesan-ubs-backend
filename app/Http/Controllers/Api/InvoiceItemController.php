@@ -326,11 +326,45 @@ class InvoiceItemController extends Controller
             if ($item) {
                 $item->QTY = $stockAfter;
                 $item->UPDATED_BY = auth()->user()->id ?? null;
-                $item->UPDATED_ON = now();
+            $item->UPDATED_ON = now();
                 $item->save();
             }
         } catch (\Exception $e) {
             \Log::error('Stock transaction error in invoice item: ' . $e->getMessage());
+            \Log::error('Stock transaction error stack trace: ' . $e->getTraceAsString());
+            // If enum value doesn't exist, try fallback to 'out' or 'in'
+            if (strpos($e->getMessage(), 'transaction_type') !== false || strpos($e->getMessage(), 'enum') !== false) {
+                \Log::warning("Transaction type '{$transactionType}' may not exist in database. Using fallback.");
+                // Fallback to basic types
+                $fallbackType = in_array($transactionType, ['invoice_sale', 'out']) ? 'out' : 'in';
+                try {
+                    ItemTransaction::create([
+                        'ITEMNO' => $itemno,
+                        'transaction_type' => $fallbackType,
+                        'quantity' => $quantityChange,
+                        'reference_type' => $referenceType,
+                        'reference_id' => $referenceId,
+                        'notes' => $notes . ' [Original type: ' . $transactionType . ' - using fallback]',
+                        'stock_before' => $stockBefore,
+                        'stock_after' => $stockAfter,
+                        'CREATED_BY' => auth()->user()->id ?? null,
+                        'UPDATED_BY' => auth()->user()->id ?? null,
+                        'CREATED_ON' => now(),
+                        'UPDATED_ON' => now(),
+                    ]);
+                    
+                    // Update icitem QTY field
+                    $item = Icitem::find($itemno);
+                    if ($item) {
+                        $item->QTY = $stockAfter;
+                        $item->UPDATED_BY = auth()->user()->id ?? null;
+                        $item->UPDATED_ON = now();
+                        $item->save();
+                    }
+                } catch (\Exception $e2) {
+                    \Log::error('Fallback stock transaction also failed: ' . $e2->getMessage());
+                }
+            }
             // Don't throw - allow invoice to be saved even if stock transaction fails
         }
     }

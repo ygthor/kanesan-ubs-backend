@@ -78,6 +78,48 @@ Route::get('/delete', function(){
     AccArCust::find('3000/TEST292')->delete();
 });
 
+// Test route: Check stock transactions for an item
+Route::get('/test/check-stock/{itemno}', function($itemno){
+    use App\Models\Icitem;
+    use App\Models\ItemTransaction;
+    
+    $item = Icitem::find($itemno);
+    if (!$item) {
+        return response()->json(['error' => 'Item not found'], 404);
+    }
+    
+    // Get all transactions
+    $transactions = ItemTransaction::where('ITEMNO', $itemno)
+        ->orderBy('CREATED_ON', 'desc')
+        ->get();
+    
+    // Calculate stock from transactions
+    $calculatedStock = ItemTransaction::where('ITEMNO', $itemno)->sum('quantity');
+    
+    return response()->json([
+        'item' => [
+            'ITEMNO' => $item->ITEMNO,
+            'DESP' => $item->DESP,
+            'QTY' => $item->QTY,
+        ],
+        'calculated_stock_from_transactions' => $calculatedStock ?? 0,
+        'transaction_count' => $transactions->count(),
+        'transactions' => $transactions->map(function($t) {
+            return [
+                'id' => $t->id,
+                'transaction_type' => $t->transaction_type,
+                'quantity' => $t->quantity,
+                'stock_before' => $t->stock_before,
+                'stock_after' => $t->stock_after,
+                'reference_type' => $t->reference_type,
+                'reference_id' => $t->reference_id,
+                'notes' => $t->notes,
+                'created_on' => $t->CREATED_ON,
+            ];
+        }),
+    ]);
+});
+
 // Test route: Add 10 quantity to all icitem
 Route::get('/test/add-stock-all', function(){
     DB::beginTransaction();
