@@ -14,6 +14,8 @@ class Icitem extends BaseModel
     protected $primaryKey = 'ITEMNO'; 
     public $incrementing = false;
     protected $keyType = 'string';
+    const CREATED_AT = 'CREATED_ON';
+    const UPDATED_AT = 'UPDATED_ON';
     
     
     // Allow mass assignment for these fields
