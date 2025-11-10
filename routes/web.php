@@ -80,9 +80,6 @@ Route::get('/delete', function(){
 
 // Test route: Check stock transactions for an item
 Route::get('/test/check-stock/{itemno}', function($itemno){
-    use App\Models\Icitem;
-    use App\Models\ItemTransaction;
-    
     $item = Icitem::find($itemno);
     if (!$item) {
         return response()->json(['error' => 'Item not found'], 404);
