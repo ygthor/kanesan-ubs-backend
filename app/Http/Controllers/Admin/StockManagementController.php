@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Web;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -23,3 +23,4 @@ class StockManagementController extends Controller
         return view('inventory.stock-management');
     }
 }
+
