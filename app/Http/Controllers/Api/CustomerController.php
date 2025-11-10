@@ -34,7 +34,7 @@ class CustomerController extends Controller
     {
         $user = auth()->user();
         
-        $query = Customer::orderBy('company_name', 'asc');
+        $query = Customer::query();
         
         // KBS user has full access to all customers
         if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
@@ -47,6 +47,30 @@ class CustomerController extends Controller
                 // If no allowed customer IDs, return empty result
                 return makeResponse(200, 'No customers accessible.', []);
             }
+        }
+        
+        // Handle sorting
+        $sortBy = $request->input('sort_by', 'created_at'); // Default to created_at
+        $sortOrder = $request->input('sort_order', 'desc'); // Default to desc
+        
+        // Validate sort_by field
+        $allowedSortFields = ['created_at', 'company_name', 'customer_code'];
+        if (!in_array($sortBy, $allowedSortFields)) {
+            $sortBy = 'created_at';
+        }
+        
+        // Validate sort_order
+        $sortOrder = strtolower($sortOrder);
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+        
+        // Apply sorting
+        $query->orderBy($sortBy, $sortOrder);
+        
+        // Add secondary sort by company_name if not already the primary sort
+        if ($sortBy !== 'company_name') {
+            $query->orderBy('company_name', 'asc');
         }
         
         $customers = $query->with('users')->get();
@@ -173,12 +197,13 @@ class CustomerController extends Controller
             $customer = Customer::create($customerData);
 
             // Handle user assignment using many-to-many relationship
-            if ($request->has('assigned_user_id') && $request->assigned_user_id) {
-                // Admin assigned a specific user
+            // Always link the customer to the user who created it
+            $customer->users()->attach($user->id);
+            
+            // If admin assigned a different user, also link to that user
+            if ($request->has('assigned_user_id') && $request->assigned_user_id && $request->assigned_user_id != $user->id) {
+                // Admin assigned a different user, link both creator and assigned user
                 $customer->users()->attach($request->assigned_user_id);
-            } else {
-                // Automatically assign to the user who created the customer
-                $customer->users()->attach($user->id);
             }
 
             // Use custom response function for success
@@ -298,12 +323,15 @@ class CustomerController extends Controller
             // Handle user assignment using many-to-many relationship
             if ($request->has('assigned_user_id')) {
                 if ($request->assigned_user_id) {
-                    // Sync the user assignment (replace existing assignments)
-                    $customer->users()->sync([$request->assigned_user_id]);
-                } else {
-                    // Remove all user assignments if assigned_user_id is null/empty
-                    $customer->users()->detach();
+                    // Get existing user IDs to preserve creator link
+                    $existingUserIds = $customer->users()->pluck('users.id')->toArray();
+                    // Merge with new assignment (avoid duplicates)
+                    $userIdsToSync = array_unique(array_merge($existingUserIds, [$request->assigned_user_id]));
+                    // Sync to include both existing users and new assignment
+                    $customer->users()->sync($userIdsToSync);
                 }
+                // Note: We don't remove all assignments if assigned_user_id is null/empty
+                // to preserve the creator link. If you need to remove assignments, do it explicitly.
             }
 
             // Use custom response function for success
