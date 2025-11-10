@@ -78,6 +78,22 @@ class ItemTransaction extends BaseModel
     }
 
     /**
+     * Scope for invoice sale transactions (stock out for invoices)
+     */
+    public function scopeInvoiceSale($query)
+    {
+        return $query->where('transaction_type', 'invoice_sale');
+    }
+
+    /**
+     * Scope for invoice return transactions (stock return for credit notes)
+     */
+    public function scopeInvoiceReturn($query)
+    {
+        return $query->where('transaction_type', 'invoice_return');
+    }
+
+    /**
      * Scope for transactions by reference
      */
     public function scopeByReference($query, $referenceType, $referenceId)

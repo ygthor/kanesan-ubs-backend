@@ -109,23 +109,55 @@ class InvoiceItemController extends Controller
                 'PRICE' => $request->unit_price,
             ];
 
+            // Determine transaction type based on invoice type
+            // CN (Credit Note) = invoice_return (stock goes back in)
+            // Other types (INV, CB, etc.) = invoice_sale (stock goes out)
+            $isCreditNote = in_array($invoice->TYPE, ['CN', 'CR']);
+            $transactionType = $isCreditNote ? 'invoice_return' : 'invoice_sale';
+            
             if ($id) {
                 // UPDATE MODE
                 $invoiceItem = ArTransItem::findOrFail($id);
                 $oldQuantity = $invoiceItem->QTY;
+                $oldIsCreditNote = in_array($invoiceItem->TYPE, ['CN', 'CR']);
+                $oldTransactionType = $oldIsCreditNote ? 'invoice_return' : 'invoice_sale';
+                
                 $invoiceItem->update($itemData);
                 
                 // Adjust stock: add back old quantity, deduct new quantity
                 $quantityDifference = $oldQuantity - $request->quantity;
                 if ($quantityDifference != 0) {
-                    $this->processStockTransaction(
-                        $request->product_code,
-                        $quantityDifference > 0 ? 'in' : 'out',
-                        abs($quantityDifference),
-                        'invoice',
-                        $invoice->REFNO,
-                        'Invoice item updated - quantity changed from ' . $oldQuantity . ' to ' . $request->quantity
-                    );
+                    // If transaction type changed (e.g., from sale to return), reverse the old transaction
+                    if ($oldTransactionType !== $transactionType) {
+                        // Reverse old transaction
+                        $this->processStockTransaction(
+                            $request->product_code,
+                            $oldIsCreditNote ? 'invoice_sale' : 'invoice_return', // Reverse the old type
+                            $oldQuantity,
+                            'invoice',
+                            $invoice->REFNO,
+                            'Invoice item updated - reversing old transaction type'
+                        );
+                        // Apply new transaction
+                        $this->processStockTransaction(
+                            $request->product_code,
+                            $transactionType,
+                            $request->quantity,
+                            'invoice',
+                            $invoice->REFNO,
+                            'Invoice item updated - new transaction type'
+                        );
+                    } else {
+                        // Same transaction type, just adjust quantity
+                        $this->processStockTransaction(
+                            $request->product_code,
+                            $quantityDifference > 0 ? ($isCreditNote ? 'invoice_sale' : 'invoice_return') : $transactionType,
+                            abs($quantityDifference),
+                            'invoice',
+                            $invoice->REFNO,
+                            'Invoice item updated - quantity changed from ' . $oldQuantity . ' to ' . $request->quantity
+                        );
+                    }
                 }
             } else {
                 // CREATE MODE
@@ -134,14 +166,16 @@ class InvoiceItemController extends Controller
                 $itemData['ITEMCOUNT'] = $itemCount;
                 $invoiceItem = ArTransItem::create($itemData);
                 
-                // Auto-deduct stock when invoice item is created
+                // Auto-process stock transaction when invoice item is created
                 $this->processStockTransaction(
                     $request->product_code,
-                    'out',
+                    $transactionType,
                     $request->quantity,
                     'invoice',
                     $invoice->REFNO,
-                    'Stock deducted for invoice ' . $invoice->REFNO
+                    $isCreditNote 
+                        ? 'Stock returned for credit note ' . $invoice->REFNO
+                        : 'Stock deducted for invoice ' . $invoice->REFNO
                 );
             }
 
@@ -202,14 +236,20 @@ class InvoiceItemController extends Controller
             $item->delete();
             
             // Add back stock when invoice item is deleted
+            // Determine the reverse transaction type based on original invoice type
+            $isCreditNote = $invoice && in_array($invoice->TYPE, ['CN', 'CR']);
+            $reverseTransactionType = $isCreditNote ? 'invoice_sale' : 'invoice_return';
+            
             if ($itemno && $quantity > 0) {
                 $this->processStockTransaction(
                     $itemno,
-                    'in',
+                    $reverseTransactionType,
                     $quantity,
                     'invoice',
                     $refno,
-                    'Stock returned - invoice item deleted from invoice ' . $refno
+                    $isCreditNote
+                        ? 'Stock adjustment - credit note item deleted from ' . $refno
+                        : 'Stock returned - invoice item deleted from ' . $refno
                 );
             }
 
@@ -252,11 +292,15 @@ class InvoiceItemController extends Controller
             $stockBefore = $this->calculateCurrentStock($itemno);
             
             // Calculate new stock
-            $quantityChange = $transactionType === 'out' ? -abs($quantity) : abs($quantity);
+            // invoice_sale = stock out (negative), invoice_return = stock in (positive)
+            // out = stock out (negative), in = stock in (positive), adjustment = can be either
+            $quantityChange = in_array($transactionType, ['out', 'invoice_sale']) 
+                ? -abs($quantity) 
+                : abs($quantity);
             $stockAfter = $stockBefore + $quantityChange;
             
             // Check if sufficient stock for stock out
-            if ($transactionType === 'out' && $stockAfter < 0) {
+            if (in_array($transactionType, ['out', 'invoice_sale']) && $stockAfter < 0) {
                 \Log::warning("Insufficient stock for item {$itemno}. Current: {$stockBefore}, Required: {$quantity}");
                 // Still process but log warning
             }

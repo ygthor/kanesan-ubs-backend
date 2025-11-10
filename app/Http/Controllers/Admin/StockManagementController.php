@@ -85,7 +85,7 @@ class StockManagementController extends Controller
     {
         $request->validate([
             'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
-            'transaction_type' => 'required|string|in:in,out,adjustment',
+            'transaction_type' => 'required|string|in:in,out,adjustment,invoice_sale,invoice_return',
             'quantity' => 'required|numeric|min:0.01',
             'notes' => 'nullable|string',
         ]);
@@ -102,8 +102,8 @@ class StockManagementController extends Controller
             $transactionType = $request->transaction_type;
             $quantity = $request->quantity;
             
-            // For stock out, check if sufficient stock is available
-            if ($transactionType === 'out') {
+            // For stock out and invoice sale, check if sufficient stock is available
+            if (in_array($transactionType, ['out', 'invoice_sale'])) {
                 $currentStock = $this->calculateCurrentStock($itemno);
                 if ($currentStock < $quantity) {
                     return redirect()->route('inventory.stock-management')
@@ -111,7 +111,7 @@ class StockManagementController extends Controller
                         ->withInput();
                 }
                 $quantity = -abs($quantity); // Make negative for stock out
-            } elseif ($transactionType === 'in') {
+            } elseif (in_array($transactionType, ['in', 'invoice_return'])) {
                 $quantity = abs($quantity); // Ensure positive for stock in
             }
             // For adjustment, quantity can be positive or negative as provided
@@ -125,8 +125,17 @@ class StockManagementController extends Controller
                 $request->notes
             );
             
-            $message = $transactionType === 'in' ? 'Stock added successfully!' : 
-                      ($transactionType === 'out' ? 'Stock removed successfully!' : 'Stock adjusted successfully!');
+            if ($transactionType === 'in') {
+                $message = 'Stock added successfully!';
+            } elseif ($transactionType === 'out') {
+                $message = 'Stock removed successfully!';
+            } elseif ($transactionType === 'invoice_sale') {
+                $message = 'Invoice sale transaction created successfully!';
+            } elseif ($transactionType === 'invoice_return') {
+                $message = 'Invoice return transaction created successfully!';
+            } else {
+                $message = 'Stock adjusted successfully!';
+            }
             
             return redirect()->route('inventory.stock-management', ['itemno' => $itemno])
                 ->with('success', $message);

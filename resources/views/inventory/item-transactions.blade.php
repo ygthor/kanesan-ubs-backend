@@ -85,6 +85,8 @@
                             <option value="">All Transaction Types</option>
                             <option value="in" {{ request('transaction_type') == 'in' ? 'selected' : '' }}>Stock In</option>
                             <option value="out" {{ request('transaction_type') == 'out' ? 'selected' : '' }}>Stock Out</option>
+                            <option value="invoice_sale" {{ request('transaction_type') == 'invoice_sale' ? 'selected' : '' }}>Invoice Sale</option>
+                            <option value="invoice_return" {{ request('transaction_type') == 'invoice_return' ? 'selected' : '' }}>Invoice Return</option>
                             <option value="adjustment" {{ request('transaction_type') == 'adjustment' ? 'selected' : '' }}>Adjustment</option>
                         </select>
                     </div>
@@ -124,15 +126,19 @@
                         @forelse($transactions as $trans)
                             <tr>
                                 <td>{{ $trans->CREATED_ON ? \Carbon\Carbon::parse($trans->CREATED_ON)->format('M d, Y H:i') : 'N/A' }}</td>
-                                <td>
-                                    @if($trans->transaction_type == 'in')
-                                        <span class="badge badge-success">Stock In</span>
-                                    @elseif($trans->transaction_type == 'out')
-                                        <span class="badge badge-danger">Stock Out</span>
-                                    @else
-                                        <span class="badge badge-warning">Adjustment</span>
-                                    @endif
-                                </td>
+                                    <td>
+                                        @if($trans->transaction_type == 'in')
+                                            <span class="badge badge-success">Stock In</span>
+                                        @elseif($trans->transaction_type == 'out')
+                                            <span class="badge badge-danger">Stock Out</span>
+                                        @elseif($trans->transaction_type == 'invoice_sale')
+                                            <span class="badge badge-danger">Invoice Sale</span>
+                                        @elseif($trans->transaction_type == 'invoice_return')
+                                            <span class="badge badge-info">Invoice Return</span>
+                                        @else
+                                            <span class="badge badge-warning">Adjustment</span>
+                                        @endif
+                                    </td>
                                 <td>
                                     @if($trans->quantity > 0)
                                         <span class="text-success">+{{ number_format($trans->quantity, 2) }}</span>

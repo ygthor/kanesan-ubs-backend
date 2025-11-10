@@ -284,14 +284,20 @@ class InvoiceController extends Controller
                         $invoiceItem->calculate();
                         $invoiceItem->save();
                         
-                        // Auto-deduct stock when invoice item is created from order
+                        // Auto-process stock when invoice item is created from order
+                        // Determine transaction type based on invoice type
+                        $isCreditNote = in_array($invoice->TYPE, ['CN', 'CR']);
+                        $transactionType = $isCreditNote ? 'invoice_return' : 'invoice_sale';
+                        
                         $this->processStockTransaction(
                             $orderItem->product_no,
-                            'out',
+                            $transactionType,
                             $orderItem->quantity,
                             'invoice',
                             $invoice->REFNO,
-                            'Stock deducted for invoice ' . $invoice->REFNO . ' (from order)'
+                            $isCreditNote
+                                ? 'Stock returned for credit note ' . $invoice->REFNO . ' (from order)'
+                                : 'Stock deducted for invoice ' . $invoice->REFNO . ' (from order)'
                         );
                         
                         $itemCount++;
@@ -516,11 +522,15 @@ class InvoiceController extends Controller
             $stockBefore = $this->calculateCurrentStock($itemno);
             
             // Calculate new stock
-            $quantityChange = $transactionType === 'out' ? -abs($quantity) : abs($quantity);
+            // invoice_sale = stock out (negative), invoice_return = stock in (positive)
+            // out = stock out (negative), in = stock in (positive), adjustment = can be either
+            $quantityChange = in_array($transactionType, ['out', 'invoice_sale']) 
+                ? -abs($quantity) 
+                : abs($quantity);
             $stockAfter = $stockBefore + $quantityChange;
             
             // Check if sufficient stock for stock out
-            if ($transactionType === 'out' && $stockAfter < 0) {
+            if (in_array($transactionType, ['out', 'invoice_sale']) && $stockAfter < 0) {
                 \Log::warning("Insufficient stock for item {$itemno}. Current: {$stockBefore}, Required: {$quantity}");
                 // Still process but log warning
             }
