@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Artran;
 use App\Models\ArTransItem;
 use App\Models\Icitem;
+use App\Models\ItemTransaction;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -111,13 +112,37 @@ class InvoiceItemController extends Controller
             if ($id) {
                 // UPDATE MODE
                 $invoiceItem = ArTransItem::findOrFail($id);
+                $oldQuantity = $invoiceItem->QTY;
                 $invoiceItem->update($itemData);
+                
+                // Adjust stock: add back old quantity, deduct new quantity
+                $quantityDifference = $oldQuantity - $request->quantity;
+                if ($quantityDifference != 0) {
+                    $this->processStockTransaction(
+                        $request->product_code,
+                        $quantityDifference > 0 ? 'in' : 'out',
+                        abs($quantityDifference),
+                        'invoice',
+                        $invoice->REFNO,
+                        'Invoice item updated - quantity changed from ' . $oldQuantity . ' to ' . $request->quantity
+                    );
+                }
             } else {
                 // CREATE MODE
                 // Determine the next item count
                 $itemCount = $invoice->items()->count() + 1;
                 $itemData['ITEMCOUNT'] = $itemCount;
                 $invoiceItem = ArTransItem::create($itemData);
+                
+                // Auto-deduct stock when invoice item is created
+                $this->processStockTransaction(
+                    $request->product_code,
+                    'out',
+                    $request->quantity,
+                    'invoice',
+                    $invoice->REFNO,
+                    'Stock deducted for invoice ' . $invoice->REFNO
+                );
             }
 
             // 1. Calculate totals for the line item itself
@@ -168,8 +193,25 @@ class InvoiceItemController extends Controller
             
             // Get the parent invoice *before* deleting the item
             $invoice = $item->artran;
+            
+            // Store item details before deletion for stock adjustment
+            $itemno = $item->ITEMNO;
+            $quantity = $item->QTY;
+            $refno = $invoice ? $invoice->REFNO : null;
 
             $item->delete();
+            
+            // Add back stock when invoice item is deleted
+            if ($itemno && $quantity > 0) {
+                $this->processStockTransaction(
+                    $itemno,
+                    'in',
+                    $quantity,
+                    'invoice',
+                    $refno,
+                    'Stock returned - invoice item deleted from invoice ' . $refno
+                );
+            }
 
             // After deleting, recalculate the parent invoice totals
             if ($invoice) {
@@ -184,5 +226,86 @@ class InvoiceItemController extends Controller
             \Log::error('Failed to delete invoice item: ' . $e->getMessage());
             return makeResponse(500, 'Failed to delete invoice item.', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Process stock transaction for invoice items
+     *
+     * @param string $itemno
+     * @param string $transactionType
+     * @param float $quantity
+     * @param string $referenceType
+     * @param string $referenceId
+     * @param string $notes
+     * @return void
+     */
+    private function processStockTransaction(
+        $itemno,
+        $transactionType,
+        $quantity,
+        $referenceType,
+        $referenceId,
+        $notes
+    ) {
+        try {
+            // Get current stock
+            $stockBefore = $this->calculateCurrentStock($itemno);
+            
+            // Calculate new stock
+            $quantityChange = $transactionType === 'out' ? -abs($quantity) : abs($quantity);
+            $stockAfter = $stockBefore + $quantityChange;
+            
+            // Check if sufficient stock for stock out
+            if ($transactionType === 'out' && $stockAfter < 0) {
+                \Log::warning("Insufficient stock for item {$itemno}. Current: {$stockBefore}, Required: {$quantity}");
+                // Still process but log warning
+            }
+
+            // Create transaction record
+            ItemTransaction::create([
+                'ITEMNO' => $itemno,
+                'transaction_type' => $transactionType,
+                'quantity' => $quantityChange,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
+                'notes' => $notes,
+                'stock_before' => $stockBefore,
+                'stock_after' => $stockAfter,
+                'CREATED_BY' => auth()->user()->id ?? null,
+                'UPDATED_BY' => auth()->user()->id ?? null,
+                'CREATED_ON' => now(),
+                'UPDATED_ON' => now(),
+            ]);
+
+            // Update icitem QTY field
+            $item = Icitem::find($itemno);
+            if ($item) {
+                $item->QTY = $stockAfter;
+                $item->UPDATED_BY = auth()->user()->id ?? null;
+                $item->UPDATED_ON = now();
+                $item->save();
+            }
+        } catch (\Exception $e) {
+            \Log::error('Stock transaction error in invoice item: ' . $e->getMessage());
+            // Don't throw - allow invoice to be saved even if stock transaction fails
+        }
+    }
+
+    /**
+     * Calculate current stock from transactions
+     *
+     * @param string $itemno
+     * @return float
+     */
+    private function calculateCurrentStock($itemno)
+    {
+        $total = ItemTransaction::where('ITEMNO', $itemno)->sum('quantity');
+        
+        if ($total === null) {
+            $item = Icitem::find($itemno);
+            return $item ? (float)($item->QTY ?? 0) : 0;
+        }
+
+        return (float)$total;
     }
 }

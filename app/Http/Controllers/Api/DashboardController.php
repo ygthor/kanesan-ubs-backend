@@ -28,15 +28,11 @@ class DashboardController extends Controller
         $request->validate([
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d',
-            'state' => 'nullable|string', // Customer state filter
         ]);
 
         // Determine date range. Default to the current month if not provided.
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
-        
-        // Get state filter
-        $selectedState = $request->input('state');
 
         // Get user's allowed customer IDs (unless KBS user or admin role)
         $allowedCustomerIds = null;
@@ -59,13 +55,10 @@ class DashboardController extends Controller
             }
         }
         
-        // Build customer filter query for state
+        // Build customer filter query (only filter by user's allowed customers if applicable)
         $customerFilterQuery = Customer::query();
         if ($allowedCustomerIds) {
             $customerFilterQuery->whereIn('id', $allowedCustomerIds);
-        }
-        if ($selectedState) {
-            $customerFilterQuery->where('state', $selectedState);
         }
         $filteredCustomerIds = $customerFilterQuery->pluck('id')->filter()->toArray();
         $filteredCustomerCodes = $customerFilterQuery->pluck('customer_code')
@@ -75,25 +68,8 @@ class DashboardController extends Controller
             ->values()
             ->toArray(); // Filter out null/empty codes and re-index array
         
-        // If state filter is applied but no customers found, return empty dashboard
-        if ($selectedState && empty($filteredCustomerIds)) {
-            return makeResponse(200, 'Dashboard summary retrieved successfully.', [
-                'totalRevenue' => 'RM 0.00',
-                'nettSales' => 'RM 0.00',
-                'totalCollections' => 'RM 0.00',
-                'outstandingDebt' => 'RM 0.00',
-                'inventoryValue' => 'RM 0.00',
-                'invoicesIssued' => '0',
-                'receiptsIssued' => '0',
-                'newCustomers' => '0',
-                'pendingOrders' => '0',
-                'lowStockItems' => '0',
-            ]);
-        }
-        
         // Debug: Log the filtered customer codes to help diagnose
         \Log::info('Dashboard Query', [
-            'selectedState' => $selectedState,
             'allowedCustomerIds' => $allowedCustomerIds ? count($allowedCustomerIds) : 'all',
             'filteredCustomerIds' => count($filteredCustomerIds),
             'filteredCustomerCodes' => count($filteredCustomerCodes),

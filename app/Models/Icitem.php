@@ -57,4 +57,20 @@ class Icitem extends BaseModel
         ];
     }
 
+    /**
+     * Get all transactions for this item
+     */
+    public function transactions()
+    {
+        return $this->hasMany(ItemTransaction::class, 'ITEMNO', 'ITEMNO');
+    }
+
+    /**
+     * Get current stock from transactions
+     */
+    public function getCurrentStockAttribute()
+    {
+        $total = $this->transactions()->sum('quantity');
+        return $total !== null ? (float)$total : (float)($this->QTY ?? 0);
+    }
 }

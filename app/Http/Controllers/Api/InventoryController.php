@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\Icitem;
+use App\Models\ItemTransaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class InventoryController extends Controller
 {
@@ -54,5 +58,275 @@ class InventoryController extends Controller
         });
 
         return makeResponse(200, 'Inventory retrieved successfully.', $formattedData);
+    }
+
+    /**
+     * Get current stock for an item (from icitem table)
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getStock(Request $request, $itemno)
+    {
+        $item = Icitem::find($itemno);
+        
+        if (!$item) {
+            return makeResponse(404, 'Item not found.', null);
+        }
+
+        // Calculate current stock from transactions
+        $currentStock = $this->calculateCurrentStock($itemno);
+
+        return makeResponse(200, 'Stock retrieved successfully.', [
+            'ITEMNO' => $itemno,
+            'DESP' => $item->DESP,
+            'current_stock' => $currentStock,
+            'QTY' => $item->QTY ?? 0, // Original QTY field from icitem
+        ]);
+    }
+
+    /**
+     * Get all transactions for an item
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getTransactions(Request $request, $itemno = null)
+    {
+        $query = ItemTransaction::with('item')
+            ->orderBy('CREATED_ON', 'desc');
+
+        if ($itemno) {
+            $query->where('ITEMNO', $itemno);
+        }
+
+        // Filter by transaction type if provided
+        if ($request->has('transaction_type')) {
+            $query->where('transaction_type', $request->transaction_type);
+        }
+
+        // Filter by reference if provided
+        if ($request->has('reference_type')) {
+            $query->where('reference_type', $request->reference_type);
+        }
+
+        if ($request->has('reference_id')) {
+            $query->where('reference_id', $request->reference_id);
+        }
+
+        // Pagination
+        $perPage = $request->input('per_page', 50);
+        $transactions = $query->paginate($perPage);
+
+        return makeResponse(200, 'Transactions retrieved successfully.', $transactions);
+    }
+
+    /**
+     * Stock In - Add stock to inventory
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function stockIn(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
+            'quantity' => 'required|numeric|min:0.01',
+            'reference_type' => 'nullable|string|max:50',
+            'reference_id' => 'nullable|string|max:100',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
+        }
+
+        return $this->processStockTransaction(
+            $request->ITEMNO,
+            'in',
+            abs($request->quantity), // Ensure positive
+            $request->reference_type,
+            $request->reference_id,
+            $request->notes
+        );
+    }
+
+    /**
+     * Stock Out - Remove stock from inventory
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function stockOut(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
+            'quantity' => 'required|numeric|min:0.01',
+            'reference_type' => 'nullable|string|max:50',
+            'reference_id' => 'nullable|string|max:100',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
+        }
+
+        // Check if sufficient stock is available
+        $currentStock = $this->calculateCurrentStock($request->ITEMNO);
+        if ($currentStock < $request->quantity) {
+            return makeResponse(400, 'Insufficient stock. Available: ' . $currentStock, null);
+        }
+
+        return $this->processStockTransaction(
+            $request->ITEMNO,
+            'out',
+            -abs($request->quantity), // Negative for stock out
+            $request->reference_type,
+            $request->reference_id,
+            $request->notes
+        );
+    }
+
+    /**
+     * Stock Adjustment - Manual stock adjustment
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function stockAdjustment(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
+            'quantity' => 'required|numeric',
+            'reference_type' => 'nullable|string|max:50',
+            'reference_id' => 'nullable|string|max:100',
+            'notes' => 'required|string|min:3', // Notes required for adjustments
+        ]);
+
+        if ($validator->fails()) {
+            return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
+        }
+
+        return $this->processStockTransaction(
+            $request->ITEMNO,
+            'adjustment',
+            $request->quantity, // Can be positive or negative
+            $request->reference_type ?? 'adjustment',
+            $request->reference_id,
+            $request->notes
+        );
+    }
+
+    /**
+     * Process a stock transaction (in/out/adjustment)
+     *
+     * @param string $itemno
+     * @param string $transactionType
+     * @param float $quantity
+     * @param string|null $referenceType
+     * @param string|null $referenceId
+     * @param string|null $notes
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function processStockTransaction(
+        $itemno,
+        $transactionType,
+        $quantity,
+        $referenceType = null,
+        $referenceId = null,
+        $notes = null
+    ) {
+        DB::beginTransaction();
+        try {
+            // Get current stock
+            $stockBefore = $this->calculateCurrentStock($itemno);
+            
+            // Calculate new stock
+            $stockAfter = $stockBefore + $quantity;
+
+            // Create transaction record
+            $transaction = ItemTransaction::create([
+                'ITEMNO' => $itemno,
+                'transaction_type' => $transactionType,
+                'quantity' => $quantity,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
+                'notes' => $notes,
+                'stock_before' => $stockBefore,
+                'stock_after' => $stockAfter,
+                'CREATED_BY' => auth()->user()->id ?? null,
+                'UPDATED_BY' => auth()->user()->id ?? null,
+                'CREATED_ON' => now(),
+                'UPDATED_ON' => now(),
+            ]);
+
+            // Update icitem QTY field (optional - for backward compatibility)
+            $item = Icitem::find($itemno);
+            if ($item) {
+                $item->QTY = $stockAfter;
+                $item->UPDATED_BY = auth()->user()->id ?? null;
+                $item->UPDATED_ON = now();
+                $item->save();
+            }
+
+            DB::commit();
+
+            return makeResponse(200, 'Stock transaction processed successfully.', [
+                'transaction' => $transaction,
+                'stock_before' => $stockBefore,
+                'stock_after' => $stockAfter,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Stock transaction error: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to process stock transaction: ' . $e->getMessage(), null);
+        }
+    }
+
+    /**
+     * Calculate current stock from transactions
+     *
+     * @param string $itemno
+     * @return float
+     */
+    private function calculateCurrentStock($itemno)
+    {
+        // Sum all quantities from transactions
+        $total = ItemTransaction::where('ITEMNO', $itemno)
+            ->sum('quantity');
+
+        // If no transactions, get from icitem.QTY
+        if ($total === null) {
+            $item = Icitem::find($itemno);
+            return $item ? (float)($item->QTY ?? 0) : 0;
+        }
+
+        return (float)$total;
+    }
+
+    /**
+     * Get inventory summary (all items with current stock)
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getInventorySummary(Request $request)
+    {
+        $items = Icitem::select('ITEMNO', 'DESP', 'QTY', 'UNIT', 'PRICE')
+            ->get();
+
+        $inventory = $items->map(function ($item) {
+            $currentStock = $this->calculateCurrentStock($item->ITEMNO);
+            return [
+                'ITEMNO' => $item->ITEMNO,
+                'DESP' => $item->DESP,
+                'current_stock' => $currentStock,
+                'QTY' => $item->QTY ?? 0,
+                'UNIT' => $item->UNIT,
+                'PRICE' => $item->PRICE,
+            ];
+        });
+
+        return makeResponse(200, 'Inventory summary retrieved successfully.', $inventory);
     }
 }

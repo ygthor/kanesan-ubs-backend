@@ -175,6 +175,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index')->middleware('filter.customer');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    
+    // Inventory Management Routes
+    Route::prefix('inventory')->group(function () {
+        Route::get('/summary', [InventoryController::class, 'getInventorySummary'])->name('inventory.summary');
+        Route::get('/stock/{itemno}', [InventoryController::class, 'getStock'])->name('inventory.stock');
+        Route::get('/transactions', [InventoryController::class, 'getTransactions'])->name('inventory.transactions');
+        Route::get('/transactions/{itemno}', [InventoryController::class, 'getTransactions'])->name('inventory.transactions.item');
+        Route::post('/stock-in', [InventoryController::class, 'stockIn'])->name('inventory.stock-in');
+        Route::post('/stock-out', [InventoryController::class, 'stockOut'])->name('inventory.stock-out');
+        Route::post('/stock-adjustment', [InventoryController::class, 'stockAdjustment'])->name('inventory.stock-adjustment');
+    });
 
     // The route below for '/customer' (singular) pointing to index would be redundant
     // if you use apiResource with 'customers' (plural) as the resource name.
