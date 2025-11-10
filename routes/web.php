@@ -18,6 +18,11 @@ Route::post('/logout', [\App\Http\Controllers\Auth\AuthController::class, 'logou
 // Dashboard route (requires authentication)
 Route::get('/dashboard', [\App\Http\Controllers\Auth\AuthController::class, 'dashboard'])->name('dashboard')->middleware('auth');
 
+// Stock Management routes (requires authentication and admin/KBS access - checked in controller)
+Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(function () {
+    Route::get('/stock-management', [\App\Http\Controllers\Web\StockManagementController::class, 'index'])->name('stock-management');
+});
+
 // Demo route for testing
 Route::get('/demo-users', function() {
     return view('demo-users');

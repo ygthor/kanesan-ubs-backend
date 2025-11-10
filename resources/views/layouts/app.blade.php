@@ -71,6 +71,15 @@
                             </a>
                         </li>
                         
+                        @if(auth()->check() && (auth()->user()->hasRole('admin') || auth()->user()->username === 'KBS' || auth()->user()->email === 'KBS@kanesan.my'))
+                        <li class="nav-item">
+                            <a href="/inventory/stock-management" class="nav-link {{ request()->is('inventory/stock-management*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-boxes"></i>
+                                <p>Stock Management</p>
+                            </a>
+                        </li>
+                        @endif
+                        
                         @if(auth()->check() && auth()->user()->hasRole('admin'))
                         <li class="nav-item">
                             <a href="/admin/users" class="nav-link {{ request()->is('admin/users*') ? 'active' : '' }}">
