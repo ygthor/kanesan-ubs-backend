@@ -220,6 +220,15 @@ class StockManagementController extends Controller
             $transactionsQuery->where('transaction_type', $request->transaction_type);
         }
         
+        // Filter by date range if provided
+        if ($request->has('date_from') && $request->date_from) {
+            $transactionsQuery->whereDate('CREATED_ON', '>=', $request->date_from);
+        }
+        
+        if ($request->has('date_to') && $request->date_to) {
+            $transactionsQuery->whereDate('CREATED_ON', '<=', $request->date_to);
+        }
+        
         $transactions = $transactionsQuery->paginate(50);
         
         return view('inventory.item-transactions', compact('item', 'currentStock', 'transactions'));

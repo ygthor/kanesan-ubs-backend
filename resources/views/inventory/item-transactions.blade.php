@@ -56,23 +56,46 @@
             <h5 class="card-title mb-0"><i class="fas fa-filter"></i> Filter Transactions</h5>
         </div>
         <div class="card-body">
-            <form method="GET" action="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}" class="row">
-                <div class="col-md-4">
-                    <label for="transactionTypeFilter">Transaction Type</label>
-                    <select class="form-control select2" name="transaction_type" id="transactionTypeFilter" style="width: 100%;">
-                        <option value="">All Transaction Types</option>
-                        <option value="in" {{ request('transaction_type') == 'in' ? 'selected' : '' }}>Stock In</option>
-                        <option value="out" {{ request('transaction_type') == 'out' ? 'selected' : '' }}>Stock Out</option>
-                        <option value="adjustment" {{ request('transaction_type') == 'adjustment' ? 'selected' : '' }}>Adjustment</option>
-                    </select>
+            <form method="GET" action="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}" id="filterForm">
+                <!-- Quick Date Range Filters -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label class="mb-2">Quick Date Range:</label>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="setDateRange('this_month')">This Month</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="setDateRange('last_month')">Last Month</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="setDateRange('last_3_months')">Last 3 Months</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="setDateRange('this_year')">This Year</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary mr-2">
-                        <i class="fas fa-filter"></i> Apply Filter
-                    </button>
-                    <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Clear
-                    </a>
+                
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="dateFrom">Date From</label>
+                        <input type="date" class="form-control" name="date_from" id="dateFrom" value="{{ request('date_from') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="dateTo">Date To</label>
+                        <input type="date" class="form-control" name="date_to" id="dateTo" value="{{ request('date_to') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="transactionTypeFilter">Transaction Type</label>
+                        <select class="form-control select2" name="transaction_type" id="transactionTypeFilter" style="width: 100%;">
+                            <option value="">All Transaction Types</option>
+                            <option value="in" {{ request('transaction_type') == 'in' ? 'selected' : '' }}>Stock In</option>
+                            <option value="out" {{ request('transaction_type') == 'out' ? 'selected' : '' }}>Stock Out</option>
+                            <option value="adjustment" {{ request('transaction_type') == 'adjustment' ? 'selected' : '' }}>Adjustment</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary mr-2">
+                            <i class="fas fa-filter"></i> Apply Filter
+                        </button>
+                        <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
                 </div>
             </form>
         </div>
@@ -127,8 +150,8 @@
                                 <td colspan="7" class="text-center text-muted py-4">
                                     <i class="fas fa-inbox fa-2x mb-2"></i>
                                     <p class="mb-0">No transactions found</p>
-                                    @if(request('transaction_type'))
-                                        <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}" class="btn btn-sm btn-secondary mt-2">Clear Filter</a>
+                                    @if(request('transaction_type') || request('date_from') || request('date_to'))
+                                        <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}" class="btn btn-sm btn-secondary mt-2">Clear Filters</a>
                                     @endif
                                 </td>
                             </tr>
@@ -164,9 +187,55 @@ $(document).ready(function() {
     
     // Auto-submit form when transaction type changes
     $('#transactionTypeFilter').on('change', function() {
-        $(this).closest('form').submit();
+        $('#filterForm').submit();
+    });
+    
+    // Auto-submit form when date inputs change
+    $('#dateFrom, #dateTo').on('change', function() {
+        $('#filterForm').submit();
     });
 });
+
+function setDateRange(range) {
+    const today = new Date();
+    let dateFrom, dateTo;
+    
+    switch(range) {
+        case 'this_month':
+            dateFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+            dateTo = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case 'last_month':
+            dateFrom = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            dateTo = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'last_3_months':
+            dateFrom = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            dateTo = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case 'this_year':
+            dateFrom = new Date(today.getFullYear(), 0, 1);
+            dateTo = new Date(today.getFullYear(), 11, 31);
+            break;
+        default:
+            return;
+    }
+    
+    // Format dates as YYYY-MM-DD
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    
+    // Set the date inputs
+    $('#dateFrom').val(formatDate(dateFrom));
+    $('#dateTo').val(formatDate(dateTo));
+    
+    // Submit the form
+    $('#filterForm').submit();
+}
 </script>
 @endpush
 
