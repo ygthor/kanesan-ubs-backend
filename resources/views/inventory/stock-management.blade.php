@@ -35,9 +35,9 @@
                     <tr>
                         <td><strong>{{ $item['ITEMNO'] }}</strong></td>
                         <td>{{ $item['DESP'] ?? 'N/A' }}</td>
-                        <td><strong>{{ number_format($item['current_stock'], 2) }}</strong></td>
+                        <td data-sort="{{ $item['current_stock'] }}"><strong>{{ number_format($item['current_stock'], 2) }}</strong></td>
                         <td>{{ $item['UNIT'] ?? 'N/A' }}</td>
-                        <td>{{ number_format($item['PRICE'] ?? 0, 2) }}</td>
+                        <td data-sort="{{ $item['PRICE'] ?? 0 }}">{{ number_format($item['PRICE'] ?? 0, 2) }}</td>
                         <td>
                             <a href="{{ route('inventory.stock-management.item.transactions', $item['ITEMNO']) }}" class="btn btn-sm btn-info" title="View transactions for this item">
                                 <i class="fas fa-history"></i> View Transactions
@@ -58,6 +58,13 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+    // Custom sorting function for numeric data-sort attribute
+    $.fn.dataTable.ext.order['dom-data-sort-num'] = function(settings, col) {
+        return this.api().column(col, {order: 'index'}).nodes().map(function(td, i) {
+            return $(td).attr('data-sort') * 1;
+        });
+    };
+    
     // Initialize DataTables
     $('#stockSummaryTable').DataTable({
         responsive: true,
@@ -72,7 +79,7 @@ $(document).ready(function() {
             },
             {
                 targets: [2, 4], // Current Stock and Price columns
-                type: 'num' // Treat as numbers for proper sorting
+                orderDataType: 'dom-data-sort-num' // Use custom sorting function
             }
         ],
         language: {
