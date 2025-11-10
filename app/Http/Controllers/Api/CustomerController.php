@@ -97,7 +97,8 @@ class CustomerController extends Controller
         $user = auth()->user();
         
         $validator = Validator::make($request->all(), [
-            'customer_code' => 'required|string|max:255|unique:customers,customer_code',
+            'customer_code' => 'sometimes|nullable|string|max:255|unique:customers,customer_code',
+            'customer_type' => 'required|string|max:255|in:Creditor,Cash Sales',
             'company_name' => 'required|string|max:255',
             'company_name2' => 'nullable|string|max:255',
             'address1' => 'required|string|max:255',
@@ -110,7 +111,6 @@ class CustomerController extends Controller
             'fax_no' => 'nullable|string|max:50',
             'contact_person' => 'nullable|string|max:255',
             'customer_group' => 'nullable|string|max:255',
-            'customer_type' => 'nullable|string|max:255',
             'lot_type' => 'nullable|string|max:255',
             // Add other fillable fields from your Customer model
             'email' => 'nullable|email|max:255|unique:customers,email',
@@ -131,10 +131,15 @@ class CustomerController extends Controller
         }
 
         try {
+            // Auto-generate customer_code if not provided or empty
+            $customerCode = $request->input('customer_code');
+            if (empty($customerCode) || trim($customerCode) === '') {
+                $customerCode = $this->generateCustomerCode($request->input('customer_type'), $user->username);
+            }
+            
             // Ensure all fields from your Flutter form are included in $fillable in Customer model
             // and are passed here in $request->only([...])
-            $customer = Customer::create($request->only([
-                'customer_code',
+            $customerData = $request->only([
                 'company_name',
                 'company_name2',
                 'address1',
@@ -160,7 +165,12 @@ class CustomerController extends Controller
                 'address'
                 // Ensure this list matches the $fillable array in your Customer model
                 // and the fields sent from your Flutter "Detailed Form".
-            ]));
+            ]);
+            
+            // Add the generated customer_code
+            $customerData['customer_code'] = $customerCode;
+            
+            $customer = Customer::create($customerData);
 
             // Handle user assignment using many-to-many relationship
             if ($request->has('assigned_user_id') && $request->assigned_user_id) {
@@ -351,6 +361,58 @@ class CustomerController extends Controller
         }
         
         return false;
+    }
+
+    /**
+     * Generate customer code based on customer type and username
+     *
+     * @param  string  $customerType
+     * @param  string  $username
+     * @return string
+     */
+    private function generateCustomerCode($customerType, $username)
+    {
+        $prefix = null;
+        
+        if ($customerType === 'Creditor') {
+            $prefix = '3000';
+        } elseif ($customerType === 'Cash Sales') {
+            $usernameUpper = strtoupper($username);
+            if ($usernameUpper === 'S01') {
+                $prefix = '3010';
+            } elseif ($usernameUpper === 'S02') {
+                $prefix = '3020';
+            } elseif ($usernameUpper === 'S03') {
+                $prefix = '3030';
+            } else {
+                // Fallback for Cash Sales with invalid username
+                throw new \Exception('Cash Sales is only available for users S01, S02, or S03. Your username: ' . $username);
+            }
+        } else {
+            throw new \Exception('Invalid customer type: ' . $customerType);
+        }
+        
+        // Find the next running number for this prefix
+        $customers = Customer::where('customer_code', 'like', $prefix . '/%')
+            ->pluck('customer_code')
+            ->toArray();
+        
+        $nextNumber = 1;
+        if (!empty($customers)) {
+            $numbers = [];
+            foreach ($customers as $code) {
+                $codeParts = explode('/', $code);
+                if (count($codeParts) === 2 && is_numeric($codeParts[1])) {
+                    $numbers[] = (int)$codeParts[1];
+                }
+            }
+            if (!empty($numbers)) {
+                $nextNumber = max($numbers) + 1;
+            }
+        }
+        
+        // Format as 3000/001, 3000/002, etc.
+        return $prefix . '/' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
     }
 
 }
