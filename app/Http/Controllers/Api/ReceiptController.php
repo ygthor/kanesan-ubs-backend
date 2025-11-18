@@ -20,7 +20,7 @@ class ReceiptController extends Controller
     {
         $user = auth()->user();
         
-        $receiptsQuery = Receipt::with('customer:id,customer_code,company_name');
+        $receiptsQuery = Receipt::with(['customer:id,customer_code,company_name', 'receiptInvoices']);
         
         // Debug logging for filter parameters
         \Log::info('Receipt filter parameters:', [
