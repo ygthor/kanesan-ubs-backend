@@ -172,11 +172,14 @@ class InvoiceController extends Controller
             ];
 
             // Set TYPE from request, default to 'INV' if not provided
-            $invoiceData['TYPE'] = $request->input('type', 'INV');
+            $requestType = $request->input('type');
+            $invoiceData['TYPE'] = !empty($requestType) ? strtoupper(trim($requestType)) : 'INV';
             
-            // Log for debugging
-            \Log::info('Invoice creation - Type received:', [
-                'request_type' => $request->input('type'),
+            // Log for debugging - log all request data
+            \Log::info('Invoice creation - Request data:', [
+                'all_request_data' => $request->all(),
+                'request_type' => $requestType,
+                'request_type_raw' => $request->input('type'),
                 'final_type' => $invoiceData['TYPE']
             ]);
 

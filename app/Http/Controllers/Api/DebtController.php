@@ -38,7 +38,10 @@ class DebtController extends Controller
                 'customers.payment_type',
                 'customers.payment_term'
             ])
-            ->leftJoin('customers', 'artrans.CUSTNO', '=', 'customers.customer_code')
+            ->leftJoin('customers', function($join) {
+                // Fix collation mismatch by converting both sides to the same collation
+                $join->on(DB::raw('artrans.CUSTNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('customers.customer_code COLLATE utf8mb4_unicode_ci'));
+            })
             ->where('artrans.TYPE', 'INV')
             ->whereNotExists(function ($query) {
                 // Exclude invoices that have at least one active (non-deleted) receipt linked
@@ -48,7 +51,7 @@ class DebtController extends Controller
                           $join->on('receipt_invoices.receipt_id', '=', 'receipts.id')
                                ->whereNull('receipts.deleted_at'); // Only consider non-deleted receipts
                       })
-                      ->whereColumn('receipt_invoices.invoice_refno', 'artrans.REFNO');
+                      ->whereColumn(DB::raw('receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci'), DB::raw('artrans.REFNO COLLATE utf8mb4_unicode_ci'));
             });
 
         // Filter by user's assigned customers (unless KBS user or admin role)
