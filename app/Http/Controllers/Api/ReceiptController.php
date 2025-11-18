@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Receipt;
+use App\Models\ReceiptInvoice;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ReceiptController extends Controller
@@ -83,6 +85,10 @@ class ReceiptController extends Controller
             'cheque_type' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
             'cheque_date' => 'nullable|required_if:payment_type,CHEQUE|date',
             'bank_name' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
+            'invoice_refnos' => 'nullable|array',
+            'invoice_refnos.*' => 'required|string|max:255',
+            'invoice_amounts' => 'nullable|array',
+            'invoice_amounts.*' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -97,10 +103,48 @@ class ReceiptController extends Controller
         }
 
         try {
-            $receipt = Receipt::create($validator->validated());
+            DB::beginTransaction();
+
+            // Get validated data and separate invoice-related fields
+            $validated = $validator->validated();
+            $invoiceRefNos = $request->input('invoice_refnos', []);
+            $invoiceAmounts = $request->input('invoice_amounts', []);
+
+            // Remove invoice fields from validated data as they're not part of receipts table
+            unset($validated['invoice_refnos'], $validated['invoice_amounts']);
+
+            // Create the receipt
+            $receipt = Receipt::create($validated);
+
+            // Link invoices if provided
+            if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
+                foreach ($invoiceRefNos as $invoiceRefNo) {
+                    if (!empty($invoiceRefNo)) {
+                        // Get amount from invoice_amounts map, or use 0 as default
+                        $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
+                            ? (float) $invoiceAmounts[$invoiceRefNo] 
+                            : 0.00;
+
+                        ReceiptInvoice::create([
+                            'receipt_id' => $receipt->id,
+                            'invoice_refno' => $invoiceRefNo,
+                            'amount_applied' => $amountApplied,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            // Load receipt with invoice links for response
+            $receipt->load('receiptInvoices');
+
             return makeResponse(201, 'Receipt created successfully.', $receipt);
         } catch (\Exception $e) {
-            // Log::error('Receipt creation failed: ' . $e->getMessage());
+            DB::rollBack();
+            \Log::error('Receipt creation failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return makeResponse(500, 'Failed to create receipt.', ['error' => $e->getMessage()]);
         }
     }
@@ -117,7 +161,7 @@ class ReceiptController extends Controller
             return makeResponse(403, 'Access denied. You do not have permission to view this receipt.', null);
         }
         
-        $receipt->load('customer'); // Load related customer
+        $receipt->load(['customer', 'receiptInvoices']); // Load related customer and invoice links
         return makeResponse(200, 'Receipt retrieved successfully.', $receipt);
     }
 
@@ -141,6 +185,10 @@ class ReceiptController extends Controller
             'cheque_type' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
             'cheque_date' => 'nullable|required_if:payment_type,CHEQUE|date',
             'bank_name' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
+            'invoice_refnos' => 'nullable|array',
+            'invoice_refnos.*' => 'required|string|max:255',
+            'invoice_amounts' => 'nullable|array',
+            'invoice_amounts.*' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -148,10 +196,54 @@ class ReceiptController extends Controller
         }
 
         try {
-            $receipt->update($validator->validated());
+            DB::beginTransaction();
+
+            // Get validated data and separate invoice-related fields
+            $validated = $validator->validated();
+            $invoiceRefNos = $request->input('invoice_refnos');
+            $invoiceAmounts = $request->input('invoice_amounts', []);
+
+            // Remove invoice fields from validated data as they're not part of receipts table
+            unset($validated['invoice_refnos'], $validated['invoice_amounts']);
+
+            // Update the receipt
+            $receipt->update($validated);
+
+            // Update invoice links if provided
+            if ($request->has('invoice_refnos')) {
+                // Delete existing invoice links
+                ReceiptInvoice::where('receipt_id', $receipt->id)->delete();
+
+                // Create new invoice links if provided
+                if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
+                    foreach ($invoiceRefNos as $invoiceRefNo) {
+                        if (!empty($invoiceRefNo)) {
+                            // Get amount from invoice_amounts map, or use 0 as default
+                            $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
+                                ? (float) $invoiceAmounts[$invoiceRefNo] 
+                                : 0.00;
+
+                            ReceiptInvoice::create([
+                                'receipt_id' => $receipt->id,
+                                'invoice_refno' => $invoiceRefNo,
+                                'amount_applied' => $amountApplied,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
+
+            // Load receipt with invoice links for response
+            $receipt->load('receiptInvoices');
+
             return makeResponse(200, 'Receipt updated successfully.', $receipt);
         } catch (\Exception $e) {
-            // Log::error('Receipt update failed: ' . $e->getMessage());
+            DB::rollBack();
+            \Log::error('Receipt update failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return makeResponse(500, 'Failed to update receipt.', ['error' => $e->getMessage()]);
         }
     }

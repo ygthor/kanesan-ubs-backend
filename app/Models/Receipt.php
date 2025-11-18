@@ -52,4 +52,12 @@ class Receipt extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    /**
+     * Get the invoice links for this receipt.
+     */
+    public function receiptInvoices()
+    {
+        return $this->hasMany(ReceiptInvoice::class);
+    }
 }

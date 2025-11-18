@@ -171,9 +171,14 @@ class InvoiceController extends Controller
                 // Other header fields like 'tax1_percentage' can be added here
             ];
 
-            if ($request->type) {
-                $invoiceData['TYPE'] = $request->type;
-            }
+            // Set TYPE from request, default to 'INV' if not provided
+            $invoiceData['TYPE'] = $request->input('type', 'INV');
+            
+            // Log for debugging
+            \Log::info('Invoice creation - Type received:', [
+                'request_type' => $request->input('type'),
+                'final_type' => $invoiceData['TYPE']
+            ]);
 
 
             if ($id) {
