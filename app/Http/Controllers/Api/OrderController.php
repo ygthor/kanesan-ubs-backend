@@ -83,6 +83,7 @@ class OrderController extends Controller
 
         // Order the results
         $orders->orderBy('order_date', 'desc');
+        $orders->orderBy('id', 'desc');
 
         // Paginate the results
         if($paginate){
@@ -150,7 +151,6 @@ class OrderController extends Controller
                 'type',
                 'branch_id',
                 'customer_id',
-                'customer_name',
                 'order_date',
                 'remarks',
                 'tax1_percentage',
@@ -162,9 +162,14 @@ class OrderController extends Controller
             $orderData['type'] = $orderData['type'] ?? 'SO';
 
             $customer = Customer::find($orderData['customer_id']);
+            if (!$customer) {
+                DB::rollBack();
+                return makeResponse(404, 'Customer not found with ID: ' . $orderData['customer_id']);
+            }
+            
             $orderData['customer_code'] = $customer->customer_code;
-            // Use company_name instead of name since name field was removed
-            $orderData['customer_name'] = $orderData['customer_name'] ?? $customer->company_name ?? 'N/A';
+            // Always use company_name for customer_name (name field was removed from customer form)
+            $orderData['customer_name'] = $customer->company_name ?? 'N/A';
 
             $orderData['status'] = 'pending';
 
