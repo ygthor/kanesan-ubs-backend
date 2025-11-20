@@ -150,6 +150,7 @@ class OrderController extends Controller
                 'type',
                 'branch_id',
                 'customer_id',
+                'customer_name',
                 'order_date',
                 'remarks',
                 'tax1_percentage',
@@ -162,7 +163,8 @@ class OrderController extends Controller
 
             $customer = Customer::find($orderData['customer_id']);
             $orderData['customer_code'] = $customer->customer_code;
-            $orderData['customer_name'] = $customer->name;
+            // Use company_name instead of name since name field was removed
+            $orderData['customer_name'] = $orderData['customer_name'] ?? $customer->company_name ?? 'N/A';
 
             $orderData['status'] = 'pending';
 
