@@ -28,7 +28,7 @@ class DebtController extends Controller
         $searchTerm = $request->input('search');
 
         // Get invoices with customer data using LEFT JOIN
-        // Exclude invoices that already have receipts linked to them (only non-deleted receipts)
+        // Include invoices with partial or no payments, calculate outstanding balance after payments
         $invoicesQuery = Artran::select([
                 'artrans.*',
                 'customers.customer_code',
@@ -36,23 +36,30 @@ class DebtController extends Controller
                 'customers.name as customer_name',
                 'customers.company_name',
                 'customers.payment_type',
-                'customers.payment_term'
+                'customers.payment_term',
+                // Calculate total payments made for this invoice (from non-deleted receipts)
+                DB::raw('COALESCE((
+                    SELECT SUM(receipt_invoices.amount_applied)
+                    FROM receipt_invoices
+                    INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
+                    WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = artrans.REFNO COLLATE utf8mb4_unicode_ci
+                    AND receipts.deleted_at IS NULL
+                ), 0) as total_payments')
             ])
             ->leftJoin('customers', function($join) {
                 // Fix collation mismatch by converting both sides to the same collation
                 $join->on(DB::raw('artrans.CUSTNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('customers.customer_code COLLATE utf8mb4_unicode_ci'));
             })
             ->where('artrans.TYPE', 'INV')
-            ->whereNotExists(function ($query) {
-                // Exclude invoices that have at least one active (non-deleted) receipt linked
-                $query->select(DB::raw(1))
-                      ->from('receipt_invoices')
-                      ->join('receipts', function($join) {
-                          $join->on('receipt_invoices.receipt_id', '=', 'receipts.id')
-                               ->whereNull('receipts.deleted_at'); // Only consider non-deleted receipts
-                      })
-                      ->whereColumn(DB::raw('receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci'), DB::raw('artrans.REFNO COLLATE utf8mb4_unicode_ci'));
-            });
+            // Only exclude invoices that are fully paid (total payments >= NET_BIL)
+            // This allows partial payments to show in the debt list with updated outstanding balance
+            ->whereRaw('COALESCE((
+                SELECT SUM(receipt_invoices.amount_applied)
+                FROM receipt_invoices
+                INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
+                WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = artrans.REFNO COLLATE utf8mb4_unicode_ci
+                AND receipts.deleted_at IS NULL
+            ), 0) < artrans.NET_BIL');
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -93,25 +100,32 @@ class DebtController extends Controller
                 // Calculate due date based on payment term
                 $dueDate = $this->calculateDueDate($invoice->DATE, $firstInvoice->payment_term);
 
+                // Calculate outstanding balance: NET_BIL minus total payments made
+                $totalPayments = (float) ($invoice->total_payments ?? 0);
+                $outstandingBalance = max(0, (float) $invoice->NET_BIL - $totalPayments);
+
                 return [
                     'salesNo' => $invoice->REFNO, // Invoice reference number
                     'salesDate' => $invoice->DATE->toIso8601String(),
                     'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $firstInvoice->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toIso8601String(),
-                    'outstandingAmount' => (float) $invoice->NET_BIL, // Net amount outstanding
+                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments
                     'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
                     'creditAmount' => (float) $invoice->CREDIT_BIL, // Credit amount if any
                     'currency' => 'RM', // Default currency
                 ];
             });
 
+            // Calculate total outstanding amount from remaining balances (not original NET_BIL)
+            $totalOutstanding = $debtItems->sum('outstandingAmount');
+
             return [
                 'customerCode' => $customerCode,
                 'outletsCode' => $customerCode, // Outlets code is same as customer code
                 'companyName' => $firstInvoice->company_name ?? $firstInvoice->customer_name ?? 'Unknown Customer',
                 'debtItems' => $debtItems,
-                'totalOutstandingAmount' => $invoices->sum('NET_BIL'),
+                'totalOutstandingAmount' => $totalOutstanding, // Sum of remaining outstanding balances
             ];
         });
 
