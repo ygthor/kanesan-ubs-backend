@@ -155,6 +155,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class)->middleware('filter.customer');
     Route::get('/customers/states', [CustomerController::class, 'getStates'])->name('customers.states');
+    Route::get('/customers/code/{customerCode}', [CustomerController::class, 'showByCode'])->name('customers.showByCode');
 
 
     Route::get('/territories/{id}', [\App\Http\Controllers\Api\TerritoryController::class, 'show'])->name('territories.show');

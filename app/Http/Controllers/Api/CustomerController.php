@@ -235,6 +235,32 @@ class CustomerController extends Controller
     }
 
     /**
+     * Display the specified customer by customer code.
+     *
+     * @param  string  $customerCode
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function showByCode($customerCode)
+    {
+        $user = auth()->user();
+        
+        // Find customer by customer_code
+        $customer = Customer::where('customer_code', $customerCode)->first();
+        
+        if (!$customer) {
+            return makeResponse(404, 'Customer not found.', null);
+        }
+        
+        // Check if user has access to this customer
+        if (!$this->userHasAccessToCustomer($user, $customer)) {
+            return makeResponse(403, 'Access denied. You do not have permission to view this customer.', null);
+        }
+        
+        $customer->load('users');
+        return makeResponse(200, 'Customer retrieved successfully.', $customer);
+    }
+
+    /**
      * Update the specified customer in storage.
      *
      * @param  \Illuminate\Http\Request  $request
