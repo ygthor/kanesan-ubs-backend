@@ -236,13 +236,21 @@ class CustomerController extends Controller
 
     /**
      * Display the specified customer by customer code.
+     * Uses query parameter to handle customer codes with special characters like slashes (e.g., "3000/003")
      *
-     * @param  string  $customerCode
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function showByCode($customerCode)
+    public function showByCode(Request $request)
     {
         $user = auth()->user();
+        
+        // Get customer_code from query parameter
+        $customerCode = $request->input('customer_code');
+        
+        if (!$customerCode) {
+            return makeResponse(422, 'Customer code is required.', ['error' => 'customer_code parameter is missing']);
+        }
         
         // Find customer by customer_code
         $customer = Customer::where('customer_code', $customerCode)->first();
