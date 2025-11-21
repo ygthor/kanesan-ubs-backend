@@ -57,7 +57,9 @@ class ReceiptController extends Controller
             \Log::info('Applied date_to filter:', ['date_to' => $request->date_to]);
         }
         
-        $receipts = $receiptsQuery->orderBy('receipt_date', 'desc')
+        // Order by date only (ignore time), then by ID for consistent ordering
+        $receipts = $receiptsQuery->orderByRaw('DATE(receipt_date) DESC')
+                                 ->orderBy('id', 'desc')
                                  ->paginate($request->input('per_page', 15));
 
         \Log::info('Receipt query result count:', ['count' => $receipts->count()]);
@@ -264,7 +266,15 @@ class ReceiptController extends Controller
                 $dateStr = $validated['receipt_date'];
                 // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
-                    $validated['receipt_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                    $newDate = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                    // Only update if the date actually changed (compare date parts only, ignore time)
+                    // This prevents unnecessary timestamp updates that could change the sort order
+                    if ($receipt->receipt_date->format('Y-m-d') !== $newDate->format('Y-m-d')) {
+                        $validated['receipt_date'] = $newDate;
+                    } else {
+                        // Date hasn't changed, don't update it to avoid unnecessary timestamp changes
+                        unset($validated['receipt_date']);
+                    }
                 }
             }
             
@@ -273,7 +283,17 @@ class ReceiptController extends Controller
                 $dateStr = $validated['cheque_date'];
                 // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
-                    $validated['cheque_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                    $newChequeDate = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                    // Only update if the date actually changed
+                    if ($receipt->cheque_date && $receipt->cheque_date->format('Y-m-d') !== $newChequeDate->format('Y-m-d')) {
+                        $validated['cheque_date'] = $newChequeDate;
+                    } elseif (!$receipt->cheque_date) {
+                        // Setting cheque_date for the first time
+                        $validated['cheque_date'] = $newChequeDate;
+                    } else {
+                        // Date hasn't changed, don't update it
+                        unset($validated['cheque_date']);
+                    }
                 }
             }
 
