@@ -163,10 +163,12 @@ class InvoiceController extends Controller
 
                 // 'branch_id' => $request->branch_id ?? 0,
                 'CUSTNO' => $customer->customer_code, // Map to legacy customer code
-                'NAME' => $customer->name, // Denormalized name
+                'NAME' => $customer->company_name, // Company name (not customer name)
+                'EMAIL' => $customer->email, // Customer email
+                'AREA' => $customer->territory, // Territory/Area from customer
                 'DATE' => $request->date ?? now(),
                 'NOTE' => $request->remarks,
-                'TERM' => $customer->term, // Get term from customer
+                'TERM' => $customer->payment_term, // Payment term from customer
                 'USERID' => auth()->user()->id ?? '', // Assuming you have auth
                 // Other header fields like 'tax1_percentage' can be added here
             ];

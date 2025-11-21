@@ -98,12 +98,12 @@
                 {{-- CORRECTED: Use fields from your Artran model --}}
                 <tr>
                     <td><strong>Subtotal:</strong></td>
-                    <td class="text-right">RM {{ number_format($invoice->GROSS_BILL, 2) }}</td>
+                    <td class="text-right">RM {{ number_format($invoice->GROSS_BIL, 2) }}</td>
                 </tr>
                 <tr>
                     {{-- CORRECTED: Added a check to prevent division by zero --}}
                     <td><strong>Tax
-                            ({{ $invoice->GROSS_BILL > 0 ? number_format(($invoice->TAX1_BIL / $invoice->GROSS_BILL) * 100, 2) : '0.00' }}%):</strong>
+                            ({{ $invoice->GROSS_BIL > 0 ? number_format(($invoice->TAX1_BIL / $invoice->GROSS_BIL) * 100, 2) : '0.00' }}%):</strong>
                     </td>
                     <td class="text-right">RM {{ number_format($invoice->TAX1_BIL, 2) }}</td>
                 </tr>

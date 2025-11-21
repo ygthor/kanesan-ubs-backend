@@ -28,7 +28,7 @@ class Artran extends BaseModel
         'DATE',  // Denormalized customer name for quick display
         'DESP',  // Denormalized customer name for quick display
         'TRANCODE',
-        'GROSS_BILL',         // e.g., 'pending', 'processing', 'completed', 'cancelled'
+        'GROSS_BIL',         // Gross amount before discount and tax
         'NET_BIL',
         'TAX1_BIL',
         'GRAND_BIL',
@@ -44,8 +44,10 @@ class Artran extends BaseModel
         'ISCASH',
         'AGE',
         'TERM',
+        'AREA',
         'PLA_DODATE',
         'NAME',
+        'EMAIL',
         'TRDATETIME',
         'USERID',
         'BDATE',
@@ -59,7 +61,7 @@ class Artran extends BaseModel
     // Cast fields to native types
     protected $casts = [
         'DATE' => 'datetime',
-        'GROSS_BILL' => 'decimal:2',
+        'GROSS_BIL' => 'decimal:2',
         'NET_BIL' => 'decimal:2',
         'TAX1_BIL' => 'decimal:2',
         'GRAND_BIL' => 'decimal:2',
@@ -119,10 +121,15 @@ class Artran extends BaseModel
     {
         // Sum the 'AMT_BIL' from all related items
         $grossTotal = $this->items()->sum('AMT_BIL');
-        // $GROSS_BILL = $grossTotal;
+        
+        // Set GROSS_BIL (gross amount before discount and tax)
+        $this->GROSS_BIL = $grossTotal;
+        
+        // Set INVGROSS (invoice gross - typically same as GROSS_BIL)
+        $this->INVGROSS = $grossTotal;
 
         // Example tax calculation. You might get percentage from config or customer.
-        $taxPercentage = $this->tax1_percentage ?? 0.00; // Default to 6% if not set
+        $taxPercentage = $this->tax1_percentage ?? 0.00; // Default to 0% if not set
         $this->TAX1_BIL = $grossTotal * ($taxPercentage / 100);
 
         $this->GRAND_BIL = $grossTotal + $this->TAX1_BIL;
@@ -133,15 +140,13 @@ class Artran extends BaseModel
 
         // For accounting: Invoices are typically debits
         $this->CREDIT_BIL = 0;
-        $this->DEBIT_BIL =0;
+        $this->DEBIT_BIL = 0;
         if( in_array($this->TYPE,['INV','SO','IV','CS','CB'])){
             $this->DEBIT_BIL = $this->NET_BIL;
         }
         if( in_array($this->TYPE,['CN']) ){
             $this->CREDIT_BIL = $this->NET_BIL;
         }
-        
-        
     }
 
     /**
