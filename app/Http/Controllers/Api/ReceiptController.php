@@ -112,6 +112,27 @@ class ReceiptController extends Controller
 
             // Remove invoice fields from validated data as they're not part of receipts table
             unset($validated['invoice_refnos'], $validated['invoice_amounts']);
+            
+            // Normalize receipt_date to start of day in app timezone
+            // Since app timezone is set to 'Asia/Kuala_Lumpur' in config/app.php,
+            // Carbon::parse() will use that timezone automatically
+            // MySQL timestamp column will automatically convert to UTC when storing
+            if (isset($validated['receipt_date'])) {
+                $dateStr = $validated['receipt_date'];
+                // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    $validated['receipt_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                }
+            }
+            
+            // Normalize cheque_date if provided
+            if (isset($validated['cheque_date']) && !empty($validated['cheque_date'])) {
+                $dateStr = $validated['cheque_date'];
+                // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    $validated['cheque_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                }
+            }
 
             // Create the receipt
             $receipt = Receipt::create($validated);
@@ -234,6 +255,27 @@ class ReceiptController extends Controller
             
             // Remove customer fields if they were sent (they shouldn't be editable, but remove them to be safe)
             unset($validated['customer_id'], $validated['customer_name'], $validated['customer_code']);
+            
+            // Normalize receipt_date to start of day in app timezone
+            // Since app timezone is set to 'Asia/Kuala_Lumpur' in config/app.php,
+            // Carbon::parse() will use that timezone automatically
+            // MySQL timestamp column will automatically convert to UTC when storing
+            if (isset($validated['receipt_date'])) {
+                $dateStr = $validated['receipt_date'];
+                // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    $validated['receipt_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                }
+            }
+            
+            // Normalize cheque_date if provided
+            if (isset($validated['cheque_date']) && !empty($validated['cheque_date'])) {
+                $dateStr = $validated['cheque_date'];
+                // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    $validated['cheque_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                }
+            }
 
             // Update the receipt
             $receipt->update($validated);
