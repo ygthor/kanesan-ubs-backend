@@ -172,9 +172,7 @@ class ReceiptController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'receipt_no' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('receipts')->ignore($receipt->id)],
-            'customer_id' => 'sometimes|required|exists:customers,id',
-            'customer_name' => 'sometimes|required|string|max:255',
-            'customer_code' => 'sometimes|required|string|max:255',
+            // Customer fields are not editable in the frontend, so we don't validate or accept them
             'receipt_date' => 'sometimes|required|date',
             'payment_type' => 'sometimes|required|string|max:255',
             'debt_amount' => 'sometimes|required|numeric|min:0',
@@ -195,6 +193,34 @@ class ReceiptController extends Controller
             return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
         }
 
+        $user = auth()->user();
+        
+        // Load the customer relationship to ensure it's available
+        $receipt->load('customer');
+        
+        // Check if customer exists
+        if (!$receipt->customer) {
+            \Log::warning('Receipt update attempted but customer not found', [
+                'receipt_id' => $receipt->id,
+                'customer_id' => $receipt->customer_id,
+                'user_id' => $user?->id,
+            ]);
+            return makeResponse(404, 'Customer not found for this receipt.', null);
+        }
+        
+        // Check if user has access to the current receipt's customer
+        // Note: Customer cannot be changed in edit mode (frontend prevents it)
+        if (!$this->userHasAccessToCustomer($user, $receipt->customer)) {
+            \Log::warning('Receipt update denied - user does not have access to customer', [
+                'receipt_id' => $receipt->id,
+                'customer_id' => $receipt->customer_id,
+                'customer_code' => $receipt->customer->customer_code,
+                'user_id' => $user?->id,
+                'has_full_access' => $user ? hasFullAccess() : false,
+            ]);
+            return makeResponse(403, 'Access denied. You do not have permission to update this receipt.', null);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -205,6 +231,9 @@ class ReceiptController extends Controller
 
             // Remove invoice fields from validated data as they're not part of receipts table
             unset($validated['invoice_refnos'], $validated['invoice_amounts']);
+            
+            // Remove customer fields if they were sent (they shouldn't be editable, but remove them to be safe)
+            unset($validated['customer_id'], $validated['customer_name'], $validated['customer_code']);
 
             // Update the receipt
             $receipt->update($validated);
