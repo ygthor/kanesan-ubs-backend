@@ -147,6 +147,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'getSummary'])->name('dashboard.summary');
 
     // CRUD API routes for the Customer model
+    // Custom customer routes must be defined BEFORE apiResource to avoid route conflicts
+    Route::get('/customers/states', [CustomerController::class, 'getStates'])->name('customers.states');
+    Route::get('/customers/code', [CustomerController::class, 'showByCode'])->middleware('filter.customer')->name('customers.showByCode');
+    
     // This will create the following routes:
     // GET      /api/customers             -> customers.index   (CustomerController@index)
     // POST     /api/customers             -> customers.store   (CustomerController@store)
@@ -154,8 +158,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // PUT/PATCH /api/customers/{customer} -> customers.update  (CustomerController@update)
     // DELETE   /api/customers/{customer}  -> customers.destroy (CustomerController@destroy)
     Route::apiResource('customers', CustomerController::class)->middleware('filter.customer');
-    Route::get('/customers/states', [CustomerController::class, 'getStates'])->name('customers.states');
-    Route::get('/customers/code', [CustomerController::class, 'showByCode'])->name('customers.showByCode');
 
 
     Route::get('/territories/{id}', [\App\Http\Controllers\Api\TerritoryController::class, 'show'])->name('territories.show');
