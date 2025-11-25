@@ -100,6 +100,7 @@ Route::post('/test/api', function () {
     ]);
 })->name('test.api');
 Route::get('products', [ProductController::class, 'index']);
+Route::get('products/groups', [ProductController::class, 'groups']);
 Route::get('icitem', [IcitemController::class, 'index']);
 
 // Territory API routes
