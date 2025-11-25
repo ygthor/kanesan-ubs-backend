@@ -61,27 +61,31 @@ class InventoryController extends Controller
     }
 
     /**
-     * Get current stock for an item (from icitem table)
+     * Get current stock for an item (from products table)
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function getStock(Request $request, $itemno)
     {
-        $item = Icitem::find($itemno);
+        // itemno is now a product code from products table
+        $product = Product::where('code', $itemno)->where('is_active', true)->first();
         
-        if (!$item) {
-            return makeResponse(404, 'Item not found.', null);
+        if (!$product) {
+            return makeResponse(404, 'Product not found.', null);
         }
 
         // Calculate current stock from transactions
         $currentStock = $this->calculateCurrentStock($itemno);
 
         return makeResponse(200, 'Stock retrieved successfully.', [
-            'ITEMNO' => $itemno,
-            'DESP' => $item->DESP,
+            'ITEMNO' => $product->code, // For backward compatibility
+            'code' => $product->code,
+            'DESP' => $product->description ?? 'Unknown Product', // For backward compatibility
+            'description' => $product->description,
             'current_stock' => $currentStock,
-            'QTY' => $item->QTY ?? 0, // Original QTY field from icitem
+            'QTY' => $currentStock, // Use calculated stock
+            'group_name' => $product->group_name,
         ]);
     }
 
@@ -130,7 +134,7 @@ class InventoryController extends Controller
     public function stockIn(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
+            'ITEMNO' => 'required|string|exists:products,code',
             'quantity' => 'required|numeric|min:0.01',
             'reference_type' => 'nullable|string|max:50',
             'reference_id' => 'nullable|string|max:100',
@@ -160,7 +164,7 @@ class InventoryController extends Controller
     public function stockOut(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
+            'ITEMNO' => 'required|string|exists:products,code',
             'quantity' => 'required|numeric|min:0.01',
             'reference_type' => 'nullable|string|max:50',
             'reference_id' => 'nullable|string|max:100',
@@ -196,7 +200,7 @@ class InventoryController extends Controller
     public function stockAdjustment(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
+            'ITEMNO' => 'required|string|exists:products,code',
             'quantity' => 'required|numeric',
             'reference_type' => 'nullable|string|max:50',
             'reference_id' => 'nullable|string|max:100',
@@ -260,14 +264,8 @@ class InventoryController extends Controller
                 'UPDATED_ON' => now(),
             ]);
 
-            // Update icitem QTY field (optional - for backward compatibility)
-            $item = Icitem::find($itemno);
-            if ($item) {
-                $item->QTY = $stockAfter;
-                $item->UPDATED_BY = auth()->user()->id ?? null;
-                $item->UPDATED_ON = now();
-                $item->save();
-            }
+            // Note: No need to update products table as stock is calculated from transactions
+            // The products table doesn't store stock quantity
 
             DB::commit();
 
@@ -285,45 +283,49 @@ class InventoryController extends Controller
 
     /**
      * Calculate current stock from transactions
+     * Now uses product code (from products table) instead of ITEMNO from icitem
      *
-     * @param string $itemno
+     * @param string $itemno Product code from products table
      * @return float
      */
     private function calculateCurrentStock($itemno)
     {
         // Sum all quantities from transactions
+        // ITEMNO in item_transactions now references products.code
         $total = ItemTransaction::where('ITEMNO', $itemno)
             ->sum('quantity');
 
-        // If no transactions, get from icitem.QTY
-        if ($total === null) {
-            $item = Icitem::find($itemno);
-            return $item ? (float)($item->QTY ?? 0) : 0;
-        }
-
-        return (float)$total;
+        // If no transactions found, return 0 (no stock)
+        return $total !== null ? (float)$total : 0.0;
     }
 
     /**
      * Get inventory summary (all items with current stock)
+     * Uses new products table instead of icitem
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function getInventorySummary(Request $request)
     {
-        $items = Icitem::select('ITEMNO', 'DESP', 'QTY', 'UNIT', 'PRICE')
+        // Get all active products from new products table
+        $products = Product::where('is_active', true)
+            ->orderBy('code')
             ->get();
 
-        $inventory = $items->map(function ($item) {
-            $currentStock = $this->calculateCurrentStock($item->ITEMNO);
+        $inventory = $products->map(function ($product) {
+            // Calculate current stock from transactions using product code
+            $currentStock = $this->calculateCurrentStock($product->code);
             return [
-                'ITEMNO' => $item->ITEMNO,
-                'DESP' => $item->DESP,
+                'ITEMNO' => $product->code, // Map code to ITEMNO for backward compatibility
+                'DESP' => $product->description ?? 'Unknown Product', // Map description to DESP
                 'current_stock' => $currentStock,
-                'QTY' => $item->QTY ?? 0,
-                'UNIT' => $item->UNIT,
-                'PRICE' => $item->PRICE,
+                'QTY' => $currentStock, // Use calculated stock as QTY
+                'UNIT' => null, // Unit not available in products table
+                'PRICE' => null, // Price not available in products table
+                'code' => $product->code, // Include new field
+                'description' => $product->description, // Include new field
+                'group_name' => $product->group_name, // Include group name
             ];
         });
 
