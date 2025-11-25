@@ -309,9 +309,14 @@ class InventoryController extends Controller
     public function getInventorySummary(Request $request)
     {
         // Get all active products from new products table
-        $products = Product::where('is_active', true)
-            ->orderBy('code')
-            ->get();
+        $query = Product::where('is_active', true);
+        
+        // Filter by product group if provided
+        if ($request->has('group_name') && $request->input('group_name')) {
+            $query->where('group_name', $request->input('group_name'));
+        }
+        
+        $products = $query->orderBy('code')->get();
 
         $inventory = $products->map(function ($product) {
             // Calculate current stock from transactions using product code
