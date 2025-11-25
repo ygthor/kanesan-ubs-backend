@@ -252,9 +252,9 @@ class InvoiceController extends Controller
                         //     continue;
                         // }
                         
-                        // Get product info from Icitem table using product_no
-                        // OrderItem.product_no should match Icitem.ITEMNO
-                        $product = Icitem::find($orderItem->product_no);
+                        // Get product info from products table using product_no
+                        // OrderItem.product_no should match Product.code
+                        $product = Product::where('code', $orderItem->product_no)->first();
                         
                         if (!$product) {
                             \Log::warning("Product not found for order item. Order Item ID: {$orderItem->id}, Product No: {$orderItem->product_no}");
@@ -262,15 +262,15 @@ class InvoiceController extends Controller
                             continue;
                         }
                         
-                        // Verify that OrderItem.product_no matches ArTransItem.ITEMNO/TRANCODE (both reference Icitem.ITEMNO)
+                        // Verify that OrderItem.product_no matches ArTransItem.ITEMNO/TRANCODE (both reference Product.code)
                         // This ensures invoice items and order items refer to the same product
                         
                         // Map OrderItem to ArTransItem
                         $invoiceItemData = [
                             'artrans_id' => $invoice->artrans_id ?? null, // May be auto-generated
-                            'ITEMNO' => $orderItem->product_no, // Product code/item number - references Icitem.ITEMNO
-                            'TRANCODE' => $orderItem->product_no, // Product code (same as ITEMNO) - references Icitem.ITEMNO
-                            'DESP' => $orderItem->product_name ?? $product->DESP ?? $orderItem->description ?? 'Unknown Product',
+                            'ITEMNO' => $orderItem->product_no, // Product code/item number - references Product.code
+                            'TRANCODE' => $orderItem->product_no, // Product code (same as ITEMNO) - references Product.code
+                            'DESP' => $orderItem->product_name ?? $product->description ?? $orderItem->description ?? 'Unknown Product',
                             
                             // Copied from parent invoice
                             'REFNO' => $invoice->REFNO,
