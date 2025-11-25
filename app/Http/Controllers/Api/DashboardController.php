@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\Artran;
 use App\Models\Product;
 use App\Models\Receipt;
+use App\Models\Icitem;
+use App\Models\ItemTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use DB;
@@ -148,13 +150,23 @@ class DashboardController extends Controller
         $totalCollectedAmount = $totalCollectedQuery->sum('paid_amount');
         $outstandingDebt = $totalOrderedAmount - $totalCollectedAmount;
 
-        // Inventory Value: Total value of all products in stock. Requires `CurrentStock` column.
-        // This is a more intensive query and should be used with caution on large datasets.
-        $inventoryValue = Product::sum(DB::raw('Unit_price * CurrentStock'));
-
-        // Low Stock Items: Count of products with stock below a certain threshold (e.g., 10).
+        // Inventory Value: Total value of all items in stock.
+        // Calculate current stock from ItemTransaction and multiply by PRICE from icitem table.
+        $items = Icitem::select('ITEMNO', 'PRICE')->get();
+        $inventoryValue = 0;
         $lowStockThreshold = 10;
-        $lowStockItems = Product::where('CurrentStock', '<', $lowStockThreshold)->where('CurrentStock', '>', 0)->count();
+        $lowStockItems = 0;
+        
+        foreach ($items as $item) {
+            $currentStock = $this->calculateCurrentStock($item->ITEMNO);
+            $price = (float)($item->PRICE ?? 0);
+            $inventoryValue += $currentStock * $price;
+            
+            // Count low stock items (stock > 0 and < threshold)
+            if ($currentStock > 0 && $currentStock < $lowStockThreshold) {
+                $lowStockItems++;
+            }
+        }
 
         // Prepare the data payload
         $data = [
@@ -171,5 +183,26 @@ class DashboardController extends Controller
         ];
 
         return makeResponse(200, 'Dashboard summary retrieved successfully.', $data);
+    }
+
+    /**
+     * Calculate current stock from transactions
+     *
+     * @param string $itemno
+     * @return float
+     */
+    private function calculateCurrentStock($itemno)
+    {
+        // Sum all quantities from transactions
+        $total = ItemTransaction::where('ITEMNO', $itemno)
+            ->sum('quantity');
+
+        // If no transactions, get from icitem.QTY
+        if ($total === null) {
+            $item = Icitem::find($itemno);
+            return $item ? (float)($item->QTY ?? 0) : 0;
+        }
+
+        return (float)$total;
     }
 }
