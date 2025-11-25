@@ -89,14 +89,18 @@ class InvoiceItemController extends Controller
             // Find the parent invoice
             $invoice = Artran::findOrFail($request->reference_code);
             
-            $product = Icitem::find($request->product_code);
-
+            // Find product using new products table
+            $product = Product::where('code', $request->product_code)->first();
+            
+            if (!$product) {
+                return makeResponse(404, 'Product not found.', ['error' => "Product with code '{$request->product_code}' does not exist."]);
+            }
 
             $itemData = [
                 // IDs and Codes
                 'artrans_id' => $invoice->artrans_id,
                 'ITEMNO' => $request->product_code,
-                'DESP' => $product->DESP,
+                'DESP' => $product->description ?? 'Unknown Product',
 
                 // Copied from Parent
                 'REFNO' => $invoice->REFNO,
