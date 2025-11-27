@@ -11,7 +11,7 @@
 -- The seeder will:
 --   1. Read db/products.json
 --   2. Extract unique product groups and insert into product_groups table
---   3. Insert all products with proper product_group_id references
+--   3. Insert all products with proper group_name references
 --   4. Handle duplicates and validation automatically
 --
 -- ============================================================================
@@ -30,15 +30,15 @@ INSERT INTO `product_groups` (`name`, `description`, `CREATED_ON`, `updated_at`)
 ('KBS STORE', 'KBS STORE product group', NOW(), NOW())
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
--- Step 2: Insert products (map CODE and DESCRIPTION to products table)
--- Example products - you'll need to replace product_group_id with actual IDs from step 1
+-- Step 2: Insert products (map CODE and DESCRIPTION to icitem table)
+-- Example products - using group_name directly for UBS compatibility
 -- This is just a template showing the structure
 
 -- For JAYASAKI- MATA group (assuming product_group_id = 1):
-INSERT INTO `products` (`code`, `description`, `product_group_id`, `is_active`, `CREATED_ON`, `updated_at`) VALUES
-('A100', '100GM S/KARI AYAM MATA', (SELECT id FROM product_groups WHERE name = 'JAYASAKI- MATA' LIMIT 1), 1, NOW(), NOW()),
-('A1K', '1KG S/KARI AYAM MATA', (SELECT id FROM product_groups WHERE name = 'JAYASAKI- MATA' LIMIT 1), 1, NOW(), NOW()),
-('A1KRP', '1KG SERBUK AYAM RP', (SELECT id FROM product_groups WHERE name = 'JAYASAKI- MATA' LIMIT 1), 1, NOW(), NOW())
+INSERT INTO `icitem` (`code`, `description`, `group_name`, `is_active`, `CREATED_ON`, `updated_at`) VALUES
+('A100', '100GM S/KARI AYAM MATA', 'JAYASAKI- MATA', 1, NOW(), NOW()),
+('A1K', '1KG S/KARI AYAM MATA', 'JAYASAKI- MATA', 1, NOW(), NOW()),
+('A1KRP', '1KG SERBUK AYAM RP', 'JAYASAKI- MATA', 1, NOW(), NOW())
 -- ... continue for all products (you'll need to generate this for all 200+ products)
 ON DUPLICATE KEY UPDATE 
     `description` = VALUES(`description`),

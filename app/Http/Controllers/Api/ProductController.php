@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\Icgroup;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -51,13 +52,23 @@ class ProductController extends Controller
     public function groups(Request $request)
     {
         try {
-            $groups = Product::active()
-                ->select('group_name')
-                ->distinct()
-                ->orderBy('group_name')
-                ->pluck('group_name')
-                ->filter() // Remove empty values
-                ->values(); // Re-index array
+            // Try to get from Icgroup table first, fallback to Product group_name if needed
+            try {
+                $groups = Icgroup::select('name')
+                    ->orderBy('name')
+                    ->pluck('name')
+                    ->filter()
+                    ->values();
+            } catch (\Exception $e) {
+                // Fallback to getting from Product table if Icgroup table doesn't exist yet
+                $groups = Product::active()
+                    ->select('group_name')
+                    ->distinct()
+                    ->orderBy('group_name')
+                    ->pluck('group_name')
+                    ->filter()
+                    ->values();
+            }
             
             return makeResponse(200, 'Product groups retrieved successfully.', $groups);
         } catch (\Exception $e) {

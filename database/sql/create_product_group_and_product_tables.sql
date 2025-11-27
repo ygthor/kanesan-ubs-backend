@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS `product_groups` (
   INDEX `idx_product_groups_created_on` (`CREATED_ON`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Product groups to categorize products';
 
--- Create product table to store product codes and descriptions
--- This replaces the old icitem and product tables
+-- Create products table to store product codes and descriptions
+-- This replaces the old product table
 
 CREATE TABLE IF NOT EXISTS `products` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

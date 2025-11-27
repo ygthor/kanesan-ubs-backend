@@ -99,8 +99,10 @@ Route::post('/test/api', function () {
         ]
     ]);
 })->name('test.api');
+// Product endpoints (using products table)
 Route::get('products', [ProductController::class, 'index']);
 Route::get('products/groups', [ProductController::class, 'groups']);
+// Legacy icitem endpoint (UBS icitem table)
 Route::get('icitem', [IcitemController::class, 'index']);
 
 // Territory API routes
