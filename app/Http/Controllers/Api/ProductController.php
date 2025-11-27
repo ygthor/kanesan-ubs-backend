@@ -52,23 +52,12 @@ class ProductController extends Controller
     public function groups(Request $request)
     {
         try {
-            // Try to get from Icgroup table first, fallback to Product group_name if needed
-            try {
-                $groups = Icgroup::select('name')
-                    ->orderBy('name')
-                    ->pluck('name')
-                    ->filter()
-                    ->values();
-            } catch (\Exception $e) {
-                // Fallback to getting from Product table if Icgroup table doesn't exist yet
-                $groups = Product::active()
-                    ->select('group_name')
-                    ->distinct()
-                    ->orderBy('group_name')
-                    ->pluck('group_name')
-                    ->filter()
-                    ->values();
-            }
+            // Get groups from icgroup table
+            $groups = Icgroup::select('name')
+                ->orderBy('name')
+                ->pluck('name')
+                ->filter()
+                ->values();
             
             return makeResponse(200, 'Product groups retrieved successfully.', $groups);
         } catch (\Exception $e) {

@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('product_groups', function (Blueprint $table) {
+        Schema::create('icgroup', function (Blueprint $table) {
             $table->id();
             $table->string('name')->comment('Product group name (e.g., JAYASAKI- MATA, BHAVANI, AKS)');
             $table->text('description')->nullable()->comment('Optional description for the product group');
@@ -24,8 +24,8 @@ return new class extends Migration
             $table->timestamps();
             
             // Indexes
-            $table->unique('name', 'uk_product_groups_name');
-            $table->index('CREATED_ON', 'idx_product_groups_created_on');
+            $table->unique('name', 'uk_icgroup_name');
+            $table->index('CREATED_ON', 'idx_icgroup_created_on');
         });
     }
 
@@ -36,7 +36,7 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('product_groups');
+        Schema::dropIfExists('icgroup');
     }
 };
 

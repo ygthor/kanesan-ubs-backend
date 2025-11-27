@@ -43,12 +43,12 @@ class ProductSeeder extends Seeder
                 continue;
             }
             
-            $group = DB::table('product_groups')
+            $group = DB::table('icgroup')
                 ->where('name', $groupName)
                 ->first();
             
             if (!$group) {
-                DB::table('product_groups')->insert([
+                DB::table('icgroup')->insert([
                     'name' => $groupName,
                     'description' => null,
                     'CREATED_ON' => now(),

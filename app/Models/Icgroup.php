@@ -9,7 +9,7 @@ class Icgroup extends BaseModel
 {
     use HasFactory;
     
-    protected $table = 'product_groups';
+    protected $table = 'icgroup';
     
     const CREATED_AT = 'CREATED_ON';
     const UPDATED_AT = 'UPDATED_ON';
