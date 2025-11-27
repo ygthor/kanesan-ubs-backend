@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
+use App\Models\Icitem;
 use App\Models\Icgroup;
 use Illuminate\Http\Request;
 
@@ -11,6 +11,7 @@ class ProductController extends Controller
 {
     /**
      * Get all products (optionally filtered by group_name)
+     * Uses Icitem model (legacy UBS icitem table)
      * 
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -18,24 +19,33 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Product::active(); // Only get active products
+            $query = Icitem::query();
             
             // Optional filter by product group
             if ($request->has('group_name') && $request->input('group_name')) {
-                $query->byGroup($request->input('group_name'));
+                $query->where('GROUP', $request->input('group_name'));
             }
             
-            // Select only the fields needed by the mobile app
-            $products = $query->select([
-                'id',
-                'code',
-                'description',
-                'group_name',
-                'is_active',
+            // Select fields from icitem table and map to expected format
+            $items = $query->select([
+                'ITEMNO',
+                'DESP',
+                'GROUP',
             ])
-            ->orderBy('group_name')
-            ->orderBy('code')
+            ->orderBy('GROUP')
+            ->orderBy('ITEMNO')
             ->get();
+            
+            // Transform to match mobile app expected format
+            $products = $items->map(function ($item) {
+                return [
+                    'id' => $item->ITEMNO, // Use ITEMNO as id
+                    'code' => $item->ITEMNO,
+                    'description' => $item->DESP ?? '',
+                    'group_name' => $item->GROUP ?? '',
+                    'is_active' => true, // Assume all items are active (icitem table doesn't have is_active)
+                ];
+            });
             
             return makeResponse(200, 'Products retrieved successfully.', $products);
         } catch (\Exception $e) {
