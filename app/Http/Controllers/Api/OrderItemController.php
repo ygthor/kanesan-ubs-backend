@@ -59,17 +59,31 @@ class OrderItemController extends Controller
 
     public function saveOrderItem(Request $request, $id = null)
     {
+        // First, check if product exists (case-insensitive check)
+        $productNo = $request->input('product_no');
+        $product = null;
+        if ($productNo) {
+            // Try exact match first
+            $product = Product::where('code', $productNo)->first();
+            // If not found, try case-insensitive match
+            if (!$product) {
+                $product = Product::whereRaw('LOWER(code) = LOWER(?)', [$productNo])->first();
+            }
+        }
+
         $validator = Validator::make($request->all(), [
-            'product_no' => 'required|string|exists:products,code', // Validate product exists in products table
-            'quantity' => 'required|min:1',
-            // 'items' => 'required|array|min:1',
-            // 'items.*.product_no' => 'required|exists:products,code',
-            // 'items.*.quantity' => 'required|numeric|min:0',
-            // 'items.*.unit_price' => 'required|numeric|min:0',
-            // 'items.*.discount' => 'nullable|numeric|min:0',
-            // 'items.*.is_free_good' => 'sometimes|boolean',
-            // 'items.*.is_trade_return' => 'sometimes|boolean',
-            // 'items.*.trade_return_is_good' => 'sometimes|boolean',
+            'order_id' => 'required|exists:orders,id',
+            'product_no' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($product) {
+                    if (!$product) {
+                        $fail('The selected product no is invalid.');
+                    }
+                },
+            ],
+            'quantity' => 'required|numeric|min:0.01',
+            'unit_price' => 'required|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -91,6 +105,11 @@ class OrderItemController extends Controller
 
             $order_id = $orderData['order_id'];
             $order = Order::find($order_id);
+            
+            if (!$order) {
+                DB::rollBack();
+                return makeResponse(404, 'Order not found.');
+            }
 
             $item_count = DB::table('order_items')->where('order_id', $order_id)->count() + 1;
 
@@ -104,13 +123,8 @@ class OrderItemController extends Controller
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
             $orderData['type'] = $orderData['type'] ?? 'SO';
 
-            // Use Product from products table
-            $product = Product::where('code', $orderData['product_no'])->first();
-            if (!$product) {
-                DB::rollBack();
-                return makeResponse(404, 'Product not found with code: ' . $orderData['product_no']);
-            }
-            
+            // Use Product from products table (already found in validation)
+            // Use the product found during validation to ensure consistency
             $orderData['product_no'] = $product->code;
             $orderData['product_name'] = $product->description;
             $orderData['sku_code'] = $product->code; // Use code as SKU
