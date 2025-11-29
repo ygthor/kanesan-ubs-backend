@@ -127,6 +127,7 @@ class CustomerController extends Controller
             'company_name2' => 'nullable|string|max:255',
             'address1' => 'required|string|max:255',
             'address2' => 'nullable|string|max:255',
+            'address3' => 'nullable|string|max:255',
             'postcode' => 'nullable|string|max:20',
             'state' => 'nullable|string|max:255',
             'territory' => 'nullable|string|max:255',
@@ -296,6 +297,7 @@ class CustomerController extends Controller
             'company_name2' => 'sometimes|nullable|string|max:255',
             'address1' => 'sometimes|string|max:255', // Made 'sometimes' to allow partial updates
             'address2' => 'nullable|string|max:255',
+            'address3' => 'nullable|string|max:255',
             'postcode' => 'nullable|string|max:20',
             'state' => 'nullable|string|max:255',
             'territory' => 'nullable|string|max:255',
@@ -333,6 +335,7 @@ class CustomerController extends Controller
                 'company_name2',
                 'address1',
                 'address2',
+                'address3',
                 'postcode',
                 'state',
                 'territory',

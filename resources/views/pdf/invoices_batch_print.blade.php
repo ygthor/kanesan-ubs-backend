@@ -68,9 +68,26 @@
                 <hr>
                 <p>
                     <strong>Bill To:</strong><br>
-                    {{ $invoice->customer->name ?? $invoice->NAME }}<br>
                     @if ($invoice->customer)
-                        {!! nl2br(e($invoice->customer->address)) !!}
+                        {{ $invoice->customer->company_name ?? $invoice->customer->name ?? $invoice->NAME }}
+                        @if (!empty($invoice->customer->company_name2))
+                            <br>{{ $invoice->customer->company_name2 }}
+                        @endif
+                        <br>
+                        @if (!empty($invoice->customer->address1))
+                            {{ $invoice->customer->address1 }}<br>
+                        @endif
+                        @if (!empty($invoice->customer->address2))
+                            {{ $invoice->customer->address2 }}<br>
+                        @endif
+                        @if (!empty($invoice->customer->address3))
+                            {{ $invoice->customer->address3 }}<br>
+                        @endif
+                        @if (!empty($invoice->customer->postcode) || !empty($invoice->customer->state))
+                            {{ trim(($invoice->customer->postcode ?? '') . ' ' . ($invoice->customer->state ?? '')) }}<br>
+                        @endif
+                    @else
+                        {{ $invoice->NAME }}
                     @endif
                 </p>
             </div>

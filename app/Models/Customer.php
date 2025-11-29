@@ -37,6 +37,7 @@ class Customer extends Model
         'address',          // General full address (e.g., for display)
         'address1',         // Street address line 1
         'address2',         // Street address line 2
+        'address3',         // Street address line 3
         'postcode',
         'state',
         'territory',

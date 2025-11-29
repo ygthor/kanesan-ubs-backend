@@ -50,6 +50,16 @@
         .totals table td {
             border: none;
         }
+        
+        .total-amount-pay {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .total-return {
+            font-size: 18px;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -62,9 +72,26 @@
             <hr>
             <p>
                 <strong>Bill To:</strong><br>
-                {{ $invoice->customer->name ?? $invoice->NAME }} ({{ $invoice->CUSTNO  }})<br>
                 @if ($invoice->customer)
-                    {!! nl2br(e($invoice->customer->address)) !!}
+                    {{ $invoice->customer->company_name ?? $invoice->customer->name ?? $invoice->NAME }}
+                    @if (!empty($invoice->customer->company_name2))
+                        <br>{{ $invoice->customer->company_name2 }}
+                    @endif
+                    ({{ $invoice->CUSTNO  }})<br>
+                    @if (!empty($invoice->customer->address1))
+                        {{ $invoice->customer->address1 }}<br>
+                    @endif
+                    @if (!empty($invoice->customer->address2))
+                        {{ $invoice->customer->address2 }}<br>
+                    @endif
+                    @if (!empty($invoice->customer->address3))
+                        {{ $invoice->customer->address3 }}<br>
+                    @endif
+                    @if (!empty($invoice->customer->postcode) || !empty($invoice->customer->state))
+                        {{ trim(($invoice->customer->postcode ?? '') . ' ' . ($invoice->customer->state ?? '')) }}<br>
+                    @endif
+                @else
+                    {{ $invoice->NAME }} ({{ $invoice->CUSTNO  }})
                 @endif
             </p>
         </div>
@@ -80,11 +107,25 @@
                 </tr>
             </thead>
             <tbody>
+                @php
+                    $totalReturnAmount = 0;
+                @endphp
                 @foreach ($invoice->items as $item)
+                    @php
+                        // Calculate return amount (items with negative SIGN or negative AMT_BIL)
+                        if (($item->SIGN ?? 1) < 0 || $item->AMT_BIL < 0) {
+                            $totalReturnAmount += abs($item->AMT_BIL);
+                        }
+                    @endphp
                     <tr>
                         <td>{{ $loop->iteration }}</td>
-                        <td>{{ $item->DESP }}</td>
-                        <td class="text-right">{{ number_format($item->QTY, 2) }}</td>
+                        <td>
+                            {{ $item->DESP }}
+                            @if (($item->SIGN ?? 1) < 0 || $item->AMT_BIL < 0)
+                                <span style="color: red;"> (RETURN)</span>
+                            @endif
+                        </td>
+                        <td class="text-right">{{ number_format(abs($item->QTY), 2) }}</td>
                         <td class="text-right">{{ number_format($item->PRICE, 2) }}</td>
                         {{-- CORRECTED: Use AMT_BIL for the line item amount --}}
                         <td class="text-right">{{ number_format($item->AMT_BIL, 2) }}</td>
@@ -95,11 +136,25 @@
 
         <div class="totals">
             <table>
+                @php
+                    $totalReturnAmount = 0;
+                    foreach ($invoice->items as $item) {
+                        if (($item->SIGN ?? 1) < 0 || $item->AMT_BIL < 0) {
+                            $totalReturnAmount += abs($item->AMT_BIL);
+                        }
+                    }
+                @endphp
                 {{-- CORRECTED: Use fields from your Artran model --}}
                 <tr>
-                    <td><strong>Subtotal:</strong></td>
+                    <td><strong>S.amt:</strong></td>
                     <td class="text-right">RM {{ number_format($invoice->GROSS_BIL, 2) }}</td>
                 </tr>
+                @if ($totalReturnAmount > 0)
+                <tr>
+                    <td class="total-return"><strong>RETURN AMOUNT:</strong></td>
+                    <td class="text-right total-return"><strong>RM {{ number_format($totalReturnAmount, 2) }}</strong></td>
+                </tr>
+                @endif
                 <tr>
                     {{-- CORRECTED: Added a check to prevent division by zero --}}
                     <td><strong>Tax
@@ -108,12 +163,12 @@
                     <td class="text-right">RM {{ number_format($invoice->TAX1_BIL, 2) }}</td>
                 </tr>
                 <tr>
-                    <td><strong>Grand Total:</strong></td>
+                    <td><strong>C.Amt:</strong></td>
                     <td class="text-right">RM {{ number_format($invoice->GRAND_BIL, 2) }}</td>
                 </tr>
                 <tr>
-                    <td><strong>Amount Due:</strong></td>
-                    <td class="text-right"><strong>RM {{ number_format($invoice->NET_BIL, 2) }}</strong></td>
+                    <td class="total-amount-pay"><strong>TOTAL AMOUNT TO PAY:</strong></td>
+                    <td class="text-right total-amount-pay"><strong>RM {{ number_format($invoice->NET_BIL, 2) }}</strong></td>
                 </tr>
             </table>
         </div>
