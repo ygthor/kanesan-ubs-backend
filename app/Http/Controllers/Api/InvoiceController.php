@@ -266,11 +266,18 @@ class InvoiceController extends Controller
                         // This ensures invoice items and order items refer to the same product
                         
                         // Map OrderItem to ArTransItem
+                        $baseDescription = $orderItem->product_name ?? $product->description ?? $orderItem->description ?? 'Unknown Product';
+                        // Add trade return indicator to description if it's a trade return
+                        if ($orderItem->is_trade_return) {
+                            $returnType = $orderItem->trade_return_is_good ? 'Good' : 'Bad';
+                            $baseDescription .= ' (TRADE RETURN - ' . $returnType . ')';
+                        }
+                        
                         $invoiceItemData = [
                             'artrans_id' => $invoice->artrans_id ?? null, // May be auto-generated
                             'ITEMNO' => $orderItem->product_no, // Product code/item number - references Product.code
                             'TRANCODE' => $orderItem->product_no, // Product code (same as ITEMNO) - references Product.code
-                            'DESP' => $orderItem->product_name ?? $product->description ?? $orderItem->description ?? 'Unknown Product',
+                            'DESP' => $baseDescription,
                             
                             // Copied from parent invoice
                             'REFNO' => $invoice->REFNO,
@@ -293,6 +300,16 @@ class InvoiceController extends Controller
                         
                         // Calculate amounts for the line item
                         $invoiceItem->calculate();
+                        
+                        // Handle trade returns: if order item is a trade return, set SIGN to -1 and recalculate AMT_BIL
+                        // This ensures trade returns are displayed with negative amounts and deducted from total
+                        if ($orderItem->is_trade_return) {
+                            $invoiceItem->SIGN = -1;
+                            // Recalculate AMT_BIL with negative sign for trade returns
+                            $lineTotal = $invoiceItem->QTY * $invoiceItem->PRICE;
+                            $invoiceItem->AMT_BIL = $lineTotal * -1;
+                        }
+                        
                         $invoiceItem->save();
                         
                         // Auto-process stock when invoice item is created from order
