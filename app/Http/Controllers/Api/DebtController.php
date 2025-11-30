@@ -80,7 +80,7 @@ class DebtController extends Controller
             });
         }
 
-        $invoicesWithCustomers = $invoicesQuery->orderBy('artrans.DATE', 'asc')->get();
+        $invoicesWithCustomers = $invoicesQuery->with('items')->orderBy('artrans.DATE', 'asc')->get();
 
         // Filter out invoices without customer data and group by customer
         $customersWithDebts = $invoicesWithCustomers
@@ -104,6 +104,16 @@ class DebtController extends Controller
                 $totalPayments = (float) ($invoice->total_payments ?? 0);
                 $outstandingBalance = max(0, (float) $invoice->NET_BIL - $totalPayments);
 
+                // Calculate return amount from invoice items (items with negative SIGN or negative AMT_BIL)
+                $returnAmount = 0;
+                if ($invoice->items) {
+                    foreach ($invoice->items as $item) {
+                        if (($item->SIGN ?? 1) < 0 || $item->AMT_BIL < 0) {
+                            $returnAmount += abs($item->AMT_BIL);
+                        }
+                    }
+                }
+
                 return [
                     'salesNo' => $invoice->REFNO, // Invoice reference number
                     'salesDate' => $invoice->DATE->toIso8601String(),
@@ -112,6 +122,7 @@ class DebtController extends Controller
                     'dueDate' => $dueDate->toIso8601String(),
                     'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments
                     'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
+                    'returnAmount' => (float) $returnAmount, // Return amount from invoice items
                     'creditAmount' => (float) $invoice->CREDIT_BIL, // Credit amount if any
                     'currency' => 'RM', // Default currency
                 ];
