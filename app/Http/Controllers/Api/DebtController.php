@@ -125,10 +125,10 @@ class DebtController extends Controller
 
                 return [
                     'salesNo' => $invoice->REFNO, // Invoice reference number
-                    'salesDate' => $invoice->DATE->toIso8601String(),
+                    'salesDate' => $invoice->DATE->toDateString(),  // Return date-only format (YYYY-MM-DD)
                     'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $firstInvoice->payment_term ?? '30 Days', // Fallback value
-                    'dueDate' => $dueDate->toIso8601String(),
+                    'dueDate' => $dueDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
                     'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments
                     'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
                     'returnAmount' => (float) $returnAmount, // Return amount from invoice items

@@ -60,7 +60,7 @@ class Artran extends BaseModel
 
     // Cast fields to native types
     protected $casts = [
-        'DATE' => 'datetime',
+        'DATE' => 'date',  // Use 'date' instead of 'datetime' to prevent timezone conversion
         'GROSS_BIL' => 'decimal:2',
         'NET_BIL' => 'decimal:2',
         'TAX1_BIL' => 'decimal:2',

@@ -103,7 +103,7 @@ class CustomerInvoiceController extends Controller
                 'TYPE' => $invoice->TYPE,
                 'NAME' => $invoice->NAME,
                 'CUSTNO' => $invoice->CUSTNO,
-                'DATE' => $invoice->DATE ? $invoice->DATE->toIso8601String() : null,
+                'DATE' => $invoice->DATE ? $invoice->DATE->toDateString() : null,  // Return date-only format (YYYY-MM-DD)
                 'NET_BIL' => $netBil,
                 'GRAND_BIL' => (float) $invoice->GRAND_BIL,
                 'GROSS_BILL' => (float) $invoice->GROSS_BIL,

@@ -38,8 +38,8 @@ class Receipt extends Model
      * @var array
      */
     protected $casts = [
-        'receipt_date' => 'datetime',
-        'cheque_date' => 'datetime',
+        'receipt_date' => 'date',  // Use 'date' instead of 'datetime' to prevent timezone conversion
+        'cheque_date' => 'date',   // Use 'date' for consistency
         'debt_amount' => 'decimal:2',
         'transaction_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',

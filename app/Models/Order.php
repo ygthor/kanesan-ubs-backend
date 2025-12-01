@@ -32,7 +32,7 @@ class Order extends BaseModel
     ];
 
     protected $casts = [
-        'order_date' => 'datetime',
+        'order_date' => 'date',  // Use 'date' instead of 'datetime' to prevent timezone conversion
         'gross_amount' => 'decimal:2',
         'tax1' => 'decimal:2',
         'tax1_percentage' => 'decimal:2',
