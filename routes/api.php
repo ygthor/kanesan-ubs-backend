@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoiceItemController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\CustomerInvoiceController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -153,6 +154,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Custom customer routes must be defined BEFORE apiResource to avoid route conflicts
     Route::get('/customers/states', [CustomerController::class, 'getStates'])->name('customers.states');
     Route::get('/customers/code', [CustomerController::class, 'showByCode'])->middleware('filter.customer')->name('customers.showByCode');
+    Route::get('/customers/{customerCode}/outstanding-invoices', [CustomerInvoiceController::class, 'getOutstandingInvoices'])->middleware('filter.customer')->name('customers.outstanding-invoices');
     
     // This will create the following routes:
     // GET      /api/customers             -> customers.index   (CustomerController@index)
