@@ -26,6 +26,8 @@ class ReceiptController extends Controller
         // Debug logging for filter parameters
         \Log::info('Receipt filter parameters:', [
             'customer_id' => $request->input('customer_id'),
+            'customer_code' => $request->input('customer_code'),
+            'invoice_refno' => $request->input('invoice_refno'),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'per_page' => $request->input('per_page', 15),
@@ -62,6 +64,14 @@ class ReceiptController extends Controller
                 $query->where('customer_code', $request->customer_code);
             });
             \Log::info('Applied customer filter by code (explicit):', ['customer_code' => $request->customer_code]);
+        }
+        
+        // Filter by invoice_refno - only show receipts linked to this specific invoice
+        if ($request->has('invoice_refno') && $request->invoice_refno) {
+            $receiptsQuery->whereHas('receiptInvoices', function($query) use ($request) {
+                $query->where('invoice_refno', $request->invoice_refno);
+            });
+            \Log::info('Applied invoice filter:', ['invoice_refno' => $request->invoice_refno]);
         }
         
         // Apply date range filters if provided
