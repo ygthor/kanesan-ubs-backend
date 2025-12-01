@@ -52,12 +52,29 @@ class InvoiceController extends Controller
             $invoices->whereIn('CUSTNO', $user->customers()->pluck('customers.customer_code')->toArray());
         }
 
-        // Filter by customer name (using the 'NAME' column in 'artrans')
+        // Enhanced customer search: search across multiple customer fields
         if ($customerName) {
-            $invoices->where('NAME', 'like', "%{$customerName}%");
+            // Join with customers table to search across multiple fields
+            $invoices->leftJoin('customers', function($join) {
+                $join->on(DB::raw('artrans.CUSTNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('customers.customer_code COLLATE utf8mb4_unicode_ci'));
+            })->where(function($query) use ($customerName) {
+                // Search in artrans.NAME (denormalized customer name)
+                $query->where('artrans.NAME', 'like', "%{$customerName}%")
+                    // Search in customers table fields
+                    ->orWhere('customers.name', 'like', "%{$customerName}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerName}%")
+                    ->orWhere('customers.company_name2', 'like', "%{$customerName}%")
+                    ->orWhere('customers.email', 'like', "%{$customerName}%")
+                    ->orWhere('customers.phone', 'like', "%{$customerName}%")
+                    ->orWhere('customers.telephone1', 'like', "%{$customerName}%")
+                    ->orWhere('customers.telephone2', 'like', "%{$customerName}%")
+                    ->orWhere('customers.customer_code', 'like', "%{$customerName}%");
+            });
+            // Select only artrans columns to avoid conflicts with joined table
+            $invoices->select('artrans.*');
         }
         if ($CUSTNO) {
-            $invoices->where('CUSTNO', 'like', "{$CUSTNO}");
+            $invoices->where('CUSTNO', 'like', "%{$CUSTNO}%");
         }
 
         // Filter by date range (using the 'DATE' column)
