@@ -125,6 +125,7 @@ class DebtController extends Controller
                     'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
                     'returnAmount' => (float) $returnAmount, // Return amount from invoice items
                     'creditAmount' => (float) $invoice->CREDIT_BIL, // Credit amount if any
+                    'amountPaid' => $totalPayments, // Amount paid from receipts
                     'currency' => 'RM', // Default currency
                 ];
             });
