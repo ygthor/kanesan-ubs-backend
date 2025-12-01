@@ -54,6 +54,8 @@ class DebtController extends Controller
             // Only exclude invoices that are fully paid (total payments >= NET_BIL)
             // Use small tolerance (0.01) for floating point precision
             // This allows partial payments to show in the debt list with updated outstanding balance
+            // Show invoices where total payments < NET_BIL (not fully paid)
+            // Changed to use tolerance to handle floating point precision issues
             ->whereRaw('COALESCE((
                 SELECT SUM(receipt_invoices.amount_applied)
                 FROM receipt_invoices
@@ -103,7 +105,13 @@ class DebtController extends Controller
 
                 // Calculate outstanding balance: NET_BIL minus total payments made
                 $totalPayments = (float) ($invoice->total_payments ?? 0);
-                $outstandingBalance = max(0, (float) $invoice->NET_BIL - $totalPayments);
+                $netBil = (float) $invoice->NET_BIL;
+                $outstandingBalance = max(0, $netBil - $totalPayments);
+                
+                // Debug logging for partially paid invoices
+                if ($totalPayments > 0 && $outstandingBalance > 0) {
+                    \Log::info("Partially paid invoice: REFNO={$invoice->REFNO}, NET_BIL={$netBil}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
+                }
 
                 // Calculate return amount from invoice items (items with negative SIGN or negative AMT_BIL)
                 $returnAmount = 0;
