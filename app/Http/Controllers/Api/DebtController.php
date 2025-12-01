@@ -52,6 +52,7 @@ class DebtController extends Controller
             })
             ->where('artrans.TYPE', 'INV')
             // Only exclude invoices that are fully paid (total payments >= NET_BIL)
+            // Use small tolerance (0.01) for floating point precision
             // This allows partial payments to show in the debt list with updated outstanding balance
             ->whereRaw('COALESCE((
                 SELECT SUM(receipt_invoices.amount_applied)
@@ -59,7 +60,7 @@ class DebtController extends Controller
                 INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
                 WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = artrans.REFNO COLLATE utf8mb4_unicode_ci
                 AND receipts.deleted_at IS NULL
-            ), 0) < artrans.NET_BIL');
+            ), 0) < (artrans.NET_BIL - 0.01)');
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Receipt;
 use App\Models\ReceiptInvoice;
 use App\Models\Customer;
+use App\Models\Artran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -136,6 +137,47 @@ class ReceiptController extends Controller
                 }
             }
 
+            // Validate partial payment amounts before creating receipt
+            if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
+                foreach ($invoiceRefNos as $invoiceRefNo) {
+                    if (!empty($invoiceRefNo)) {
+                        // Get the invoice
+                        $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                        if (!$invoice) {
+                            DB::rollBack();
+                            return makeResponse(404, "Invoice not found: {$invoiceRefNo}", null);
+                        }
+
+                        // Calculate existing payments for this invoice
+                        $existingPayments = DB::table('receipt_invoices')
+                            ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
+                            ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
+                            ->whereNull('receipts.deleted_at')
+                            ->sum('receipt_invoices.amount_applied') ?? 0.00;
+
+                        // Calculate outstanding amount
+                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+
+                        // Get the amount being applied in this receipt
+                        $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
+                            ? (float) $invoiceAmounts[$invoiceRefNo] 
+                            : (float) $outstandingAmount; // Default to full outstanding if not specified
+
+                        // Validate: amount applied should not exceed outstanding amount
+                        if ($amountApplied > $outstandingAmount + 0.01) { // Add small tolerance for floating point
+                            DB::rollBack();
+                            return makeResponse(422, "Payment amount (RM " . number_format($amountApplied, 2) . ") exceeds outstanding amount (RM " . number_format($outstandingAmount, 2) . ") for invoice {$invoiceRefNo}", null);
+                        }
+
+                        // Validate: amount should be positive
+                        if ($amountApplied <= 0) {
+                            DB::rollBack();
+                            return makeResponse(422, "Payment amount must be greater than 0 for invoice {$invoiceRefNo}", null);
+                        }
+                    }
+                }
+            }
+
             // Create the receipt
             $receipt = Receipt::create($validated);
 
@@ -143,10 +185,25 @@ class ReceiptController extends Controller
             if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
                 foreach ($invoiceRefNos as $invoiceRefNo) {
                     if (!empty($invoiceRefNo)) {
-                        // Get amount from invoice_amounts map, or use 0 as default
+                        // Get the invoice to calculate outstanding
+                        $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                        
+                        // Calculate existing payments (excluding current receipt being created)
+                        $existingPayments = DB::table('receipt_invoices')
+                            ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
+                            ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
+                            ->whereNull('receipts.deleted_at')
+                            ->sum('receipt_invoices.amount_applied') ?? 0.00;
+
+                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+
+                        // Get amount from invoice_amounts map, or use outstanding amount as default
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
                             ? (float) $invoiceAmounts[$invoiceRefNo] 
-                            : 0.00;
+                            : (float) $outstandingAmount;
+
+                        // Ensure it doesn't exceed outstanding (safety check)
+                        $amountApplied = min($amountApplied, $outstandingAmount);
 
                         ReceiptInvoice::create([
                             'receipt_id' => $receipt->id,
@@ -297,6 +354,48 @@ class ReceiptController extends Controller
                 }
             }
 
+            // Validate partial payment amounts before updating receipt
+            if ($request->has('invoice_refnos') && !empty($invoiceRefNos) && is_array($invoiceRefNos)) {
+                foreach ($invoiceRefNos as $invoiceRefNo) {
+                    if (!empty($invoiceRefNo)) {
+                        // Get the invoice
+                        $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                        if (!$invoice) {
+                            DB::rollBack();
+                            return makeResponse(404, "Invoice not found: {$invoiceRefNo}", null);
+                        }
+
+                        // Calculate existing payments for this invoice (excluding current receipt being updated)
+                        $existingPayments = DB::table('receipt_invoices')
+                            ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
+                            ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
+                            ->where('receipt_invoices.receipt_id', '!=', $receipt->id) // Exclude current receipt
+                            ->whereNull('receipts.deleted_at')
+                            ->sum('receipt_invoices.amount_applied') ?? 0.00;
+
+                        // Calculate outstanding amount
+                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+
+                        // Get the amount being applied in this receipt
+                        $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
+                            ? (float) $invoiceAmounts[$invoiceRefNo] 
+                            : (float) $outstandingAmount; // Default to full outstanding if not specified
+
+                        // Validate: amount applied should not exceed outstanding amount
+                        if ($amountApplied > $outstandingAmount + 0.01) { // Add small tolerance for floating point
+                            DB::rollBack();
+                            return makeResponse(422, "Payment amount (RM " . number_format($amountApplied, 2) . ") exceeds outstanding amount (RM " . number_format($outstandingAmount, 2) . ") for invoice {$invoiceRefNo}", null);
+                        }
+
+                        // Validate: amount should be positive
+                        if ($amountApplied <= 0) {
+                            DB::rollBack();
+                            return makeResponse(422, "Payment amount must be greater than 0 for invoice {$invoiceRefNo}", null);
+                        }
+                    }
+                }
+            }
+
             // Update the receipt
             $receipt->update($validated);
 
@@ -309,10 +408,26 @@ class ReceiptController extends Controller
                 if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
                     foreach ($invoiceRefNos as $invoiceRefNo) {
                         if (!empty($invoiceRefNo)) {
-                            // Get amount from invoice_amounts map, or use 0 as default
+                            // Get the invoice to calculate outstanding
+                            $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                            
+                            // Calculate existing payments (excluding current receipt being updated)
+                            $existingPayments = DB::table('receipt_invoices')
+                                ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
+                                ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
+                                ->where('receipt_invoices.receipt_id', '!=', $receipt->id) // Exclude current receipt
+                                ->whereNull('receipts.deleted_at')
+                                ->sum('receipt_invoices.amount_applied') ?? 0.00;
+
+                            $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+
+                            // Get amount from invoice_amounts map, or use outstanding amount as default
                             $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
                                 ? (float) $invoiceAmounts[$invoiceRefNo] 
-                                : 0.00;
+                                : (float) $outstandingAmount;
+
+                            // Ensure it doesn't exceed outstanding (safety check)
+                            $amountApplied = min($amountApplied, $outstandingAmount);
 
                             ReceiptInvoice::create([
                                 'receipt_id' => $receipt->id,
