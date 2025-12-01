@@ -84,7 +84,7 @@ class CustomerInvoiceController extends Controller
             ), 0) < (artrans.NET_BIL - 0.01)');
         }
 
-        $invoices = $query->with(['items', 'customer'])
+        $invoices = $query->with(['customer'])
             ->orderBy('DATE', 'desc')
             ->get();
 
@@ -112,8 +112,8 @@ class CustomerInvoiceController extends Controller
                 'status' => $invoice->status ?? 'pending',
                 'total_payments' => $totalPayments,
                 'outstanding_balance' => $outstandingBalance,
-                'items' => $invoice->items,
-                'customer' => $invoice->customer,
+                // items excluded for cleaner JSON and better performance
+                // customer excluded as customer info is already in invoice (NAME, CUSTNO)
             ];
         });
 
