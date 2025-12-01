@@ -41,10 +41,27 @@ class ReceiptController extends Controller
             $receiptsQuery->whereIn('customer_id', $allowedCustomerIds);
         }
         
-        // Apply customer filter if provided
+        // Apply customer filter if provided (supports both customer_id and customer_code)
         if ($request->has('customer_id') && $request->customer_id) {
-            $receiptsQuery->where('customer_id', $request->customer_id);
-            \Log::info('Applied customer filter:', ['customer_id' => $request->customer_id]);
+            // Check if it's a numeric ID or a customer code
+            if (is_numeric($request->customer_id)) {
+                $receiptsQuery->where('customer_id', $request->customer_id);
+                \Log::info('Applied customer filter by ID:', ['customer_id' => $request->customer_id]);
+            } else {
+                // It's a customer code, join with customers table to filter by code
+                $receiptsQuery->whereHas('customer', function($query) use ($request) {
+                    $query->where('customer_code', $request->customer_id);
+                });
+                \Log::info('Applied customer filter by code:', ['customer_code' => $request->customer_id]);
+            }
+        }
+        
+        // Also support explicit customer_code parameter
+        if ($request->has('customer_code') && $request->customer_code) {
+            $receiptsQuery->whereHas('customer', function($query) use ($request) {
+                $query->where('customer_code', $request->customer_code);
+            });
+            \Log::info('Applied customer filter by code (explicit):', ['customer_code' => $request->customer_code]);
         }
         
         // Apply date range filters if provided
