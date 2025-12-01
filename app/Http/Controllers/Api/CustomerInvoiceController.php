@@ -19,16 +19,21 @@ class CustomerInvoiceController extends Controller
      * - Simple, flat structure for easy frontend consumption
      *
      * Query parameters:
+     * - customer_code: Customer code (required)
      * - include_paid: Set to 'true' to include fully paid invoices (default: false)
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  string  $customerCode
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getOutstandingInvoices(Request $request, $customerCode)
+    public function getOutstandingInvoices(Request $request)
     {
         $user = auth()->user();
+        $customerCode = $request->query('customer_code');
         $includePaid = $request->query('include_paid', 'false') === 'true';
+
+        if (!$customerCode) {
+            return makeResponse(400, 'customer_code parameter is required', null);
+        }
 
         \Log::info("Fetching invoices for customer: {$customerCode}, include_paid: " . ($includePaid ? 'yes' : 'no'));
 
