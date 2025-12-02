@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Carbon\Carbon;
+use App\Casts\DateOnlyCast;
 
 class Artran extends BaseModel
 {
@@ -60,7 +61,9 @@ class Artran extends BaseModel
 
     // Cast fields to native types
     protected $casts = [
-        'DATE' => 'date',  // Use 'date' instead of 'datetime' to prevent timezone conversion
+        // Use custom cast for TEXT DATE column to prevent timezone conversion
+        // Since DATE is stored as TEXT (not DATE/DATETIME type), we need special handling
+        'DATE' => DateOnlyCast::class,
         'GROSS_BIL' => 'decimal:2',
         'NET_BIL' => 'decimal:2',
         'TAX1_BIL' => 'decimal:2',
