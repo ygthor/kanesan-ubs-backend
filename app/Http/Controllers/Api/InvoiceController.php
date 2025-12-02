@@ -450,6 +450,23 @@ class InvoiceController extends Controller
             return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
         }
         
+        // For INV invoices, include linked credit notes
+        if ($invoice->TYPE == 'INV') {
+            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                ->with(['creditNote.items', 'creditNote.customer'])
+                ->get()
+                ->map(function ($link) {
+                    return $link->creditNote;
+                })
+                ->filter()
+                ->values();
+            
+            $invoiceData = $invoice->toArray();
+            $invoiceData['credit_notes'] = $creditNotes;
+            
+            return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
+        }
+        
         return makeResponse(200, 'Invoice retrieved successfully.', $invoice);
     }
 
