@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Artran;
+use App\Models\ArtransCreditNote;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -103,14 +104,29 @@ class DebtController extends Controller
                 // Calculate due date based on payment term
                 $dueDate = $this->calculateDueDate($invoice->DATE, $firstInvoice->payment_term);
 
-                // Calculate outstanding balance: NET_BIL minus total payments made
+                // Calculate total payments made
                 $totalPayments = (float) ($invoice->total_payments ?? 0);
+                
+                // Calculate total credit notes amount for this invoice
+                $totalCreditNotes = 0;
+                if ($invoice->artrans_id) {
+                    $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                        ->with('creditNote')
+                        ->get();
+                    foreach ($creditNotes as $cnLink) {
+                        if ($cnLink->creditNote) {
+                            $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
+                        }
+                    }
+                }
+                
+                // Calculate outstanding balance: NET_BIL minus total payments and credit notes
                 $netBil = (float) $invoice->NET_BIL;
-                $outstandingBalance = max(0, $netBil - $totalPayments);
+                $outstandingBalance = max(0, $netBil - $totalPayments - $totalCreditNotes);
                 
                 // Debug logging for partially paid invoices
                 if ($totalPayments > 0 && $outstandingBalance > 0) {
-                    \Log::info("Partially paid invoice: REFNO={$invoice->REFNO}, NET_BIL={$netBil}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
+                    \Log::info("Partially paid invoice: REFNO={$invoice->REFNO}, NET_BIL={$netBil}, total_payments={$totalPayments}, credit_notes={$totalCreditNotes}, outstanding={$outstandingBalance}");
                 }
 
                 // Calculate return amount from invoice items (items with negative SIGN or negative AMT_BIL)
@@ -129,10 +145,10 @@ class DebtController extends Controller
                     'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $firstInvoice->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
-                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments
+                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments and credit notes
                     'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
                     'returnAmount' => (float) $returnAmount, // Return amount from invoice items
-                    'creditAmount' => (float) $invoice->CREDIT_BIL, // Credit amount if any
+                    'creditAmount' => (float) ($invoice->CREDIT_BIL + $totalCreditNotes), // Credit amount including credit notes
                     'amountPaid' => $totalPayments, // Amount paid from receipts
                     'currency' => 'RM', // Default currency
                 ];

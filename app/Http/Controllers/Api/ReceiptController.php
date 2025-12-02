@@ -7,6 +7,7 @@ use App\Models\Receipt;
 use App\Models\ReceiptInvoice;
 use App\Models\Customer;
 use App\Models\Artran;
+use App\Models\ArtransCreditNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -182,8 +183,21 @@ class ReceiptController extends Controller
                             ->whereNull('receipts.deleted_at')
                             ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
-                        // Calculate outstanding amount
-                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+                        // Calculate total credit notes for this invoice
+                        $totalCreditNotes = 0;
+                        if ($invoice->artrans_id) {
+                            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                                ->with('creditNote')
+                                ->get();
+                            foreach ($creditNotes as $cnLink) {
+                                if ($cnLink->creditNote) {
+                                    $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
+                                }
+                            }
+                        }
+
+                        // Calculate outstanding amount: NET_BIL minus payments and credit notes
+                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
 
                         // Get the amount being applied in this receipt
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -222,7 +236,21 @@ class ReceiptController extends Controller
                             ->whereNull('receipts.deleted_at')
                             ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
-                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+                        // Calculate total credit notes for this invoice
+                        $totalCreditNotes = 0;
+                        if ($invoice->artrans_id) {
+                            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                                ->with('creditNote')
+                                ->get();
+                            foreach ($creditNotes as $cnLink) {
+                                if ($cnLink->creditNote) {
+                                    $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
+                                }
+                            }
+                        }
+
+                        // Calculate outstanding amount: NET_BIL minus payments and credit notes
+                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
 
                         // Get amount from invoice_amounts map, or use outstanding amount as default
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -400,8 +428,21 @@ class ReceiptController extends Controller
                             ->whereNull('receipts.deleted_at')
                             ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
-                        // Calculate outstanding amount
-                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+                        // Calculate total credit notes for this invoice
+                        $totalCreditNotes = 0;
+                        if ($invoice->artrans_id) {
+                            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                                ->with('creditNote')
+                                ->get();
+                            foreach ($creditNotes as $cnLink) {
+                                if ($cnLink->creditNote) {
+                                    $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
+                                }
+                            }
+                        }
+
+                        // Calculate outstanding amount: NET_BIL minus payments and credit notes
+                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
 
                         // Get the amount being applied in this receipt
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -446,7 +487,21 @@ class ReceiptController extends Controller
                                 ->whereNull('receipts.deleted_at')
                                 ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
-                            $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments;
+                            // Calculate total credit notes for this invoice
+                            $totalCreditNotes = 0;
+                            if ($invoice->artrans_id) {
+                                $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                                    ->with('creditNote')
+                                    ->get();
+                                foreach ($creditNotes as $cnLink) {
+                                    if ($cnLink->creditNote) {
+                                        $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
+                                    }
+                                }
+                            }
+
+                            // Calculate outstanding amount: NET_BIL minus payments and credit notes
+                            $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
 
                             // Get amount from invoice_amounts map, or use outstanding amount as default
                             $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
