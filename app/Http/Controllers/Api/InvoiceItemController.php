@@ -102,8 +102,12 @@ class InvoiceItemController extends Controller
                     
                     if ($linkedInvoice) {
                         // Check if the product code exists in the linked invoice items
+                        // Check both ITEMNO and TRANCODE as they should be the same
                         $linkedInvoiceItem = ArTransItem::where('artrans_id', $linkedInvoice->artrans_id)
-                            ->where('ITEMNO', $request->product_code)
+                            ->where(function($query) use ($request) {
+                                $query->where('ITEMNO', $request->product_code)
+                                      ->orWhere('TRANCODE', $request->product_code);
+                            })
                             ->first();
                         
                         if (!$linkedInvoiceItem) {
