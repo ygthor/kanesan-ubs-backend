@@ -356,12 +356,19 @@ class InvoiceController extends Controller
             }
 
             // If this is a credit note (CN/CR) and invoice_refno is provided, link them
-            if (in_array($invoiceData['TYPE'], ['CN', 'CR']) && $request->has('invoice_refno')) {
+            // This works for both CREATE and UPDATE modes
+            if (in_array($invoiceData['TYPE'], ['CN', 'CR']) && $request->has('invoice_refno') && $request->invoice_refno) {
                 try {
                     $this->linkCreditNoteToInvoice($invoice->artrans_id, $request->invoice_refno);
+                    \Log::info("Credit note linking attempted for CN {$invoice->REFNO} with invoice {$request->invoice_refno}");
                 } catch (\Exception $e) {
                     \Log::warning('Failed to link credit note to invoice: ' . $e->getMessage());
-                    // Don't fail the invoice creation if linking fails
+                    // Don't fail the invoice creation/update if linking fails
+                }
+            } else {
+                // Log when invoice_refno is not provided for CN
+                if (in_array($invoiceData['TYPE'], ['CN', 'CR'])) {
+                    \Log::info("Credit note {$invoice->REFNO} updated without invoice_refno parameter");
                 }
             }
 
@@ -670,8 +677,17 @@ class InvoiceController extends Controller
         // Check if link already exists
         $existingLink = ArtransCreditNote::where('credit_note_id', $creditNoteArtransId)->first();
         if ($existingLink) {
-            \Log::info("Credit note {$creditNote->REFNO} is already linked to invoice {$invoice->REFNO}");
-            return $existingLink;
+            // If link exists but points to a different invoice, update it
+            if ($existingLink->invoice_id != $invoice->artrans_id) {
+                $existingLink->invoice_id = $invoice->artrans_id;
+                $existingLink->save();
+                \Log::info("Updated link: Credit note {$creditNote->REFNO} is now linked to invoice {$invoice->REFNO}");
+                return $existingLink;
+            } else {
+                // Already linked to the same invoice
+                \Log::info("Credit note {$creditNote->REFNO} is already linked to invoice {$invoice->REFNO}");
+                return $existingLink;
+            }
         }
         
         // Create the link
