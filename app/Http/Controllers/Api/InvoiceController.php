@@ -438,8 +438,17 @@ class InvoiceController extends Controller
             return makeResponse(403, 'Access denied. You do not have permission to view this invoice.', null);
         }
         
-        // The invoice_refno is now automatically included via the accessor in the Artran model
-        // No need to manually set it here - it will be included in the JSON response
+        // Ensure invoice_refno is included in the response for credit notes
+        if (in_array($invoice->TYPE, ['CN', 'CR'])) {
+            // Get the invoice_refno from the accessor
+            $invoiceRefno = $invoice->invoice_refno;
+            
+            // Convert to array and manually add invoice_refno to ensure it's included
+            $invoiceData = $invoice->toArray();
+            $invoiceData['invoice_refno'] = $invoiceRefno;
+            
+            return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
+        }
         
         return makeResponse(200, 'Invoice retrieved successfully.', $invoice);
     }

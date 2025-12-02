@@ -91,15 +91,32 @@ class Artran extends BaseModel
             return null;
         }
 
-        // Query the linked invoice directly from the pivot table
-        $creditNoteLink = \App\Models\ArtransCreditNote::where('credit_note_id', $this->artrans_id)->first();
-        if ($creditNoteLink) {
-            $linkedInvoice = self::where('artrans_id', $creditNoteLink->invoice_id)
-                ->where('TYPE', 'INV')
-                ->first();
-            if ($linkedInvoice) {
-                return $linkedInvoice->REFNO;
+        // Check if artrans_id is available
+        if (!$this->artrans_id) {
+            \Log::debug("invoice_refno accessor: artrans_id not available for CN {$this->REFNO}");
+            return null;
+        }
+
+        try {
+            // Query the linked invoice directly from the pivot table
+            $creditNoteLink = \App\Models\ArtransCreditNote::where('credit_note_id', $this->artrans_id)->first();
+            if ($creditNoteLink) {
+                $linkedInvoice = self::where('artrans_id', $creditNoteLink->invoice_id)
+                    ->where('TYPE', 'INV')
+                    ->first();
+                if ($linkedInvoice) {
+                    \Log::debug("invoice_refno accessor: Found linked invoice {$linkedInvoice->REFNO} for CN {$this->REFNO}");
+                    return $linkedInvoice->REFNO;
+                } else {
+                    \Log::debug("invoice_refno accessor: Link exists but invoice not found for CN {$this->REFNO}");
+                }
+            } else {
+                \Log::debug("invoice_refno accessor: No link found for CN {$this->REFNO} (artrans_id: {$this->artrans_id})");
             }
+        } catch (\Exception $e) {
+            // Table might not exist yet, return null silently
+            \Log::debug("invoice_refno accessor: Error for CN {$this->REFNO}: " . $e->getMessage());
+            return null;
         }
         
         return null;
@@ -115,6 +132,7 @@ class Artran extends BaseModel
             'items',
             'customer',
             'orders', // Include orders relationship
+            'invoice_refno', // Include the accessor for credit notes
             // $this->getKeyName(), // The getKeyName() method gets the primary key column name (e.g., 'id')
         ];
     }
