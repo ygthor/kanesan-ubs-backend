@@ -134,6 +134,7 @@ class InvoiceItemController extends Controller
                 // IDs and Codes
                 'artrans_id' => $invoice->artrans_id,
                 'ITEMNO' => $request->product_code,
+                'TRANCODE' => $request->product_code, // Set both ITEMNO and TRANCODE to the same product code
                 'DESP' => $product->description ?? 'Unknown Product',
 
                 // Copied from Parent
