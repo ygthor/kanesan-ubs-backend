@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Artran;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DebtController extends Controller
@@ -157,11 +157,11 @@ class DebtController extends Controller
      * A helper function to calculate the due date based on a payment term string.
      * This is a simplified implementation.
      *
-     * @param \Illuminate\Support\Carbon $orderDate
+     * @param \Carbon\Carbon|\Illuminate\Support\Carbon $orderDate
      * @param string|null $paymentTerm
-     * @return \Illuminate\Support\Carbon
+     * @return \Carbon\Carbon
      */
-    private function calculateDueDate(Carbon $orderDate, ?string $paymentTerm): Carbon
+    private function calculateDueDate($orderDate, ?string $paymentTerm): Carbon
     {
         $date = $orderDate->copy();
         
