@@ -176,6 +176,17 @@ class InvoiceController extends Controller
             }
 
 
+            // Normalize invoice date to prevent timezone conversion issues
+            // If date is provided, parse it in app timezone at start of day
+            // Since app timezone is set to 'Asia/Kuala_Lumpur' in config/app.php,
+            // Carbon::parse() will use that timezone automatically
+            $invoiceDate = $request->date ?? now();
+            if ($request->has('date') && $request->date) {
+                $dateStr = $request->date;
+                // Parse date in app timezone at start of day to prevent day shift
+                $invoiceDate = \Carbon\Carbon::parse($dateStr)->startOfDay();
+            }
+
             // Data for Artran (header)
             $invoiceData = [
 
@@ -184,7 +195,7 @@ class InvoiceController extends Controller
                 'NAME' => $customer->company_name, // Company name (not customer name)
                 'EMAIL' => $customer->email, // Customer email
                 'AREA' => $customer->territory, // Territory/Area from customer
-                'DATE' => $request->date ?? now(),
+                'DATE' => $invoiceDate,
                 'NOTE' => $request->remarks,
                 'TERM' => $customer->payment_term, // Payment term from customer
                 'USERID' => auth()->user()->id ?? '', // Assuming you have auth

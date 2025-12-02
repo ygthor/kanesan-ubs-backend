@@ -218,4 +218,19 @@ class Artran extends BaseModel
                 return 'Document'; // A fallback for any other types
         }
     }
+
+    /**
+     * Override date serialization to return date-only format (YYYY-MM-DD)
+     * This prevents timezone conversion issues when retrieving dates from the database
+     * and ensures dates are always returned as date-only strings in API responses
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        // Format as date-only to prevent timezone conversion issues
+        // Use the date's timezone, not UTC
+        if ($date instanceof Carbon) {
+            return $date->format('Y-m-d');
+        }
+        return $date->format('Y-m-d');
+    }
 }

@@ -60,4 +60,14 @@ class Receipt extends Model
     {
         return $this->hasMany(ReceiptInvoice::class);
     }
+
+    /**
+     * Override date serialization to return date-only format (YYYY-MM-DD)
+     * This prevents timezone conversion issues when retrieving dates from the database
+     * and ensures dates are always returned as date-only strings in API responses
+     */
+    protected function serializeDate(\DateTimeInterface $date)
+    {
+        return $date->format('Y-m-d');
+    }
 }
