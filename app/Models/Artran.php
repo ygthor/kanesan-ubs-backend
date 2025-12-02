@@ -73,6 +73,38 @@ class Artran extends BaseModel
         'ISCASH' => 'boolean',
     ];
 
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['invoice_refno'];
+
+    /**
+     * Get the linked invoice REFNO for credit notes.
+     * This is an accessor that will be included in JSON responses.
+     */
+    public function getInvoiceRefnoAttribute()
+    {
+        // Only for credit notes (CN/CR)
+        if (!in_array($this->TYPE, ['CN', 'CR'])) {
+            return null;
+        }
+
+        // Query the linked invoice directly from the pivot table
+        $creditNoteLink = \App\Models\ArtransCreditNote::where('credit_note_id', $this->artrans_id)->first();
+        if ($creditNoteLink) {
+            $linkedInvoice = self::where('artrans_id', $creditNoteLink->invoice_id)
+                ->where('TYPE', 'INV')
+                ->first();
+            if ($linkedInvoice) {
+                return $linkedInvoice->REFNO;
+            }
+        }
+        
+        return null;
+    }
+
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
