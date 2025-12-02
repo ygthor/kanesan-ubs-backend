@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Artran; // Changed from Order
 use App\Models\ArTransItem; // Changed from OrderItem
+use App\Models\ArtransCreditNote;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Order;
@@ -354,6 +355,16 @@ class InvoiceController extends Controller
                 }
             }
 
+            // If this is a credit note (CN/CR) and invoice_refno is provided, link them
+            if (in_array($invoiceData['TYPE'], ['CN', 'CR']) && $request->has('invoice_refno')) {
+                try {
+                    $this->linkCreditNoteToInvoice($invoice->artrans_id, $request->invoice_refno);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to link credit note to invoice: ' . $e->getMessage());
+                    // Don't fail the invoice creation if linking fails
+                }
+            }
+
             DB::commit();
 
             return makeResponse(
@@ -626,5 +637,51 @@ class InvoiceController extends Controller
         }
 
         return (float)$total;
+    }
+
+    /**
+     * Link a credit note to an invoice
+     *
+     * @param int $creditNoteArtransId The artrans_id of the credit note
+     * @param string $invoiceRefNo The REFNO of the invoice to link to
+     * @return ArtransCreditNote
+     * @throws \Exception
+     */
+    private function linkCreditNoteToInvoice($creditNoteArtransId, $invoiceRefNo)
+    {
+        // Find the invoice by REFNO
+        $invoice = Artran::where('REFNO', $invoiceRefNo)
+            ->where('TYPE', 'INV')
+            ->first();
+        
+        if (!$invoice) {
+            throw new \Exception("Invoice with REFNO '{$invoiceRefNo}' not found or is not an INV type");
+        }
+        
+        // Verify the credit note exists
+        $creditNote = Artran::where('artrans_id', $creditNoteArtransId)
+            ->whereIn('TYPE', ['CN', 'CR'])
+            ->first();
+        
+        if (!$creditNote) {
+            throw new \Exception("Credit note with artrans_id '{$creditNoteArtransId}' not found or is not a CN/CR type");
+        }
+        
+        // Check if link already exists
+        $existingLink = ArtransCreditNote::where('credit_note_id', $creditNoteArtransId)->first();
+        if ($existingLink) {
+            \Log::info("Credit note {$creditNote->REFNO} is already linked to invoice {$invoice->REFNO}");
+            return $existingLink;
+        }
+        
+        // Create the link
+        $link = ArtransCreditNote::create([
+            'invoice_id' => $invoice->artrans_id,
+            'credit_note_id' => $creditNoteArtransId,
+        ]);
+        
+        \Log::info("Linked credit note {$creditNote->REFNO} to invoice {$invoice->REFNO}");
+        
+        return $link;
     }
 }

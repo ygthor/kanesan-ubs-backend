@@ -114,6 +114,41 @@ class Artran extends BaseModel
     }
 
     /**
+     * Get credit notes linked to this invoice (when this is an INV).
+     * One invoice can have multiple credit notes.
+     */
+    public function creditNotes()
+    {
+        return $this->hasMany(ArtransCreditNote::class, 'invoice_id', 'artrans_id')
+            ->with('creditNote');
+    }
+
+    /**
+     * Get the invoice that this credit note is linked to (when this is a CN).
+     * One credit note belongs to one invoice.
+     */
+    public function linkedInvoice()
+    {
+        return $this->hasOne(ArtransCreditNote::class, 'credit_note_id', 'artrans_id')
+            ->with('invoice');
+    }
+
+    /**
+     * Get the invoice directly (convenience method).
+     */
+    public function invoice()
+    {
+        return $this->hasOneThrough(
+            Artran::class,
+            ArtransCreditNote::class,
+            'credit_note_id', // Foreign key on artrans_credit_note
+            'artrans_id',     // Foreign key on artrans (invoice)
+            'artrans_id',     // Local key on artrans (this credit note)
+            'invoice_id'      // Local key on artrans_credit_note
+        )->where('artrans.TYPE', 'INV');
+    }
+
+    /**
      * Calculate invoice totals based on its items.
      * Assumes 'tax1_percentage' and 'discount' are passed or set on the model.
      */
