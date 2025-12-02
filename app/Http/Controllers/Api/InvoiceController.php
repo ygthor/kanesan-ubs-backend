@@ -438,6 +438,21 @@ class InvoiceController extends Controller
             return makeResponse(403, 'Access denied. You do not have permission to view this invoice.', null);
         }
         
+        // If this is a credit note (CN/CR), get the linked invoice REFNO and add it to response
+        if (in_array($invoice->TYPE, ['CN', 'CR'])) {
+            // Query the linked invoice directly from the pivot table
+            $creditNoteLink = ArtransCreditNote::where('credit_note_id', $invoice->artrans_id)->first();
+            if ($creditNoteLink) {
+                $linkedInvoice = Artran::where('artrans_id', $creditNoteLink->invoice_id)
+                    ->where('TYPE', 'INV')
+                    ->first();
+                if ($linkedInvoice) {
+                    // Add invoice_refno attribute to the invoice model for frontend
+                    $invoice->setAttribute('invoice_refno', $linkedInvoice->REFNO);
+                }
+            }
+        }
+        
         return makeResponse(200, 'Invoice retrieved successfully.', $invoice);
     }
 
