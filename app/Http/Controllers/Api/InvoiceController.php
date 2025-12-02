@@ -370,16 +370,41 @@ class InvoiceController extends Controller
             // This works for both CREATE and UPDATE modes
             if (in_array($invoiceData['TYPE'], ['CN', 'CR']) && $request->has('invoice_refno') && $request->invoice_refno) {
                 try {
-                    $this->linkCreditNoteToInvoice($invoice->artrans_id, $request->invoice_refno);
-                    \Log::info("Credit note linking attempted for CN {$invoice->REFNO} with invoice {$request->invoice_refno}");
+                    // Get credit note artrans_id
+                    // In CREATE mode, artrans_id might not be loaded yet (since primary key is REFNO, not artrans_id)
+                    // In UPDATE mode, artrans_id should already be available
+                    $creditNoteArtransId = $invoice->artrans_id;
+                    
+                    // If artrans_id is not available (usually in CREATE mode), refresh or query from DB
+                    if (!$creditNoteArtransId) {
+                        // Refresh to load artrans_id (auto-increment field)
+                        $invoice->refresh();
+                        $creditNoteArtransId = $invoice->artrans_id;
+                        
+                        // Fallback: query directly from database if refresh didn't work
+                        if (!$creditNoteArtransId) {
+                            $creditNoteArtransId = Artran::where('REFNO', $invoice->REFNO)->value('artrans_id');
+                        }
+                    }
+                    
+                    if ($creditNoteArtransId) {
+                        $this->linkCreditNoteToInvoice($creditNoteArtransId, $request->invoice_refno);
+                        \Log::info("Credit note linking: CN {$invoice->REFNO} (artrans_id: {$creditNoteArtransId}) -> Invoice {$request->invoice_refno}");
+                    } else {
+                        \Log::warning("Could not find artrans_id for credit note {$invoice->REFNO}. Cannot create link.");
+                    }
                 } catch (\Exception $e) {
-                    \Log::warning('Failed to link credit note to invoice: ' . $e->getMessage());
+                    \Log::warning('Failed to link credit note to invoice: ' . $e->getMessage(), [
+                        'credit_note_refno' => $invoice->REFNO,
+                        'invoice_refno' => $request->invoice_refno,
+                        'exception' => $e->getTraceAsString()
+                    ]);
                     // Don't fail the invoice creation/update if linking fails
                 }
             } else {
                 // Log when invoice_refno is not provided for CN
                 if (in_array($invoiceData['TYPE'], ['CN', 'CR'])) {
-                    \Log::info("Credit note {$invoice->REFNO} updated without invoice_refno parameter");
+                    \Log::info("Credit note {$invoice->REFNO} saved without invoice_refno parameter");
                 }
             }
 
