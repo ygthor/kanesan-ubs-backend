@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Artran;
 use App\Models\ArTransItem;
+use App\Models\ArtransCreditNote;
 use App\Models\Icitem;
 use App\Models\ItemTransaction;
 use App\Models\Product;
@@ -89,6 +90,35 @@ class InvoiceItemController extends Controller
             // Find the parent invoice
             $invoice = Artran::findOrFail($request->reference_code);
             
+            // For credit notes, validate that the product exists in the linked invoice
+            $isCreditNote = in_array($invoice->TYPE, ['CN', 'CR']);
+            if ($isCreditNote) {
+                // Get the linked invoice
+                $creditNoteLink = ArtransCreditNote::where('credit_note_id', $invoice->artrans_id)->first();
+                if ($creditNoteLink) {
+                    $linkedInvoice = Artran::where('artrans_id', $creditNoteLink->invoice_id)
+                        ->where('TYPE', 'INV')
+                        ->first();
+                    
+                    if ($linkedInvoice) {
+                        // Check if the product code exists in the linked invoice items
+                        $linkedInvoiceItem = ArTransItem::where('artrans_id', $linkedInvoice->artrans_id)
+                            ->where('ITEMNO', $request->product_code)
+                            ->first();
+                        
+                        if (!$linkedInvoiceItem) {
+                            return makeResponse(422, 'Validation error.', [
+                                'error' => "Product '{$request->product_code}' is not found in the linked invoice '{$linkedInvoice->REFNO}'. Credit notes can only include items from their linked invoice."
+                            ]);
+                        }
+                    } else {
+                        \Log::warning("Linked invoice not found for credit note {$invoice->REFNO}");
+                    }
+                } else {
+                    \Log::warning("Credit note {$invoice->REFNO} is not linked to any invoice");
+                }
+            }
+            
             // Find product using new products table
             $product = Product::where('code', $request->product_code)->first();
             
@@ -116,7 +146,7 @@ class InvoiceItemController extends Controller
             // Determine transaction type based on invoice type
             // CN (Credit Note) = invoice_return (stock goes back in)
             // Other types (INV, CB, etc.) = invoice_sale (stock goes out)
-            $isCreditNote = in_array($invoice->TYPE, ['CN', 'CR']);
+            // Note: $isCreditNote is already set above
             $transactionType = $isCreditNote ? 'invoice_return' : 'invoice_sale';
             
             if ($id) {
