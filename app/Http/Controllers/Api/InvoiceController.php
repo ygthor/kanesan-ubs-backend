@@ -96,8 +96,16 @@ class InvoiceController extends Controller
 
         if ($paginate) {
             $paginatedInvoices = $invoices->paginate($request->input('per_page', 15));
+            // Adjust amounts for INV invoices
+            $paginatedInvoices->getCollection()->transform(function ($invoice) {
+                return $this->adjustInvoiceAmounts($invoice);
+            });
         } else {
             $paginatedInvoices = $invoices->get();
+            // Adjust amounts for INV invoices
+            $paginatedInvoices->transform(function ($invoice) {
+                return $this->adjustInvoiceAmounts($invoice);
+            });
         }
 
 
@@ -450,7 +458,7 @@ class InvoiceController extends Controller
             return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
         }
         
-        // For INV invoices, include linked credit notes
+        // For INV invoices, include linked credit notes and adjust amounts
         if ($invoice->TYPE == 'INV') {
             $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
                 ->with(['creditNote.items', 'creditNote.customer'])
@@ -461,7 +469,9 @@ class InvoiceController extends Controller
                 ->filter()
                 ->values();
             
-            $invoiceData = $invoice->toArray();
+            // Adjust amounts by deducting linked credit notes
+            $adjustedInvoice = $this->adjustInvoiceAmounts($invoice);
+            $invoiceData = $adjustedInvoice->toArray();
             $invoiceData['credit_notes'] = $creditNotes;
             
             return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
@@ -764,5 +774,41 @@ class InvoiceController extends Controller
         \Log::info("Linked credit note {$creditNote->REFNO} to invoice {$invoice->REFNO}");
         
         return $link;
+    }
+
+    /**
+     * Adjust invoice amounts by deducting linked credit notes (for INV type only).
+     * 
+     * @param \App\Models\Artran $invoice
+     * @return \App\Models\Artran
+     */
+    private function adjustInvoiceAmounts($invoice)
+    {
+        // Only adjust INV type invoices
+        if ($invoice->TYPE !== 'INV') {
+            return $invoice;
+        }
+
+        $totalCreditNotes = $invoice->getTotalCreditNotesAmount();
+        if ($totalCreditNotes > 0) {
+            // Store original values before adjustment
+            $originalNetBil = (float) $invoice->NET_BIL;
+            $originalGrandBil = (float) $invoice->GRAND_BIL;
+            $originalGrossBil = (float) $invoice->GROSS_BIL;
+            $originalTax1Bil = (float) $invoice->TAX1_BIL;
+            
+            // Adjust amounts by deducting credit notes
+            $invoice->NET_BIL = max(0, $originalNetBil - $totalCreditNotes);
+            $invoice->GRAND_BIL = max(0, $originalGrandBil - $totalCreditNotes);
+            $invoice->GROSS_BIL = max(0, $originalGrossBil - $totalCreditNotes);
+            
+            // Proportionally adjust tax based on original GRAND_BIL
+            if ($originalGrandBil > 0) {
+                $creditNoteRatio = $totalCreditNotes / $originalGrandBil;
+                $invoice->TAX1_BIL = max(0, $originalTax1Bil * (1 - $creditNoteRatio));
+            }
+        }
+
+        return $invoice;
     }
 }

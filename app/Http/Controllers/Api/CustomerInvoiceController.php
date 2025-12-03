@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Artran;
+use App\Models\ArtransCreditNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -93,8 +94,44 @@ class CustomerInvoiceController extends Controller
         // Calculate outstanding balance for each invoice and format response
         $formattedInvoices = $invoices->map(function ($invoice) {
             $totalPayments = (float) ($invoice->total_payments ?? 0);
-            $netBil = (float) $invoice->NET_BIL;
-            // Outstanding balance = invoice amount - payments made
+            
+            // Calculate total credit notes amount for this invoice
+            $totalCreditNotes = 0;
+            if ($invoice->artrans_id) {
+                $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                    ->with('creditNote')
+                    ->get();
+                foreach ($creditNotes as $cnLink) {
+                    if ($cnLink->creditNote) {
+                        $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
+                    }
+                }
+            }
+            
+            // Adjust amounts by deducting credit notes (for INV type)
+            $originalNetBil = (float) $invoice->NET_BIL;
+            $originalGrandBil = (float) $invoice->GRAND_BIL;
+            $originalGrossBil = (float) $invoice->GROSS_BIL;
+            $originalTax1Bil = (float) $invoice->TAX1_BIL;
+            
+            $netBil = $originalNetBil;
+            $grandBil = $originalGrandBil;
+            $grossBil = $originalGrossBil;
+            $tax1Bil = $originalTax1Bil;
+            
+            if ($totalCreditNotes > 0) {
+                $netBil = max(0, $originalNetBil - $totalCreditNotes);
+                $grandBil = max(0, $originalGrandBil - $totalCreditNotes);
+                $grossBil = max(0, $originalGrossBil - $totalCreditNotes);
+                
+                // Proportionally adjust tax
+                if ($originalGrandBil > 0) {
+                    $creditNoteRatio = $totalCreditNotes / $originalGrandBil;
+                    $tax1Bil = max(0, $originalTax1Bil * (1 - $creditNoteRatio));
+                }
+            }
+            
+            // Outstanding balance = adjusted invoice amount - payments made
             $outstandingBalance = max(0, $netBil - $totalPayments);
 
             return [
@@ -104,14 +141,15 @@ class CustomerInvoiceController extends Controller
                 'NAME' => $invoice->NAME,
                 'CUSTNO' => $invoice->CUSTNO,
                 'DATE' => $invoice->DATE ? $invoice->DATE->toDateString() : null,  // Return date-only format (YYYY-MM-DD)
-                'NET_BIL' => $netBil,
-                'GRAND_BIL' => (float) $invoice->GRAND_BIL,
-                'GROSS_BILL' => (float) $invoice->GROSS_BIL,
-                'TAX1_BIL' => (float) $invoice->TAX1_BIL,
+                'NET_BIL' => $netBil, // Adjusted amount (deducting CN)
+                'GRAND_BIL' => $grandBil, // Adjusted amount (deducting CN)
+                'GROSS_BILL' => $grossBil, // Adjusted amount (deducting CN)
+                'TAX1_BIL' => $tax1Bil, // Adjusted amount (proportionally)
                 'NOTE' => $invoice->NOTE,
                 'status' => $invoice->status ?? 'pending',
                 'total_payments' => $totalPayments,
                 'outstanding_balance' => $outstandingBalance,
+                'total_credit_notes' => $totalCreditNotes, // Total amount of linked credit notes
                 // items excluded for cleaner JSON and better performance
                 // customer excluded as customer info is already in invoice (NAME, CUSTNO)
             ];

@@ -78,7 +78,7 @@ class Artran extends BaseModel
      *
      * @var array
      */
-    protected $appends = ['invoice_refno'];
+    protected $appends = ['invoice_refno', 'total_credit_notes_amount'];
 
     /**
      * Get the linked invoice REFNO for credit notes.
@@ -122,6 +122,123 @@ class Artran extends BaseModel
         return null;
     }
 
+    /**
+     * Get the total amount of all linked credit notes for this invoice.
+     * Only applicable for INV type invoices.
+     * 
+     * @return float
+     */
+    public function getTotalCreditNotesAmount()
+    {
+        // Only for invoices (INV)
+        if ($this->TYPE !== 'INV') {
+            return 0.0;
+        }
+
+        // Check if artrans_id is available
+        if (!$this->artrans_id) {
+            return 0.0;
+        }
+
+        try {
+            $creditNotes = ArtransCreditNote::where('invoice_id', $this->artrans_id)
+                ->with('creditNote')
+                ->get();
+            
+            $total = 0.0;
+            foreach ($creditNotes as $cnLink) {
+                if ($cnLink->creditNote) {
+                    $total += (float) ($cnLink->creditNote->NET_BIL ?? 0);
+                }
+            }
+            
+            return $total;
+        } catch (\Exception $e) {
+            \Log::debug("getTotalCreditNotesAmount: Error for INV {$this->REFNO}: " . $e->getMessage());
+            return 0.0;
+        }
+    }
+
+    /**
+     * Accessor for total_credit_notes_amount (for JSON serialization).
+     * 
+     * @return float
+     */
+    public function getTotalCreditNotesAmountAttribute()
+    {
+        return $this->getTotalCreditNotesAmount();
+    }
+
+    /**
+     * Get adjusted NET_BIL (original NET_BIL minus linked credit notes).
+     * Only applicable for INV type invoices.
+     * 
+     * @return float
+     */
+    public function getNetBilAdjustedAttribute()
+    {
+        if ($this->TYPE !== 'INV') {
+            return (float) $this->NET_BIL;
+        }
+        
+        $totalCreditNotes = $this->getTotalCreditNotesAmount();
+        return max(0, (float) $this->NET_BIL - $totalCreditNotes);
+    }
+
+    /**
+     * Get adjusted GRAND_BIL (original GRAND_BIL minus linked credit notes).
+     * Only applicable for INV type invoices.
+     * 
+     * @return float
+     */
+    public function getGrandBilAdjustedAttribute()
+    {
+        if ($this->TYPE !== 'INV') {
+            return (float) $this->GRAND_BIL;
+        }
+        
+        $totalCreditNotes = $this->getTotalCreditNotesAmount();
+        return max(0, (float) $this->GRAND_BIL - $totalCreditNotes);
+    }
+
+    /**
+     * Get adjusted GROSS_BIL (original GROSS_BIL minus linked credit notes).
+     * Only applicable for INV type invoices.
+     * 
+     * @return float
+     */
+    public function getGrossBilAdjustedAttribute()
+    {
+        if ($this->TYPE !== 'INV') {
+            return (float) $this->GROSS_BIL;
+        }
+        
+        $totalCreditNotes = $this->getTotalCreditNotesAmount();
+        return max(0, (float) $this->GROSS_BIL - $totalCreditNotes);
+    }
+
+    /**
+     * Get adjusted TAX1_BIL (proportionally adjusted based on credit notes).
+     * Only applicable for INV type invoices.
+     * 
+     * @return float
+     */
+    public function getTax1BilAdjustedAttribute()
+    {
+        if ($this->TYPE !== 'INV') {
+            return (float) $this->TAX1_BIL;
+        }
+        
+        $totalCreditNotes = $this->getTotalCreditNotesAmount();
+        if ($totalCreditNotes == 0 || $this->GRAND_BIL == 0) {
+            return (float) $this->TAX1_BIL;
+        }
+        
+        // Proportionally adjust tax based on credit note ratio
+        $creditNoteRatio = $totalCreditNotes / (float) $this->GRAND_BIL;
+        return max(0, (float) $this->TAX1_BIL * (1 - $creditNoteRatio));
+    }
+
     public function __construct(array $attributes = [])
     {
         parent::__construct($attributes);
@@ -133,6 +250,11 @@ class Artran extends BaseModel
             'customer',
             'orders', // Include orders relationship
             'invoice_refno', // Include the accessor for credit notes
+            'total_credit_notes_amount', // Total amount of linked credit notes
+            'net_bil_adjusted', // Adjusted NET_BIL (deducting CN amounts)
+            'grand_bil_adjusted', // Adjusted GRAND_BIL (deducting CN amounts)
+            'gross_bil_adjusted', // Adjusted GROSS_BIL (deducting CN amounts)
+            'tax1_bil_adjusted', // Adjusted TAX1_BIL (proportionally adjusted)
             // $this->getKeyName(), // The getKeyName() method gets the primary key column name (e.g., 'id')
         ];
     }

@@ -148,7 +148,7 @@ class DebtController extends Controller
                     'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments and credit notes
                     'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
                     'returnAmount' => (float) $returnAmount, // Return amount from invoice items
-                    'creditAmount' => (float) ($invoice->CREDIT_BIL + $totalCreditNotes), // Credit amount including credit notes
+                    'creditAmount' => (float) $totalCreditNotes, // Credit amount from all linked credit notes (CN/CR)
                     'amountPaid' => $totalPayments, // Amount paid from receipts
                     'currency' => 'RM', // Default currency
                 ];
