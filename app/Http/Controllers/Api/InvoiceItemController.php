@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Artran;
 use App\Models\ArTransItem;
+use App\Models\ArTransItemDetail;
 use App\Models\ArtransCreditNote;
 use App\Models\Icitem;
 use App\Models\ItemTransaction;
@@ -24,7 +25,7 @@ class InvoiceItemController extends Controller
     public function index(Request $request)
     {
         // Start a query on ArTransItem
-        $query = ArTransItem::query()->with(['product', 'artran:id,REFNO,NAME']);
+        $query = ArTransItem::query()->with(['product', 'artran:id,REFNO,NAME', 'detail']);
 
         // Join with parent 'artrans' table to filter by its properties
         $query->join('artrans', 'artrans_items.artrans_id', '=', 'artrans.id');
@@ -74,12 +75,33 @@ class InvoiceItemController extends Controller
      */
     private function saveInvoiceItem(Request $request, $id = null)
     {
-        $validator = Validator::make($request->all(), [
+        // Find the parent invoice first to check if it's a credit note
+        $invoice = Artran::findOrFail($request->reference_code);
+        $isCreditNote = in_array($invoice->TYPE, ['CN', 'CR']);
+        
+        $validationRules = [
             'reference_code' => 'required',
             'product_code' => 'required',
             'quantity' => 'required|numeric|min:0.01',
             'unit_price' => 'required|numeric|min:0',
-        ]);
+        ];
+        
+        // For credit notes, add trade return validation
+        if ($isCreditNote) {
+            $validationRules['is_trade_return'] = 'nullable|boolean';
+            $validationRules['return_status'] = 'nullable|in:good,bad';
+        }
+        
+        $validator = Validator::make($request->all(), $validationRules);
+        
+        // Custom validation: if is_trade_return is true, return_status is required
+        if ($isCreditNote && $request->has('is_trade_return') && $request->is_trade_return) {
+            $validator->after(function ($validator) use ($request) {
+                if (empty($request->return_status)) {
+                    $validator->errors()->add('return_status', 'Return status (good or bad) is required when trade return is checked.');
+                }
+            });
+        }
 
         if ($validator->fails()) {
             return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
@@ -87,11 +109,7 @@ class InvoiceItemController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find the parent invoice
-            $invoice = Artran::findOrFail($request->reference_code);
-            
-            // For credit notes, validate that the product exists in the linked invoice
-            $isCreditNote = in_array($invoice->TYPE, ['CN', 'CR']);
+            // Invoice is already loaded above for validation
             if ($isCreditNote) {
                 // Get the linked invoice
                 $creditNoteLink = ArtransCreditNote::where('credit_note_id', $invoice->artrans_id)->first();
@@ -226,7 +244,36 @@ class InvoiceItemController extends Controller
             $invoiceItem->calculate();
             $invoiceItem->save();
 
-            // 2. Recalculate all totals for the parent invoice
+            // 2. Save or update trade return details (only for credit notes)
+            if ($isCreditNote) {
+                $isTradeReturn = $request->has('is_trade_return') && $request->is_trade_return;
+                $returnStatus = $isTradeReturn ? $request->return_status : null;
+                
+                $detailData = [
+                    'is_trade_return' => $isTradeReturn,
+                    'return_status' => $returnStatus,
+                    'updated_by' => auth()->user()->id ?? null,
+                ];
+                
+                if ($id) {
+                    // UPDATE MODE - update existing detail or create if doesn't exist
+                    $itemDetail = ArTransItemDetail::where('artrans_item_id', $invoiceItem->id)->first();
+                    if ($itemDetail) {
+                        $itemDetail->update($detailData);
+                    } else {
+                        $detailData['artrans_item_id'] = $invoiceItem->id;
+                        $detailData['created_by'] = auth()->user()->id ?? null;
+                        ArTransItemDetail::create($detailData);
+                    }
+                } else {
+                    // CREATE MODE
+                    $detailData['artrans_item_id'] = $invoiceItem->id;
+                    $detailData['created_by'] = auth()->user()->id ?? null;
+                    ArTransItemDetail::create($detailData);
+                }
+            }
+
+            // 3. Recalculate all totals for the parent invoice
             $invoice->calculate();
             $invoice->save();
 
@@ -252,7 +299,7 @@ class InvoiceItemController extends Controller
      */
     public function show($id)
     {
-        $item = ArTransItem::with(['item', 'artran.customer'])->findOrFail($id);
+        $item = ArTransItem::with(['item', 'artran.customer', 'detail'])->findOrFail($id);
         return makeResponse(200, 'Invoice item retrieved successfully.', $item);
     }
 

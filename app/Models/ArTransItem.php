@@ -62,7 +62,8 @@ class ArTransItem extends BaseModel
         // Set the visible property to be the fillable fields and the primary key
         $this->visible = [
             ...$this->fillable, // The spread operator unpacks the fillable array
-            'item'
+            'item',
+            'detail'
         ];
     }
 
@@ -86,6 +87,14 @@ class ArTransItem extends BaseModel
         // Local key on 'artrans_items' is 'TRANCODE'.
         // The Owner key (primary key) on 'icitem' is 'ITEMNO'.
         return $this->belongsTo(Icitem::class, 'ITEMNO', 'ITEMNO');
+    }
+
+    /**
+     * Get the detail record for this invoice item (trade return information).
+     */
+    public function detail()
+    {
+        return $this->hasOne(ArTransItemDetail::class, 'artrans_item_id', 'id');
     }
 
     /**
