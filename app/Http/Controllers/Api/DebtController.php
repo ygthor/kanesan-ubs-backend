@@ -84,7 +84,7 @@ class DebtController extends Controller
             });
         }
 
-        $invoicesWithCustomers = $invoicesQuery->with('items')->orderBy('artrans.DATE', 'asc')->get();
+        $invoicesWithCustomers = $invoicesQuery->with('items.detail')->orderBy('artrans.DATE', 'asc')->get();
 
         // Filter out invoices without customer data and group by customer
         $customersWithDebts = $invoicesWithCustomers

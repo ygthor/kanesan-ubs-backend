@@ -91,6 +91,7 @@ class ArTransItem extends BaseModel
 
     /**
      * Get the detail record for this invoice item (trade return information).
+     * Uses left join to ensure items without details are still included.
      */
     public function detail()
     {
