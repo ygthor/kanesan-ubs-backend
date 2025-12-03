@@ -255,6 +255,11 @@ class Artran extends BaseModel
             'grand_bil_adjusted', // Adjusted GRAND_BIL (deducting CN amounts)
             'gross_bil_adjusted', // Adjusted GROSS_BIL (deducting CN amounts)
             'tax1_bil_adjusted', // Adjusted TAX1_BIL (proportionally adjusted)
+            'original_amount', // Original NET_BIL before adjustments
+            'credit_note_amount', // Total credit note amount
+            'net_amount', // Net amount after credit notes
+            'paid_amount', // Total payments made
+            'outstanding_amount', // Outstanding balance
             // $this->getKeyName(), // The getKeyName() method gets the primary key column name (e.g., 'id')
         ];
     }

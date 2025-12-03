@@ -96,15 +96,15 @@ class InvoiceController extends Controller
 
         if ($paginate) {
             $paginatedInvoices = $invoices->paginate($request->input('per_page', 15));
-            // Adjust amounts for INV invoices
+            // Adjust amounts for INV invoices and add payment/credit note info
             $paginatedInvoices->getCollection()->transform(function ($invoice) {
-                return $this->adjustInvoiceAmounts($invoice);
+                return $this->enrichInvoiceWithPaymentInfo($invoice);
             });
         } else {
             $paginatedInvoices = $invoices->get();
-            // Adjust amounts for INV invoices
+            // Adjust amounts for INV invoices and add payment/credit note info
             $paginatedInvoices->transform(function ($invoice) {
-                return $this->adjustInvoiceAmounts($invoice);
+                return $this->enrichInvoiceWithPaymentInfo($invoice);
             });
         }
 
@@ -469,9 +469,9 @@ class InvoiceController extends Controller
                 ->filter()
                 ->values();
             
-            // Adjust amounts by deducting linked credit notes
-            $adjustedInvoice = $this->adjustInvoiceAmounts($invoice);
-            $invoiceData = $adjustedInvoice->toArray();
+            // Enrich invoice with payment and credit note information
+            $enrichedInvoice = $this->enrichInvoiceWithPaymentInfo($invoice);
+            $invoiceData = $enrichedInvoice->toArray();
             $invoiceData['credit_notes'] = $creditNotes;
             
             return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
@@ -777,23 +777,35 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Adjust invoice amounts by deducting linked credit notes (for INV type only).
+     * Adjust invoice amounts by deducting linked credit notes and add payment information.
      * 
      * @param \App\Models\Artran $invoice
      * @return \App\Models\Artran
      */
-    private function adjustInvoiceAmounts($invoice)
+    private function enrichInvoiceWithPaymentInfo($invoice)
     {
-        // Only adjust INV type invoices
-        if ($invoice->TYPE !== 'INV') {
-            return $invoice;
+        // Store original amounts before any adjustments
+        $originalNetBil = (float) $invoice->NET_BIL;
+        $originalGrandBil = (float) $invoice->GRAND_BIL;
+        
+        // Calculate total credit notes amount
+        $totalCreditNotes = 0;
+        if ($invoice->TYPE === 'INV' && $invoice->artrans_id) {
+            $totalCreditNotes = $invoice->getTotalCreditNotesAmount();
         }
-
-        $totalCreditNotes = $invoice->getTotalCreditNotesAmount();
-        if ($totalCreditNotes > 0) {
-            // Store original values before adjustment
-            $originalNetBil = (float) $invoice->NET_BIL;
-            $originalGrandBil = (float) $invoice->GRAND_BIL;
+        
+        // Calculate total payments made
+        $totalPayments = 0;
+        if ($invoice->REFNO) {
+            $totalPayments = (float) DB::table('receipt_invoices')
+                ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
+                ->where('receipt_invoices.invoice_refno', $invoice->REFNO)
+                ->whereNull('receipts.deleted_at')
+                ->sum('receipt_invoices.amount_applied') ?? 0;
+        }
+        
+        // Adjust amounts for INV invoices (deduct credit notes)
+        if ($invoice->TYPE === 'INV' && $totalCreditNotes > 0) {
             $originalGrossBil = (float) $invoice->GROSS_BIL;
             $originalTax1Bil = (float) $invoice->TAX1_BIL;
             
@@ -808,7 +820,21 @@ class InvoiceController extends Controller
                 $invoice->TAX1_BIL = max(0, $originalTax1Bil * (1 - $creditNoteRatio));
             }
         }
-
+        
+        // Calculate net amount (after credit notes) and outstanding amount
+        $netAmount = $invoice->TYPE === 'INV' 
+            ? (float) $invoice->NET_BIL  // Already adjusted
+            : $originalNetBil;  // For CN/CR, use original
+        
+        $outstandingAmount = max(0, $netAmount - $totalPayments);
+        
+        // Add these as attributes to the invoice model for JSON serialization
+        $invoice->setAttribute('original_amount', $originalNetBil);
+        $invoice->setAttribute('credit_note_amount', $totalCreditNotes);
+        $invoice->setAttribute('net_amount', $netAmount);
+        $invoice->setAttribute('paid_amount', $totalPayments);
+        $invoice->setAttribute('outstanding_amount', $outstandingAmount);
+        
         return $invoice;
     }
 }
