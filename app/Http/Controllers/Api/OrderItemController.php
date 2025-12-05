@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Customer; // To fetch customer details if needed
-use App\Models\Product;  // To fetch product details from products table
+use App\Models\Icitem;  // To fetch product details from icitem table (actual inventory data)
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -36,7 +36,7 @@ class OrderItemController extends Controller
      * @bodyParam order_date string nullable The date of the order (YYYY-MM-DD HH:MM:SS). Defaults to now. Example: "2025-05-20 10:00:00"
      * @bodyParam remarks string nullable Any remarks for the order.
      * @bodyParam items array required An array of order items.
-     * @bodyParam items.*.product_no string required The code of the product from products table. Example: "A100"
+     * @bodyParam items.*.product_no string required The ITEMNO of the product from icitem table. Example: "AK1K"
      * @bodyParam items.*.quantity float required The quantity of the product. Example: 2
      * @bodyParam items.*.unit_price float required The unit price of the product. Example: 10.00
      * @bodyParam items.*.discount float nullable The discount for this item. Example: 1.00
@@ -59,15 +59,15 @@ class OrderItemController extends Controller
 
     public function saveOrderItem(Request $request, $id = null)
     {
-        // First, check if product exists (case-insensitive check)
+        // First, check if item exists in icitem table (case-insensitive check)
         $productNo = $request->input('product_no');
-        $product = null;
+        $icitem = null;
         if ($productNo) {
-            // Try exact match first
-            $product = Product::where('code', $productNo)->first();
+            // Try exact match first using ITEMNO (primary key)
+            $icitem = Icitem::find($productNo);
             // If not found, try case-insensitive match
-            if (!$product) {
-                $product = Product::whereRaw('LOWER(code) = LOWER(?)', [$productNo])->first();
+            if (!$icitem) {
+                $icitem = Icitem::whereRaw('LOWER(ITEMNO) = LOWER(?)', [$productNo])->first();
             }
         }
 
@@ -76,8 +76,8 @@ class OrderItemController extends Controller
             'product_no' => [
                 'required',
                 'string',
-                function ($attribute, $value, $fail) use ($product) {
-                    if (!$product) {
+                function ($attribute, $value, $fail) use ($icitem) {
+                    if (!$icitem) {
                         $fail('The selected product no is invalid.');
                     }
                 },
@@ -123,12 +123,12 @@ class OrderItemController extends Controller
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
             $orderData['type'] = $orderData['type'] ?? 'SO';
 
-            // Use Product from products table (already found in validation)
-            // Use the product found during validation to ensure consistency
-            $orderData['product_no'] = $product->code;
-            $orderData['product_name'] = $product->description;
-            $orderData['sku_code'] = $product->code; // Use code as SKU
-            $orderData['description'] = $product->description;
+            // Use Icitem from icitem table (actual inventory data)
+            // Use the item found during validation to ensure consistency
+            $orderData['product_no'] = $icitem->ITEMNO;
+            $orderData['product_name'] = $icitem->DESP ?? 'Unknown Product';
+            $orderData['sku_code'] = $icitem->ITEMNO; // Use ITEMNO as SKU
+            $orderData['description'] = $icitem->DESP ?? 'Unknown Product'; // Use DESP from icitem table
 
             // Handle free goods
             if (isset($orderData['is_free_good']) && $orderData['is_free_good']) {
@@ -173,7 +173,7 @@ class OrderItemController extends Controller
     public function show(Order $order)
     {
         // Load items and customer relationship for detailed view
-        // Note: items now reference products table via product_no (code)
+        // Note: items now reference icitem table via product_no (ITEMNO)
         $order->load('items', 'customer');
         return makeResponse(200, 'Order item retrieved successfully.', $order);
     }
