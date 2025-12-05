@@ -283,15 +283,15 @@ class InventoryController extends Controller
 
     /**
      * Calculate current stock from transactions
-     * Now uses product code (from products table) instead of ITEMNO from icitem
+     * Uses ITEMNO from icitem table (matches item_transactions.ITEMNO)
      *
-     * @param string $itemno Product code from products table
+     * @param string $itemno ITEMNO from icitem table
      * @return float
      */
     private function calculateCurrentStock($itemno)
     {
         // Sum all quantities from transactions
-        // ITEMNO in item_transactions now references products.code
+        // ITEMNO in item_transactions references icitem.ITEMNO
         $total = ItemTransaction::where('ITEMNO', $itemno)
             ->sum('quantity');
 
@@ -301,36 +301,37 @@ class InventoryController extends Controller
 
     /**
      * Get inventory summary (all items with current stock)
-     * Uses new products table instead of icitem
+     * Uses icitem table to match actual inventory data
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function getInventorySummary(Request $request)
     {
-        // Get all active products from new products table
-        $query = Product::where('is_active', true);
+        // Get all items from icitem table (actual inventory data)
+        $query = Icitem::query();
         
-        // Filter by product group if provided
+        // Filter by product group if provided (use GROUP field from icitem)
+        // MySQL collation should handle case-insensitivity, but using whereRaw for exact match
         if ($request->has('group_name') && $request->input('group_name')) {
-            $query->where('group_name', $request->input('group_name'));
+            $query->where('GROUP', $request->input('group_name'));
         }
         
-        $products = $query->orderBy('code')->get();
+        $items = $query->orderBy('ITEMNO')->get();
 
-        $inventory = $products->map(function ($product) {
-            // Calculate current stock from transactions using product code
-            $currentStock = $this->calculateCurrentStock($product->code);
+        $inventory = $items->map(function ($item) {
+            // Calculate current stock from transactions using ITEMNO
+            $currentStock = $this->calculateCurrentStock($item->ITEMNO);
             return [
-                'ITEMNO' => $product->code, // Map code to ITEMNO for backward compatibility
-                'DESP' => $product->description ?? 'Unknown Product', // Map description to DESP
+                'ITEMNO' => $item->ITEMNO,
+                'DESP' => $item->DESP ?? 'Unknown Product',
                 'current_stock' => $currentStock,
                 'QTY' => $currentStock, // Use calculated stock as QTY
-                'UNIT' => null, // Unit not available in products table
-                'PRICE' => null, // Price not available in products table
-                'code' => $product->code, // Include new field
-                'description' => $product->description, // Include new field
-                'group_name' => $product->group_name, // Include group name
+                'UNIT' => $item->UNIT, // Unit from icitem table
+                'PRICE' => $item->PRICE ? (float)$item->PRICE : null, // Price from icitem table
+                'code' => $item->ITEMNO, // Map ITEMNO to code for backward compatibility
+                'description' => $item->DESP ?? 'Unknown Product', // Map DESP to description
+                'group_name' => $item->GROUP ?? '', // Include group name from GROUP field
             ];
         });
 
