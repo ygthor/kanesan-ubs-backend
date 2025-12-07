@@ -50,7 +50,7 @@ class ProductController extends Controller
                     'unit_price' => (float)$unitPrice, // Unit price from UCOST or PRICE
                     'is_active' => true, // Assume all items are active (icitem table doesn't have is_active)
                 ];
-            });
+            })->values()->toArray(); // Convert Collection to array for proper JSON serialization
             
             return makeResponse(200, 'Products retrieved successfully.', $products);
         } catch (\Exception $e) {
