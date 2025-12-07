@@ -36,6 +36,7 @@ class Order extends BaseModel
         'gross_amount' => 'decimal:2',
         'tax1' => 'decimal:2',
         'tax1_percentage' => 'decimal:2',
+        'grand_amount' => 'decimal:2',
         'net_amount' => 'decimal:2',
         'discount' => 'decimal:2',
     ];
