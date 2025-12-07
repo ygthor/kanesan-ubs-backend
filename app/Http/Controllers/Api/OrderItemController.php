@@ -84,6 +84,7 @@ class OrderItemController extends Controller
             ],
             'quantity' => 'required|numeric|min:0.01',
             'unit_price' => 'required|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -97,6 +98,7 @@ class OrderItemController extends Controller
                 'product_no', // Changed from product_id
                 'quantity',
                 'unit_price',
+                'discount', // Item-level discount
                 'item_group',
                 'is_free_good',
                 'is_trade_return',
@@ -133,9 +135,16 @@ class OrderItemController extends Controller
             // Handle free goods
             if (isset($orderData['is_free_good']) && $orderData['is_free_good']) {
                 $orderData['unit_price'] = 0;
+                $orderData['discount'] = 0;
             }
 
-            $orderData['amount'] = $orderData['quantity'] * $orderData['unit_price'];
+            // Calculate amount: (quantity * unit_price) - discount
+            $discount = isset($orderData['discount']) ? (float)$orderData['discount'] : 0.0;
+            $orderData['amount'] = ($orderData['quantity'] * $orderData['unit_price']) - $discount;
+            // Ensure amount doesn't go negative
+            if ($orderData['amount'] < 0) {
+                $orderData['amount'] = 0;
+            }
             $orderData['updated_at'] = timestamp();
 
 
