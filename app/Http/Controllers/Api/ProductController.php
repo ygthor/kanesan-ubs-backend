@@ -31,6 +31,8 @@ class ProductController extends Controller
                 'ITEMNO',
                 'DESP',
                 'GROUP',
+                'UCOST',  // Unit cost - can be changed to PRICE if needed
+                'PRICE',  // Price field - alternative to UCOST
             ])
             ->orderBy('GROUP')
             ->orderBy('ITEMNO')
@@ -38,11 +40,14 @@ class ProductController extends Controller
             
             // Transform to match mobile app expected format
             $products = $items->map(function ($item) {
+                // Use UCOST if available, fallback to PRICE, default to 0
+                $unitPrice = $item->UCOST ?? $item->PRICE ?? 0;
                 return [
                     'id' => $item->ITEMNO, // Use ITEMNO as id
                     'code' => $item->ITEMNO,
                     'description' => $item->DESP ?? '',
                     'group_name' => $item->GROUP ?? '',
+                    'unit_price' => (float)$unitPrice, // Unit price from UCOST or PRICE
                     'is_active' => true, // Assume all items are active (icitem table doesn't have is_active)
                 ];
             });
