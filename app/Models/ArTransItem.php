@@ -26,7 +26,8 @@ class ArTransItem extends BaseModel
         'ITEMCOUNT',             // Denormalized SKU
         'DESP',
         'LOCATION',
-        'SIGN',             // Discount amount for this line item
+        'SIGN',             // Sign for sale/return (1 or -1)
+        'DISAMT',          // Discount amount for this line item
         'QTY_BIL',
         'PRICE_BIL',
         'UNIT_BIL',
@@ -52,6 +53,7 @@ class ArTransItem extends BaseModel
         'QTY' => 'decimal:2',
         'PRICE' => 'decimal:2',
         'AMT_BIL' => 'decimal:2',
+        'DISAMT' => 'decimal:2',
         'DATE' => 'datetime',
     ];
 
@@ -108,10 +110,17 @@ class ArTransItem extends BaseModel
         $this->SIGN = in_array($this->TYPE, ['CR', 'RT']) ? -1 : 1;
 
         $lineTotal = $this->QTY * $this->PRICE;
+        
+        // Apply discount if DISAMT is set
+        $discount = $this->DISAMT ?? 0.00;
+        $lineTotalAfterDiscount = $lineTotal - $discount;
+        if ($lineTotalAfterDiscount < 0) {
+            $lineTotalAfterDiscount = 0;
+        }
 
         // Apply SIGN to the final amount.
         // AMT_BIL stores the final calculated amount for this line.
-        $this->AMT_BIL = $lineTotal * $this->SIGN;
+        $this->AMT_BIL = $lineTotalAfterDiscount * $this->SIGN;
 
         // You can use other fields for more complex logic
         // For example, AMT1_BIL could be the gross amount before line-item discounts

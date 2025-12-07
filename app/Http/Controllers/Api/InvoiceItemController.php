@@ -84,6 +84,7 @@ class InvoiceItemController extends Controller
             'product_code' => 'required',
             'quantity' => 'required|numeric|min:0.01',
             'unit_price' => 'required|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
         ];
         
         // For credit notes, add trade return validation
@@ -168,6 +169,7 @@ class InvoiceItemController extends Controller
                 // Item specific data from request
                 'QTY' => $request->quantity,
                 'PRICE' => $request->unit_price,
+                'DISAMT' => $request->discount ?? 0.00,
             ];
 
             // Determine transaction type based on invoice type
