@@ -78,7 +78,28 @@ class OrderController extends Controller
         if ($orderType) {
             // The Flutter app sends a comma-separated string, so we need to split it
             $types = explode(',', $orderType);
-            $orders->whereIn('type', $types);
+            
+            // Special handling for Trade Return ('TR')
+            // Trade returns are orders that have items with is_trade_return = 1
+            if (in_array('TR', $types)) {
+                // Remove 'TR' from the types array
+                $types = array_filter($types, function($type) {
+                    return $type !== 'TR';
+                });
+                
+                // Filter orders that have at least one trade return item
+                $orders->whereHas('items', function ($query) {
+                    $query->where('is_trade_return', 1);
+                });
+                
+                // If there are other types besides 'TR', also filter by those types
+                if (!empty($types)) {
+                    $orders->whereIn('type', $types);
+                }
+            } else {
+                // Normal type filtering for non-TR types
+                $orders->whereIn('type', $types);
+            }
         }
 
         // Order the results
