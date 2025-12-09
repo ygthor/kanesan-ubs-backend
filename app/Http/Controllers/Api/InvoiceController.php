@@ -40,7 +40,7 @@ class InvoiceController extends Controller
         }
 
         // Start building the query on the Artran model
-        $invoices = Artran::with(['items.detail', 'customer']);
+        $invoices = Artran::with(['items.detail', 'items.item', 'customer']);
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -461,7 +461,7 @@ class InvoiceController extends Controller
         // For INV invoices, include linked credit notes and adjust amounts
         if ($invoice->TYPE == 'INV') {
             $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
-                ->with(['creditNote.items.detail', 'creditNote.customer'])
+                ->with(['creditNote.items.detail', 'creditNote.items.item', 'creditNote.customer'])
                 ->get()
                 ->map(function ($link) {
                     return $link->creditNote;
@@ -522,7 +522,7 @@ class InvoiceController extends Controller
         $validated = $validator->validated();
 
         // Eager load relationships to avoid N+1 query problems
-        $invoices = Artran::with(['items.detail', 'customer'])
+        $invoices = Artran::with(['items.detail', 'items.item', 'customer'])
             ->whereIn('REFNO', $validated['ref_nos'])
             ->orderBy('DATE', 'asc') // Order them consistently
             ->get();
@@ -544,7 +544,7 @@ class InvoiceController extends Controller
     public function printInvoice($refNo)
     {
         // Find the invoice by its REFNO or fail with a 404 error
-        $invoice = Artran::with(['items.detail', 'customer'])
+        $invoice = Artran::with(['items.detail', 'items.item', 'customer'])
             ->where('REFNO', $refNo)
             ->firstOrFail();
 
@@ -566,7 +566,7 @@ class InvoiceController extends Controller
         $endDate   = $request->input('end_date');
 
         // Fetch invoices with items + customer in one go
-        $invoices = Artran::with('items', 'customer');
+        $invoices = Artran::with(['items.item', 'items.detail', 'customer']);
         if (!empty($custNo)) {
             $invoices->where('CUSTNO', $custNo);
         }
