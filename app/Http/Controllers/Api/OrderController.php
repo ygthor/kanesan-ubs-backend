@@ -36,7 +36,7 @@ class OrderController extends Controller
         }
 
         // Start building the query
-        $orders = Order::with('items', 'customer');
+        $orders = Order::with('items.item', 'customer');
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -196,7 +196,7 @@ class OrderController extends Controller
 
             if ($id) {
                 // ✅ Update mode
-                $order = Order::with('items')->findOrFail($id);
+                $order = Order::with('items.item')->findOrFail($id);
                 $order->fill($orderData)->save();
             } else {
                 // ✅ Create mode
@@ -248,7 +248,7 @@ class OrderController extends Controller
 
             DB::commit();
 
-            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $order->load('items'));
+            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $order->load('items.item'));
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Order save failed: ' . $e->getMessage());
@@ -273,7 +273,7 @@ class OrderController extends Controller
         }
         
         // Load items and customer relationship for detailed view
-        $order->load('items.product', 'customer');
+        $order->load('items.product', 'items.item', 'customer');
         return makeResponse(200, 'Order retrieved successfully.', $order);
     }
 
@@ -285,7 +285,7 @@ class OrderController extends Controller
         try {
             DB::beginTransaction();
 
-            $order = Order::with('items', 'customer')->findOrFail($id);
+            $order = Order::with('items.item', 'customer')->findOrFail($id);
             
             // Check if user has access to this order's customer
             if (!$this->userHasAccessToCustomer($user, $order->customer)) {

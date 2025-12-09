@@ -58,6 +58,35 @@ class OrderItem extends BaseModel
         return $this->belongsTo(Product::class);
     }
 
+    /**
+     * Get the master item (from icitem table) associated with this order item.
+     * Uses product_no to match ITEMNO in icitem table.
+     */
+    public function item()
+    {
+        // Local key on 'order_items' is 'product_no'.
+        // The Owner key (primary key) on 'icitem' is 'ITEMNO'.
+        return $this->belongsTo(Icitem::class, 'product_no', 'ITEMNO');
+    }
+
+    /**
+     * Accessor to get the unit from icitem
+     */
+    public function getUnitAttribute()
+    {
+        return $this->item ? $this->item->UNIT : null;
+    }
+
+    /**
+     * Append unit to array/json output
+     */
+    protected $appends = ['unit'];
+
+    /**
+     * Hide the item relationship from default serialization to avoid recursion
+     */
+    protected $hidden = ['item'];
+
     public function calculate()
     {
         if ($this->is_free_good) {
