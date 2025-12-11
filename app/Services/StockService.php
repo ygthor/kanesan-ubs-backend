@@ -1,0 +1,333 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\ItemTransaction;
+use App\Models\Order;
+use App\Models\OrderItem;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class StockService
+{
+    /**
+     * Calculate stock totals for an agent and item
+     * 
+     * @param string $agentNo Agent number (user name)
+     * @param string $itemNo Item number (ITEMNO from icitem)
+     * @return array ['stockIn', 'stockOut', 'returnGood', 'returnBad', 'available']
+     */
+    public function calculateStockTotals(string $agentNo, string $itemNo): array
+    {
+        // Get all transactions for this agent and item
+        $transactions = ItemTransaction::where('agent_no', $agentNo)
+            ->where('ITEMNO', $itemNo)
+            ->get();
+
+        $stockIn = 0;
+        $stockOut = 0;
+        $returnGood = 0;
+        $returnBad = 0;
+
+        foreach ($transactions as $transaction) {
+            $qty = (float) $transaction->quantity;
+
+            if ($transaction->transaction_type === 'in') {
+                if ($transaction->return_type === 'good') {
+                    $returnGood += $qty;
+                } else {
+                    $stockIn += $qty;
+                }
+            } elseif ($transaction->transaction_type === 'out') {
+                if ($transaction->return_type === 'bad') {
+                    $returnBad += $qty;
+                } else {
+                    $stockOut += $qty;
+                }
+            }
+        }
+
+        // Available stock = stockIn + returnGood - stockOut - returnBad
+        $available = $stockIn + $returnGood - $stockOut - $returnBad;
+
+        return [
+            'stockIn' => $stockIn,
+            'stockOut' => $stockOut,
+            'returnGood' => $returnGood,
+            'returnBad' => $returnBad,
+            'available' => max(0, $available), // Never go negative in display
+        ];
+    }
+
+    /**
+     * Get available stock for an agent and item
+     * 
+     * @param string $agentNo Agent number
+     * @param string $itemNo Item number
+     * @return float Available stock quantity
+     */
+    public function getAvailableStock(string $agentNo, string $itemNo): float
+    {
+        $totals = $this->calculateStockTotals($agentNo, $itemNo);
+        return $totals['available'];
+    }
+
+    /**
+     * Check if sufficient stock is available
+     * 
+     * @param string $agentNo Agent number
+     * @param string $itemNo Item number
+     * @param float $requiredQty Required quantity
+     * @return bool True if sufficient stock available
+     */
+    public function hasSufficientStock(string $agentNo, string $itemNo, float $requiredQty): bool
+    {
+        $available = $this->getAvailableStock($agentNo, $itemNo);
+        return $available >= $requiredQty;
+    }
+
+    /**
+     * Validate stock availability for order items
+     * 
+     * @param string $agentNo Agent number
+     * @param array $items Array of order items with product_no and quantity
+     * @return array ['valid' => bool, 'errors' => array]
+     */
+    public function validateOrderStock(string $agentNo, array $items): array
+    {
+        $errors = [];
+
+        foreach ($items as $item) {
+            $itemNo = $item['product_no'] ?? null;
+            $quantity = (float) ($item['quantity'] ?? 0);
+            $isTradeReturn = $item['is_trade_return'] ?? false;
+
+            // Skip validation for trade returns (they add stock back)
+            if ($isTradeReturn) {
+                continue;
+            }
+
+            if (!$itemNo) {
+                $errors[] = "Item missing product_no";
+                continue;
+            }
+
+            if ($quantity <= 0) {
+                continue; // Skip zero quantity items
+            }
+
+            if (!$this->hasSufficientStock($agentNo, $itemNo, $quantity)) {
+                $available = $this->getAvailableStock($agentNo, $itemNo);
+                $errors[] = "Insufficient stock for item {$itemNo}. Available: {$available}, Required: {$quantity}";
+            }
+        }
+
+        return [
+            'valid' => empty($errors),
+            'errors' => $errors,
+        ];
+    }
+
+    /**
+     * Record stock movement for an order
+     * 
+     * @param Order $order The order
+     * @return void
+     */
+    public function recordOrderMovements(Order $order): void
+    {
+        $agentNo = $order->agent_no;
+        if (!$agentNo) {
+            Log::warning("Order {$order->id} has no agent_no, skipping stock movement");
+            return;
+        }
+
+        $orderType = $order->type;
+        $referenceType = 'order';
+        $referenceId = $order->id;
+
+        foreach ($order->items as $orderItem) {
+            $itemNo = $orderItem->product_no;
+            if (!$itemNo) {
+                continue;
+            }
+
+            $quantity = (float) $orderItem->quantity;
+            $isTradeReturn = $orderItem->is_trade_return ?? false;
+            $tradeReturnIsGood = $orderItem->trade_return_is_good ?? true;
+
+            // Get current stock before transaction
+            $stockBefore = $this->getAvailableStock($agentNo, $itemNo);
+
+            if ($orderType === 'DO') {
+                // DO = Stock IN
+                $this->recordMovement(
+                    $agentNo,
+                    $itemNo,
+                    $quantity,
+                    'in',
+                    $referenceType,
+                    $referenceId,
+                    null,
+                    "DO Order: {$order->reference_no}"
+                );
+            } elseif ($orderType === 'INV') {
+                if ($isTradeReturn) {
+                    if ($tradeReturnIsGood) {
+                        // Trade return good = Stock IN (return_type = 'good')
+                        $this->recordMovement(
+                            $agentNo,
+                            $itemNo,
+                            $quantity,
+                            'in',
+                            $referenceType,
+                            $referenceId,
+                            'good',
+                            "INV Trade Return Good: {$order->reference_no}"
+                        );
+                    } else {
+                        // Trade return bad = Stock OUT (return_type = 'bad')
+                        $this->recordMovement(
+                            $agentNo,
+                            $itemNo,
+                            $quantity,
+                            'out',
+                            $referenceType,
+                            $referenceId,
+                            'bad',
+                            "INV Trade Return Bad: {$order->reference_no}"
+                        );
+                    }
+                } else {
+                    // Normal INV item = Stock OUT
+                    $this->recordMovement(
+                        $agentNo,
+                        $itemNo,
+                        $quantity,
+                        'out',
+                        $referenceType,
+                        $referenceId,
+                        null,
+                        "INV Order: {$order->reference_no}"
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Record a stock movement transaction
+     * 
+     * @param string $agentNo Agent number
+     * @param string $itemNo Item number
+     * @param float $quantity Quantity (positive for in, negative for out)
+     * @param string $transactionType 'in' or 'out'
+     * @param string $referenceType Reference type (e.g., 'order')
+     * @param string|int $referenceId Reference ID
+     * @param string|null $returnType 'good' or 'bad' for trade returns
+     * @param string|null $notes Additional notes
+     * @return ItemTransaction
+     */
+    public function recordMovement(
+        string $agentNo,
+        string $itemNo,
+        float $quantity,
+        string $transactionType,
+        string $referenceType,
+        $referenceId,
+        ?string $returnType = null,
+        ?string $notes = null
+    ): ItemTransaction {
+        // Ensure quantity is positive (we use transaction_type to indicate direction)
+        $quantity = abs($quantity);
+        
+        // Get stock before
+        $stockBefore = $this->getAvailableStock($agentNo, $itemNo);
+
+        // Calculate stock after
+        $stockAfter = $stockBefore;
+        if ($transactionType === 'in') {
+            $stockAfter += $quantity;
+        } elseif ($transactionType === 'out') {
+            $stockAfter -= $quantity;
+        }
+
+        // Create transaction record
+        $transaction = ItemTransaction::create([
+            'ITEMNO' => $itemNo,
+            'agent_no' => $agentNo,
+            'transaction_type' => $transactionType,
+            'quantity' => $quantity, // Store as positive, type indicates direction
+            'reference_type' => $referenceType,
+            'reference_id' => $referenceId,
+            'return_type' => $returnType,
+            'notes' => $notes,
+            'stock_before' => $stockBefore,
+            'stock_after' => $stockAfter,
+            'CREATED_BY' => auth()->user()?->name ?? auth()->user()?->username ?? 'system',
+        ]);
+
+        return $transaction;
+    }
+
+    /**
+     * Reverse stock movements for an order (used when updating or deleting)
+     * 
+     * @param Order $order The order
+     * @return void
+     */
+    public function reverseOrderMovements(Order $order): void
+    {
+        // Find all transactions for this order
+        $transactions = ItemTransaction::where('reference_type', 'order')
+            ->where('reference_id', $order->id)
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            // Reverse the transaction by creating opposite movement
+            $reverseType = $transaction->transaction_type === 'in' ? 'out' : 'in';
+            
+            // Use the recordMovement method to ensure consistency
+            $this->recordMovement(
+                $transaction->agent_no,
+                $transaction->ITEMNO,
+                $transaction->quantity,
+                $reverseType,
+                'order_reversal',
+                $order->id,
+                $transaction->return_type,
+                "Reversal of order: {$order->reference_no}"
+            );
+        }
+    }
+
+    /**
+     * Get stock summary for all items for an agent
+     * 
+     * @param string $agentNo Agent number
+     * @return array Array of items with stock totals
+     */
+    public function getAgentStockSummary(string $agentNo): array
+    {
+        // Get all unique items for this agent
+        $itemNos = ItemTransaction::where('agent_no', $agentNo)
+            ->distinct()
+            ->pluck('ITEMNO')
+            ->toArray();
+
+        $summary = [];
+        foreach ($itemNos as $itemNo) {
+            $totals = $this->calculateStockTotals($agentNo, $itemNo);
+            $summary[] = [
+                'ITEMNO' => $itemNo,
+                'stockIn' => $totals['stockIn'],
+                'stockOut' => $totals['stockOut'],
+                'returnGood' => $totals['returnGood'],
+                'returnBad' => $totals['returnBad'],
+                'available' => $totals['available'],
+            ];
+        }
+
+        return $summary;
+    }
+}

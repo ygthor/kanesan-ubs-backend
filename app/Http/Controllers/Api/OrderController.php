@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Customer; // To fetch customer details if needed
 use App\Models\Product;  // To fetch product details if needed
+use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -179,8 +180,8 @@ class OrderController extends Controller
 
             $orderData['order_date'] = $orderData['order_date'] ?? now();
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
-            // Force all new orders to be invoices to avoid SO references
-            $orderData['type'] = 'INV';
+            // Allow type to be passed, default to INV for new orders
+            $orderData['type'] = $request->input('type', 'INV');
 
             $customer = Customer::find($orderData['customer_id']);
             if (!$customer) {
@@ -212,9 +213,19 @@ class OrderController extends Controller
 
             $orderData['status'] = 'pending';
 
+            // Initialize stock service
+            $stockService = new StockService();
+
             if ($id) {
-                // ✅ Update mode
+                // ✅ Update mode - reverse existing stock movements first
                 $order = Order::with('items.item')->findOrFail($id);
+                
+                // Reverse existing stock movements before updating
+                $stockService->reverseOrderMovements($order);
+                
+                // Delete old items
+                $order->items()->delete();
+                
                 $order->fill($orderData)->save();
             } else {
                 // ✅ Create mode
@@ -223,10 +234,41 @@ class OrderController extends Controller
                 $order->save();
             }
 
+            // Get agent_no for stock validation
+            $agentNo = $order->agent_no;
+            if (!$agentNo) {
+                DB::rollBack();
+                return makeResponse(422, 'Agent number is required for stock management.', null);
+            }
+
+            $items = $request->input('items') ?? [];
+            
+            // Prepare items for stock validation (for INV orders)
+            if ($orderData['type'] === 'INV') {
+                $itemsForValidation = [];
+                foreach ($items as $itemData) {
+                    $product = Product::find($itemData['product_id'] ?? null);
+                    if (!$product) {
+                        continue;
+                    }
+                    $itemsForValidation[] = [
+                        'product_no' => $product->product_no,
+                        'quantity' => $itemData['quantity'] ?? 0,
+                        'is_trade_return' => $itemData['is_trade_return'] ?? false,
+                    ];
+                }
+                
+                // Validate stock availability for INV orders
+                $stockValidation = $stockService->validateOrderStock($agentNo, $itemsForValidation);
+                if (!$stockValidation['valid']) {
+                    DB::rollBack();
+                    return makeResponse(422, 'Stock validation failed.', ['errors' => $stockValidation['errors']]);
+                }
+            }
+
             $reference_no = $order->reference_no;
             $item_count = 1;
 
-            $items = $request->input('items') ?? [];
             foreach ($items as $itemData) {
                 $product = Product::find($itemData['product_id']);
                 if (!$product) {
@@ -263,6 +305,12 @@ class OrderController extends Controller
 
             $order->calculate();
             $order->save();
+
+            // Reload order with items for stock movement recording
+            $order->load('items');
+
+            // Record stock movements for the order
+            $stockService->recordOrderMovements($order);
 
             DB::commit();
 
@@ -309,6 +357,10 @@ class OrderController extends Controller
             if (!$this->userHasAccessToCustomer($user, $order->customer)) {
                 return makeResponse(403, 'Access denied. You do not have permission to delete this order.', null);
             }
+
+            // Reverse stock movements before deleting
+            $stockService = new StockService();
+            $stockService->reverseOrderMovements($order);
 
             // Delete all items
             $order->items()->delete();

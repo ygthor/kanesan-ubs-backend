@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Icitem;
 use App\Models\ItemTransaction;
+use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -302,39 +303,129 @@ class InventoryController extends Controller
     /**
      * Get inventory summary (all items with current stock)
      * Uses icitem table to match actual inventory data
+     * Now supports agent filtering and shows return good/bad columns
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function getInventorySummary(Request $request)
     {
+        $request->validate([
+            'agent_no' => 'nullable|string',
+            'group_name' => 'nullable|string',
+        ]);
+
         // Get all items from icitem table (actual inventory data)
         $query = Icitem::query();
         
         // Filter by product group if provided (use GROUP field from icitem)
-        // MySQL collation should handle case-insensitivity, but using whereRaw for exact match
         if ($request->has('group_name') && $request->input('group_name')) {
             $query->where('GROUP', $request->input('group_name'));
         }
         
         $items = $query->orderBy('ITEMNO')->get();
 
-        $inventory = $items->map(function ($item) {
-            // Calculate current stock from transactions using ITEMNO
-            $currentStock = $this->calculateCurrentStock($item->ITEMNO);
+        // Get agent_no from request or default to current user
+        $agentNo = $request->input('agent_no');
+        if (!$agentNo && auth()->user()) {
+            $agentNo = auth()->user()->name ?? auth()->user()->username;
+        }
+
+        $stockService = new StockService();
+
+        $inventory = $items->map(function ($item) use ($agentNo, $stockService) {
+            if ($agentNo) {
+                // Calculate stock totals for this agent
+                $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
+                $currentStock = $totals['available'];
+                $stockIn = $totals['stockIn'];
+                $stockOut = $totals['stockOut'];
+                $returnGood = $totals['returnGood'];
+                $returnBad = $totals['returnBad'];
+            } else {
+                // Fallback to old calculation if no agent specified
+                $currentStock = $this->calculateCurrentStock($item->ITEMNO);
+                $stockIn = 0;
+                $stockOut = 0;
+                $returnGood = 0;
+                $returnBad = 0;
+            }
+
             return [
                 'ITEMNO' => $item->ITEMNO,
                 'DESP' => $item->DESP ?? 'Unknown Product',
                 'current_stock' => $currentStock,
                 'QTY' => $currentStock, // Use calculated stock as QTY
+                'stockIn' => $stockIn,
+                'stockOut' => $stockOut,
+                'returnGood' => $returnGood,
+                'returnBad' => $returnBad,
                 'UNIT' => $item->UNIT, // Unit from icitem table
                 'PRICE' => $item->PRICE ? (float)$item->PRICE : null, // Price from icitem table
                 'code' => $item->ITEMNO, // Map ITEMNO to code for backward compatibility
                 'description' => $item->DESP ?? 'Unknown Product', // Map DESP to description
                 'group_name' => $item->GROUP ?? '', // Include group name from GROUP field
+                'agent_no' => $agentNo, // Include agent_no in response
             ];
         });
 
         return makeResponse(200, 'Inventory summary retrieved successfully.', $inventory);
+    }
+
+    /**
+     * Get stock by agent and product
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $itemno Item number (ITEMNO)
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getStockByAgent(Request $request, $itemno = null)
+    {
+        $request->validate([
+            'agent_no' => 'required|string',
+            'itemno' => 'nullable|string',
+        ]);
+
+        $agentNo = $request->input('agent_no');
+        $stockService = new StockService();
+
+        if ($itemno) {
+            // Get stock for specific item
+            $totals = $stockService->calculateStockTotals($agentNo, $itemno);
+            
+            // Get item details from icitem
+            $item = Icitem::find($itemno);
+            
+            return makeResponse(200, 'Stock retrieved successfully.', [
+                'ITEMNO' => $itemno,
+                'DESP' => $item->DESP ?? 'Unknown Product',
+                'agent_no' => $agentNo,
+                'stockIn' => $totals['stockIn'],
+                'stockOut' => $totals['stockOut'],
+                'returnGood' => $totals['returnGood'],
+                'returnBad' => $totals['returnBad'],
+                'available' => $totals['available'],
+            ]);
+        } else {
+            // Get stock summary for all items for this agent
+            $summary = $stockService->getAgentStockSummary($agentNo);
+            
+            // Enrich with item details
+            $enrichedSummary = collect($summary)->map(function ($stockItem) use ($agentNo) {
+                $item = Icitem::find($stockItem['ITEMNO']);
+                return [
+                    'ITEMNO' => $stockItem['ITEMNO'],
+                    'DESP' => $item->DESP ?? 'Unknown Product',
+                    'agent_no' => $agentNo,
+                    'stockIn' => $stockItem['stockIn'],
+                    'stockOut' => $stockItem['stockOut'],
+                    'returnGood' => $stockItem['returnGood'],
+                    'returnBad' => $stockItem['returnBad'],
+                    'available' => $stockItem['available'],
+                ];
+            });
+
+            return makeResponse(200, 'Agent stock summary retrieved successfully.', $enrichedSummary);
+        }
     }
 }

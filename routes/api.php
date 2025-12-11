@@ -188,6 +188,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('inventory')->group(function () {
         Route::get('/summary', [InventoryController::class, 'getInventorySummary'])->name('inventory.summary');
         Route::get('/stock/{itemno}', [InventoryController::class, 'getStock'])->name('inventory.stock');
+        Route::get('/stock-by-agent', [InventoryController::class, 'getStockByAgent'])->name('inventory.stock-by-agent');
+        Route::get('/stock-by-agent/{itemno}', [InventoryController::class, 'getStockByAgent'])->name('inventory.stock-by-agent.item');
         Route::get('/transactions', [InventoryController::class, 'getTransactions'])->name('inventory.transactions');
         Route::get('/transactions/{itemno}', [InventoryController::class, 'getTransactions'])->name('inventory.transactions.item');
         Route::post('/stock-in', [InventoryController::class, 'stockIn'])->name('inventory.stock-in');

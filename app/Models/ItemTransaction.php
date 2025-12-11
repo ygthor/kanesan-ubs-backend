@@ -15,10 +15,12 @@ class ItemTransaction extends BaseModel
 
     protected $fillable = [
         'ITEMNO',
+        'agent_no',
         'transaction_type',
         'quantity',
         'reference_type',
         'reference_id',
+        'return_type', // 'good' or 'bad' for trade returns
         'notes',
         'stock_before',
         'stock_after',
