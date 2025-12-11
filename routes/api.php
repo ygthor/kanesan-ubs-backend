@@ -34,7 +34,7 @@ use Illuminate\Support\Facades\Route;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
-
+Route::get('/inv/summary', [InventoryController::class, 'getInventorySummary']);
 Route::any('/test/response', function () {
     return response()->json([
         'status' => 200,

@@ -24,36 +24,39 @@ class StockService
         $returnGood = 0;
         $returnBad = 0;
 
-        // Calculate from orders
-        $orders = Order::where('agent_no', $agentNo)
-            ->with('items')
+        // Calculate from orders - optimized query with direct join
+        $orderItems = DB::table('orders')
+            ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->where('orders.agent_no', $agentNo)
+            ->where('order_items.product_no', $itemNo)
+            ->select(
+                'orders.type',
+                'order_items.quantity',
+                'order_items.is_trade_return',
+                'order_items.trade_return_is_good'
+            )
             ->get();
 
-        foreach ($orders as $order) {
-            // Get order items matching this item number
-            $orderItems = $order->items()->where('product_no', $itemNo)->get();
+        foreach ($orderItems as $orderItem) {
+            $qty = (float) $orderItem->quantity;
+            $isTradeReturn = (bool) ($orderItem->is_trade_return ?? false);
+            $tradeReturnIsGood = (bool) ($orderItem->trade_return_is_good ?? true);
 
-            foreach ($orderItems as $orderItem) {
-                $qty = (float) $orderItem->quantity;
-                $isTradeReturn = $orderItem->is_trade_return ?? false;
-                $tradeReturnIsGood = $orderItem->trade_return_is_good ?? true;
-
-                if ($order->type === 'DO') {
-                    // DO orders = Stock IN
-                    $stockIn += $qty;
-                } elseif ($order->type === 'INV') {
-                    if ($isTradeReturn) {
-                        if ($tradeReturnIsGood) {
-                            // Trade return good = Stock IN (returnGood)
-                            $returnGood += $qty;
-                        } else {
-                            // Trade return bad = Stock OUT (returnBad)
-                            $returnBad += $qty;
-                        }
+            if ($orderItem->type === 'DO') {
+                // DO orders = Stock IN
+                $stockIn += $qty;
+            } elseif ($orderItem->type === 'INV') {
+                if ($isTradeReturn) {
+                    if ($tradeReturnIsGood) {
+                        // Trade return good = Stock IN (returnGood)
+                        $returnGood += $qty;
                     } else {
-                        // Normal INV item = Stock OUT
-                        $stockOut += $qty;
+                        // Trade return bad = Stock OUT (returnBad)
+                        $returnBad += $qty;
                     }
+                } else {
+                    // Normal INV item = Stock OUT
+                    $stockOut += $qty;
                 }
             }
         }
@@ -349,46 +352,53 @@ class StockService
      */
     public function getAgentStockSummary(string $agentNo): array
     {
-        // Get all unique items from orders for this agent
-        $orders = Order::where('agent_no', $agentNo)
-            ->with('items')
+        // Optimized query - get all order items for this agent in one query
+        $orderItems = DB::table('orders')
+            ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->where('orders.agent_no', $agentNo)
+            ->whereNotNull('order_items.product_no')
+            ->select(
+                'order_items.product_no',
+                'orders.type',
+                'order_items.quantity',
+                'order_items.is_trade_return',
+                'order_items.trade_return_is_good'
+            )
             ->get();
 
         $itemTotals = [];
 
-        foreach ($orders as $order) {
-            foreach ($order->items as $orderItem) {
-                $itemNo = $orderItem->product_no;
-                if (!$itemNo) {
-                    continue;
-                }
+        foreach ($orderItems as $orderItem) {
+            $itemNo = $orderItem->product_no;
+            if (!$itemNo) {
+                continue;
+            }
 
-                if (!isset($itemTotals[$itemNo])) {
-                    $itemTotals[$itemNo] = [
-                        'ITEMNO' => $itemNo,
-                        'stockIn' => 0,
-                        'stockOut' => 0,
-                        'returnGood' => 0,
-                        'returnBad' => 0,
-                    ];
-                }
+            if (!isset($itemTotals[$itemNo])) {
+                $itemTotals[$itemNo] = [
+                    'ITEMNO' => $itemNo,
+                    'stockIn' => 0,
+                    'stockOut' => 0,
+                    'returnGood' => 0,
+                    'returnBad' => 0,
+                ];
+            }
 
-                $qty = (float) $orderItem->quantity;
-                $isTradeReturn = $orderItem->is_trade_return ?? false;
-                $tradeReturnIsGood = $orderItem->trade_return_is_good ?? true;
+            $qty = (float) $orderItem->quantity;
+            $isTradeReturn = (bool) ($orderItem->is_trade_return ?? false);
+            $tradeReturnIsGood = (bool) ($orderItem->trade_return_is_good ?? true);
 
-                if ($order->type === 'DO') {
-                    $itemTotals[$itemNo]['stockIn'] += $qty;
-                } elseif ($order->type === 'INV') {
-                    if ($isTradeReturn) {
-                        if ($tradeReturnIsGood) {
-                            $itemTotals[$itemNo]['returnGood'] += $qty;
-                        } else {
-                            $itemTotals[$itemNo]['returnBad'] += $qty;
-                        }
+            if ($orderItem->type === 'DO') {
+                $itemTotals[$itemNo]['stockIn'] += $qty;
+            } elseif ($orderItem->type === 'INV') {
+                if ($isTradeReturn) {
+                    if ($tradeReturnIsGood) {
+                        $itemTotals[$itemNo]['returnGood'] += $qty;
                     } else {
-                        $itemTotals[$itemNo]['stockOut'] += $qty;
+                        $itemTotals[$itemNo]['returnBad'] += $qty;
                     }
+                } else {
+                    $itemTotals[$itemNo]['stockOut'] += $qty;
                 }
             }
         }
