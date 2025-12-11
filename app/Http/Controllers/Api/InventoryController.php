@@ -367,7 +367,16 @@ class InventoryController extends Controller
                 'group_name' => $item->GROUP ?? '', // Include group name from GROUP field
                 'agent_no' => $agentNo, // Include agent_no in response
             ];
-        });
+        })
+        ->filter(function ($item) {
+            // Hide items with no transactions (all zeros)
+            // Show only items that have at least one transaction (stockIn, stockOut, returnGood, or returnBad > 0)
+            return $item['stockIn'] > 0 || 
+                   $item['stockOut'] > 0 || 
+                   $item['returnGood'] > 0 || 
+                   $item['returnBad'] > 0;
+        })
+        ->values(); // Re-index the array after filtering
 
         return makeResponse(200, 'Inventory summary retrieved successfully.', $inventory);
     }
