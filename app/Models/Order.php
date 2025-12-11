@@ -53,10 +53,11 @@ class Order extends BaseModel
 
     /**
      * Get the items for the order.
+     * Uses reference_no to link orders and order_items.
      */
     public function items()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(OrderItem::class, 'reference_no', 'reference_no');
     }
 
     /**

@@ -284,6 +284,7 @@ class OrderController extends Controller
                 $orderItem = $order->items()->create([
                     'unique_key' => $unique_key,
                     'reference_no' => $reference_no,
+                    'order_id' => $order->id, // Keep for backward compatibility, but relationship uses reference_no
                     'item_count' => $item_count,
                     'product_id' => $product->id,
                     'product_no' => $product->product_no,

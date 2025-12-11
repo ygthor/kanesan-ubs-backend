@@ -44,10 +44,11 @@ class OrderItem extends BaseModel
 
     /**
      * Get the order that this item belongs to.
+     * Uses reference_no to link order_items and orders.
      */
     public function order()
     {
-        return $this->belongsTo(Order::class);
+        return $this->belongsTo(Order::class, 'reference_no', 'reference_no');
     }
 
     /**
