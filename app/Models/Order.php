@@ -90,12 +90,13 @@ class Order extends BaseModel
     public function getReferenceNo()
     {
         $type = $this->type;
+        $prefix = $type === 'INV' ? 'I' : $type;
         $count = Order::where('type', "=", $type)->count();
 
         $found = false;
         $running_number = $count;
         while (!$found) {
-            $refNo = $type . str_pad($running_number, 5, '0', STR_PAD_LEFT);
+            $refNo = $prefix . str_pad($running_number, 5, '0', STR_PAD_LEFT);
             $chk = Order::where('reference_no', "=", $refNo)->first();
             if ($chk == null) break;
             $running_number++;

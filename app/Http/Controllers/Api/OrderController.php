@@ -169,7 +169,6 @@ class OrderController extends Controller
         DB::beginTransaction();
         try {
             $orderData = $request->only([
-                'type',
                 'branch_id',
                 'customer_id',
                 'order_date',
@@ -180,7 +179,8 @@ class OrderController extends Controller
 
             $orderData['order_date'] = $orderData['order_date'] ?? now();
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
-            $orderData['type'] = $orderData['type'] ?? 'SO';
+            // Force all new orders to be invoices to avoid SO references
+            $orderData['type'] = 'INV';
 
             $customer = Customer::find($orderData['customer_id']);
             if (!$customer) {

@@ -461,6 +461,8 @@ class CustomerController extends Controller
                 $prefix = '3020';
             } elseif ($usernameUpper === 'S03') {
                 $prefix = '3030';
+            } elseif ($usernameUpper === 'S04') {
+                $prefix = '3040';
             } else {
                 // Fallback for Cash Sales with invalid username
                 throw new \Exception('Cash Sales is only available for users S01, S02, or S03. Your username: ' . $username);
