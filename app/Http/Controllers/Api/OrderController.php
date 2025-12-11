@@ -190,8 +190,8 @@ class OrderController extends Controller
             }
             
             $orderData['customer_code'] = $customer->customer_code;
-            // Always use company_name for customer_name (name field was removed from customer form)
-            $orderData['customer_name'] = $customer->company_name ?? 'N/A';
+            // Use company_name if available, otherwise use name field
+            $orderData['customer_name'] = $customer->company_name ?? $customer->name ?? 'N/A';
 
             // Handle agent_no: KBS users can set/update it, others default to their name
             $user = auth()->user();

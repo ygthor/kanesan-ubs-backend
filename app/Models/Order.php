@@ -60,6 +60,29 @@ class Order extends BaseModel
     }
 
     /**
+     * Accessor to get customer_name, using customer's name if company_name is empty
+     */
+    public function getCustomerNameAttribute($value)
+    {
+        // If customer_name is empty or 'N/A', try to get from customer relationship
+        if (empty($value) || $value === 'N/A') {
+            // Check if customer relationship is loaded to avoid N+1 queries
+            if ($this->relationLoaded('customer') && $this->customer) {
+                return $this->customer->company_name ?? $this->customer->name ?? 'N/A';
+            }
+            // If relationship not loaded, try to load it (but this could cause N+1)
+            // Better to ensure customer is always loaded in queries
+            if ($this->customer_id && !$this->relationLoaded('customer')) {
+                $this->load('customer');
+                if ($this->customer) {
+                    return $this->customer->company_name ?? $this->customer->name ?? 'N/A';
+                }
+            }
+        }
+        return $value;
+    }
+
+    /**
      * Get the invoices that were created from this order.
      * Many-to-many relationship through invoice_orders pivot table.
      */
