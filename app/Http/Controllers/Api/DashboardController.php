@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Order;
-use App\Models\Artran;
 use App\Models\Product;
 use App\Models\Receipt;
 use App\Models\Icitem;
@@ -89,27 +88,28 @@ class DashboardController extends Controller
         }
         $totalCollections = $totalCollectionsQuery->sum('paid_amount');
 
-        // Revenue: Sum of invoice grand amounts (gross + tax) in the date range.
-        $revenueQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
-            ->whereIn('TYPE', ['INV','CB','CS','DN']);
-        if (!empty($filteredCustomerCodes)) {
-            $revenueQuery->whereIn('CUSTNO', $filteredCustomerCodes);
+        // Revenue: Sum of order grand amounts (gross + tax) in the date range.
+        // Invoices are orders with type='INV', also include CB, CS, DN types
+        $revenueQuery = Order::whereBetween('order_date', [$dateFrom, $dateTo])
+            ->whereIn('type', ['INV','CB','CS','DN']);
+        if (!empty($filteredCustomerIds)) {
+            $revenueQuery->whereIn('customer_id', $filteredCustomerIds);
         }
-        $revenue = $revenueQuery->sum('GRAND_BIL');
+        $revenue = $revenueQuery->sum('grand_amount');
 
-        // Nett Sales: Sum of invoice net amounts (after discount) in the date range.
-        $nettSalesQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
-            ->whereIn('TYPE', ['INV','CB','CS','DN']);
-        if (!empty($filteredCustomerCodes)) {
-            $nettSalesQuery->whereIn('CUSTNO', $filteredCustomerCodes);
+        // Nett Sales: Sum of order net amounts (after discount) in the date range.
+        $nettSalesQuery = Order::whereBetween('order_date', [$dateFrom, $dateTo])
+            ->whereIn('type', ['INV','CB','CS','DN']);
+        if (!empty($filteredCustomerIds)) {
+            $nettSalesQuery->whereIn('customer_id', $filteredCustomerIds);
         }
-        $nettSales = $nettSalesQuery->sum('NET_BIL');
+        $nettSales = $nettSalesQuery->sum('net_amount');
 
-        // Invoices Issued: Count of invoices in the date range.
-        $invoicesQuery = Artran::whereBetween('DATE', [$dateFrom, $dateTo])
-            ->whereIn('TYPE', ['INV','CB','CS','DN']);
-        if (!empty($filteredCustomerCodes)) {
-            $invoicesQuery->whereIn('CUSTNO', $filteredCustomerCodes);
+        // Invoices Issued: Count of orders (invoices) in the date range.
+        $invoicesQuery = Order::whereBetween('order_date', [$dateFrom, $dateTo])
+            ->whereIn('type', ['INV','CB','CS','DN']);
+        if (!empty($filteredCustomerIds)) {
+            $invoicesQuery->whereIn('customer_id', $filteredCustomerIds);
         }
         $invoicesIssued = $invoicesQuery->count();
 
