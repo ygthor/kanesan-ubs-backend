@@ -19,6 +19,7 @@ class Order extends BaseModel
         'customer_name',  // Denormalized customer name for quick display
         'order_date',
         'status',         // e.g., 'pending', 'processing', 'completed', 'cancelled'
+        'agent_no',       // Agent number (user's name)
         'gross_amount',   // Calculated total for the order
         'tax1',   // Calculated total for the order
         'tax1_percentage',   // Calculated total for the order

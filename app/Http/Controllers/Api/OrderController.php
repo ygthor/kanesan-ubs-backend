@@ -192,6 +192,24 @@ class OrderController extends Controller
             // Always use company_name for customer_name (name field was removed from customer form)
             $orderData['customer_name'] = $customer->company_name ?? 'N/A';
 
+            // Handle agent_no: KBS users can set/update it, others default to their name
+            $user = auth()->user();
+            if ($user) {
+                $isKBS = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
+                
+                if ($isKBS && $request->has('agent_no') && $request->input('agent_no') !== null) {
+                    // KBS user: use agent_no from request if provided (can be empty string to clear)
+                    $orderData['agent_no'] = $request->input('agent_no');
+                } elseif (!$isKBS) {
+                    // Non-KBS: always default to user's name
+                    $orderData['agent_no'] = $user->name ?? $user->username ?? null;
+                } elseif ($isKBS && !$id) {
+                    // KBS in create mode without agent_no: default to user's name
+                    $orderData['agent_no'] = $user->name ?? $user->username ?? null;
+                }
+                // For KBS in update mode without agent_no: don't set it, keep existing value
+            }
+
             $orderData['status'] = 'pending';
 
             if ($id) {
