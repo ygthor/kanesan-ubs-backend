@@ -4,8 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Artran;
-use App\Models\ArtransCreditNote;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,42 +27,32 @@ class DebtController extends Controller
 
         $searchTerm = $request->input('search');
 
-        // Get invoices with customer data using LEFT JOIN
-        // Include invoices with partial or no payments, calculate outstanding balance after payments
-        $invoicesQuery = Artran::select([
-                'artrans.*',
+        // Fetch invoice-type orders with outstanding balances
+        $invoicesQuery = Order::select([
+                'orders.*',
                 'customers.customer_code',
                 'customers.id as customer_id',
                 'customers.name as customer_name',
                 'customers.company_name',
                 'customers.payment_type',
                 'customers.payment_term',
-                // Calculate total payments made for this invoice (from non-deleted receipts)
                 DB::raw('COALESCE((
                     SELECT SUM(receipt_invoices.amount_applied)
                     FROM receipt_invoices
                     INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
-                    WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = artrans.REFNO COLLATE utf8mb4_unicode_ci
+                    WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
                     AND receipts.deleted_at IS NULL
                 ), 0) as total_payments')
             ])
-            ->leftJoin('customers', function($join) {
-                // Fix collation mismatch by converting both sides to the same collation
-                $join->on(DB::raw('artrans.CUSTNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('customers.customer_code COLLATE utf8mb4_unicode_ci'));
-            })
-            ->where('artrans.TYPE', 'INV')
-            // Only exclude invoices that are fully paid (total payments >= NET_BIL)
-            // Use small tolerance (0.01) for floating point precision
-            // This allows partial payments to show in the debt list with updated outstanding balance
-            // Show invoices where total payments < NET_BIL (not fully paid)
-            // Changed to use tolerance to handle floating point precision issues
+            ->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
+            ->where('orders.type', 'INV')
             ->whereRaw('COALESCE((
                 SELECT SUM(receipt_invoices.amount_applied)
                 FROM receipt_invoices
                 INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
-                WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = artrans.REFNO COLLATE utf8mb4_unicode_ci
+                WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
                 AND receipts.deleted_at IS NULL
-            ), 0) < (artrans.NET_BIL - 0.01)');
+            ), 0) < (COALESCE(orders.net_amount, orders.grand_amount, 0) - 0.01)');
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -84,7 +73,10 @@ class DebtController extends Controller
             });
         }
 
-        $invoicesWithCustomers = $invoicesQuery->with('items.detail')->orderBy('artrans.DATE', 'asc')->get();
+        $invoicesWithCustomers = $invoicesQuery
+            ->with(['items', 'customer'])
+            ->orderBy('orders.order_date', 'asc')
+            ->get();
 
         // Filter out invoices without customer data and group by customer
         $customersWithDebts = $invoicesWithCustomers
@@ -101,54 +93,30 @@ class DebtController extends Controller
             // Map the invoices to the 'debtItems' structure
             $debtItems = $invoices->map(function ($invoice) use ($firstInvoice) {
                 
+                $orderDate = $invoice->order_date instanceof Carbon ? $invoice->order_date : Carbon::parse($invoice->order_date);
                 // Calculate due date based on payment term
-                $dueDate = $this->calculateDueDate($invoice->DATE, $firstInvoice->payment_term);
+                $dueDate = $this->calculateDueDate($orderDate, $firstInvoice->payment_term);
 
                 // Calculate total payments made
                 $totalPayments = (float) ($invoice->total_payments ?? 0);
-                
-                // Calculate total credit notes amount for this invoice
-                $totalCreditNotes = 0;
-                if ($invoice->artrans_id) {
-                    $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
-                        ->with('creditNote')
-                        ->get();
-                    foreach ($creditNotes as $cnLink) {
-                        if ($cnLink->creditNote) {
-                            $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
-                        }
-                    }
-                }
-                
-                // Calculate outstanding balance: NET_BIL minus total payments and credit notes
-                $netBil = (float) $invoice->NET_BIL;
-                $outstandingBalance = max(0, $netBil - $totalPayments - $totalCreditNotes);
+                $netAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
+                $outstandingBalance = max(0, $netAmount - $totalPayments);
                 
                 // Debug logging for partially paid invoices
                 if ($totalPayments > 0 && $outstandingBalance > 0) {
-                    \Log::info("Partially paid invoice: REFNO={$invoice->REFNO}, NET_BIL={$netBil}, total_payments={$totalPayments}, credit_notes={$totalCreditNotes}, outstanding={$outstandingBalance}");
-                }
-
-                // Calculate return amount from invoice items (items with negative SIGN or negative AMT_BIL)
-                $returnAmount = 0;
-                if ($invoice->items) {
-                    foreach ($invoice->items as $item) {
-                        if (($item->SIGN ?? 1) < 0 || $item->AMT_BIL < 0) {
-                            $returnAmount += abs($item->AMT_BIL);
-                        }
-                    }
+                    \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, net_amount={$netAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
                 }
 
                 return [
-                    'salesNo' => $invoice->REFNO, // Invoice reference number
-                    'salesDate' => $invoice->DATE->toDateString(),  // Return date-only format (YYYY-MM-DD)
+                    'salesNo' => $invoice->reference_no, // Invoice reference number
+                    'salesDate' => $orderDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
                     'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $firstInvoice->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
-                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments and credit notes
-                    'salesAmount' => (float) $invoice->GRAND_BIL, // Grand total amount
-                    'returnAmount' => (float) $returnAmount, // Return amount from invoice items
-                    'creditAmount' => (float) $totalCreditNotes, // Credit amount from all linked credit notes (CN/CR)
+                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments
+                    'salesAmount' => (float) ($invoice->grand_amount ?? $netAmount), // Grand total amount
+                    'returnAmount' => 0.0, // Returns not tracked in orders table
+                    'creditAmount' => 0.0, // Credit notes not tracked here
                     'amountPaid' => $totalPayments, // Amount paid from receipts
                     'currency' => 'RM', // Default currency
                 ];
