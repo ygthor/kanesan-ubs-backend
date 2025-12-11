@@ -148,7 +148,7 @@ class CustomerController extends Controller
             'name' => 'nullable|string|max:255', // General name field if used
             'address' => 'nullable|string|max:1000', // General address field if used
             'assigned_user_id' => 'nullable|integer|exists:users,id',
-            'agent_no' => 'nullable|string|max:255',
+            'agent_no' => 'nullable|string|max:255', // WHY NEED THIS ? already asked to get from assigned_user_id right ?
         ]);
 
         if ($validator->fails()) {
@@ -481,13 +481,6 @@ class CustomerController extends Controller
                 $codeParts = explode('/', $code);
                 if (count($codeParts) === 2 && is_numeric($codeParts[1])) {
                     $numbers[] = (int)$codeParts[1];
-                }
-                
-                // Update agent_no based on assigned_user_id when provided
-                if ($request->assigned_user_id) {
-                    $assignedUser = \App\Models\User::find($request->assigned_user_id);
-                    $customer->agent_no = $assignedUser?->name ?? $assignedUser?->username ?? $customer->agent_no;
-                    $customer->save();
                 }
             }
             if (!empty($numbers)) {
