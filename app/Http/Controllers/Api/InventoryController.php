@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Icitem;
 use App\Models\ItemTransaction;
+use App\Models\User;
 use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -315,6 +316,8 @@ class InventoryController extends Controller
             'group_name' => 'nullable|string',
         ]);
 
+        
+
         // Get all items from icitem table (actual inventory data)
         $query = Icitem::query();
         
@@ -329,6 +332,16 @@ class InventoryController extends Controller
         $agentNo = $request->input('agent_no');
         if (!$agentNo && auth()->user()) {
             $agentNo = auth()->user()->name ?? auth()->user()->username;
+        }
+        
+        // Normalize agent_no: if it's a username, convert to user's name
+        // (because orders store agent_no as user's name, not username)
+        if ($agentNo) {
+            $user = User::where('username', $agentNo)->first();
+            if ($user && $user->name) {
+                $agentNo = $user->name;
+            }
+            // If not found by username, assume agent_no is already the name
         }
 
         $stockService = new StockService();
@@ -396,6 +409,15 @@ class InventoryController extends Controller
         ]);
 
         $agentNo = $request->input('agent_no');
+        
+        // Normalize agent_no: if it's a username, convert to user's name
+        if ($agentNo) {
+            $user = User::where('username', $agentNo)->first();
+            if ($user && $user->name) {
+                $agentNo = $user->name;
+            }
+        }
+        
         $stockService = new StockService();
 
         if ($itemno) {

@@ -24,9 +24,9 @@ class StockService
         $returnGood = 0;
         $returnBad = 0;
 
-        // Calculate from orders - optimized query with direct join
+        // Calculate from orders - optimized query with direct join using reference_no
         $orderItems = DB::table('orders')
-            ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
             ->where('orders.agent_no', $agentNo)
             ->where('order_items.product_no', $itemNo)
             ->select(
@@ -352,9 +352,9 @@ class StockService
      */
     public function getAgentStockSummary(string $agentNo): array
     {
-        // Optimized query - get all order items for this agent in one query
+        // Optimized query - get all order items for this agent in one query using reference_no
         $orderItems = DB::table('orders')
-            ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
             ->where('orders.agent_no', $agentNo)
             ->whereNotNull('order_items.product_no')
             ->select(
