@@ -76,6 +76,11 @@ class OrderController extends Controller
         }
 
         // Filter by order type
+        // If called from /api/invoices route, default to 'INV' type
+        if (request()->is('api/invoices*')) {
+            $orderType = $orderType ?? 'INV';
+        }
+        
         if ($orderType) {
             // The Flutter app sends a comma-separated string, so we need to split it
             $types = explode(',', $orderType);
@@ -180,8 +185,12 @@ class OrderController extends Controller
 
             $orderData['order_date'] = $orderData['order_date'] ?? now();
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
-            // Allow type to be passed, default to INV for new orders
-            $orderData['type'] = $request->input('type', 'INV');
+            // If called from /api/invoices route, default to 'INV', otherwise use request or default to INV
+            if (request()->is('api/invoices*')) {
+                $orderData['type'] = $request->input('type', 'INV');
+            } else {
+                $orderData['type'] = $request->input('type', 'INV');
+            }
 
             $customer = Customer::find($orderData['customer_id']);
             if (!$customer) {
@@ -330,9 +339,18 @@ class OrderController extends Controller
      * @param  \App\Models\Order  $order
      * @return \Illuminate\Http\JsonResponse
      */
-    public function show(Order $order)
+    public function show($id)
     {
         $user = auth()->user();
+        
+        // Try to find by reference_no first (for invoice lookups), then by ID
+        $order = Order::where('reference_no', $id)
+            ->orWhere('id', $id)
+            ->first();
+        
+        if (!$order) {
+            return makeResponse(404, 'Order/Invoice not found.', null);
+        }
         
         // Check if user has access to this order's customer
         if (!$this->userHasAccessToCustomer($user, $order->customer)) {
@@ -340,7 +358,7 @@ class OrderController extends Controller
         }
         
         // Load items and customer relationship for detailed view
-        $order->load('items.product', 'items.item', 'customer');
+        $order->load('items.item', 'customer');
         return makeResponse(200, 'Order retrieved successfully.', $order);
     }
 

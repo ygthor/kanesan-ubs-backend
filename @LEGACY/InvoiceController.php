@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Artran; // Changed from Order
-use App\Models\ArTransItem; // Changed from OrderItem
 use App\Models\ArtransCreditNote;
 use App\Models\Customer;
 use App\Models\Product;
@@ -39,8 +37,9 @@ class InvoiceController extends Controller
             $paginate = true;
         }
 
-        // Start building the query on the Artran model
-        $invoices = Artran::with(['items.detail', 'items.item', 'customer']);
+        // Use Orders table - artrans is deprecated
+        $invoices = Order::with(['items.item', 'customer'])
+            ->where('type', 'INV');
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -49,50 +48,49 @@ class InvoiceController extends Controller
                 // User has no assigned customers, return empty result
                 return makeResponse(200, 'No invoices accessible.', $paginate ? ['data' => [], 'total' => 0] : []);
             }
-            // Filter by customer IDs - assuming Artran has a customer_id field or CUSTNO field
-            $invoices->whereIn('CUSTNO', $user->customers()->pluck('customers.customer_code')->toArray());
+            // Filter by customer IDs
+            $invoices->whereIn('customer_id', $allowedCustomerIds);
         }
 
         // Enhanced customer search: search across multiple customer fields
         if ($customerName) {
             // Join with customers table to search across multiple fields
-            $invoices->leftJoin('customers', function($join) {
-                $join->on(DB::raw('artrans.CUSTNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('customers.customer_code COLLATE utf8mb4_unicode_ci'));
-            })->where(function($query) use ($customerName) {
-                // Search in artrans.NAME (denormalized customer name)
-                $query->where('artrans.NAME', 'like', "%{$customerName}%")
-                    // Search in customers table fields
-                    ->orWhere('customers.name', 'like', "%{$customerName}%")
-                    ->orWhere('customers.company_name', 'like', "%{$customerName}%")
-                    ->orWhere('customers.company_name2', 'like', "%{$customerName}%")
-                    ->orWhere('customers.email', 'like', "%{$customerName}%")
-                    ->orWhere('customers.phone', 'like', "%{$customerName}%")
-                    ->orWhere('customers.telephone1', 'like', "%{$customerName}%")
-                    ->orWhere('customers.telephone2', 'like', "%{$customerName}%")
-                    ->orWhere('customers.customer_code', 'like', "%{$customerName}%");
-            });
-            // Select only artrans columns to avoid conflicts with joined table
-            $invoices->select('artrans.*');
+            $invoices->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
+                ->where(function($query) use ($customerName) {
+                    // Search in orders.customer_name (denormalized customer name)
+                    $query->where('orders.customer_name', 'like', "%{$customerName}%")
+                        // Search in customers table fields
+                        ->orWhere('customers.name', 'like', "%{$customerName}%")
+                        ->orWhere('customers.company_name', 'like', "%{$customerName}%")
+                        ->orWhere('customers.company_name2', 'like', "%{$customerName}%")
+                        ->orWhere('customers.email', 'like', "%{$customerName}%")
+                        ->orWhere('customers.phone', 'like', "%{$customerName}%")
+                        ->orWhere('customers.telephone1', 'like', "%{$customerName}%")
+                        ->orWhere('customers.telephone2', 'like', "%{$customerName}%")
+                        ->orWhere('customers.customer_code', 'like', "%{$customerName}%");
+                });
+            // Select only orders columns to avoid conflicts with joined table
+            $invoices->select('orders.*');
         }
         if ($CUSTNO) {
-            $invoices->where('CUSTNO', 'like', "%{$CUSTNO}%");
+            $invoices->where('customer_code', 'like', "%{$CUSTNO}%");
         }
 
-        // Filter by date range (using the 'DATE' column)
+        // Filter by date range (using the 'order_date' column)
         if ($startDate) {
-            $invoices->whereDate('DATE', '>=', $startDate);
+            $invoices->whereDate('order_date', '>=', $startDate);
         }
         if ($endDate) {
-            $invoices->whereDate('DATE', '<=', $endDate);
+            $invoices->whereDate('order_date', '<=', $endDate);
         }
 
-        // Filter by invoice type (using the 'TYPE' column)
+        // Filter by invoice type (using the 'type' column)
         if ($invoiceType) {
             $types = explode(',', $invoiceType);
-            $invoices->whereIn('TYPE', $types);
+            $invoices->whereIn('type', $types);
         }
 
-        $invoices->orderBy('DATE', 'desc')->orderBy('REFNO', 'desc');
+        $invoices->orderBy('order_date', 'desc')->orderBy('reference_no', 'desc');
 
         if ($paginate) {
             $paginatedInvoices = $invoices->paginate($request->input('per_page', 15));
@@ -432,52 +430,50 @@ class InvoiceController extends Controller
 
     /**
      * Display the specified invoice.
+     * Only uses the orders table - artrans table is deprecated and will be removed.
      *
-     * @param  int  $id
+     * @param  string  $id  The reference_no from orders table
      * @return \Illuminate\Http\JsonResponse
      */
     public function show($id)
     {
         $user = auth()->user();
-        $invoice = Artran::with(['items.detail', 'items.item', 'customer'])->findOrFail($id);
+        
+        // Only use orders table - artrans is deprecated
+        $order = Order::with(['items.item', 'customer'])
+            ->where('reference_no', $id)
+            ->where('type', 'INV')
+            ->first();
+        
+        if (!$order) {
+            return makeResponse(404, 'Invoice not found.', null);
+        }
+        
+        // Convert order to invoice format
+        $invoice = $this->convertOrderToInvoice($order);
         
         // Check if user has access to this invoice's customer
         if (!$this->userHasAccessToCustomer($user, $invoice->customer)) {
             return makeResponse(403, 'Access denied. You do not have permission to view this invoice.', null);
         }
         
-        // Ensure invoice_refno is included in the response for credit notes
-        if (in_array($invoice->TYPE, ['CN', 'CR'])) {
-            // Get the invoice_refno from the accessor
-            $invoiceRefno = $invoice->invoice_refno;
-            
-            // Convert to array and manually add invoice_refno to ensure it's included
-            $invoiceData = $invoice->toArray();
-            $invoiceData['invoice_refno'] = $invoiceRefno;
-            
-            return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
-        }
+        // Enrich invoice with payment and credit note information
+        $enrichedInvoice = $this->enrichInvoiceWithPaymentInfo($invoice);
+        $invoiceData = $enrichedInvoice->toArray();
         
-        // For INV invoices, include linked credit notes and adjust amounts
-        if ($invoice->TYPE == 'INV') {
-            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
-                ->with(['creditNote.items.detail', 'creditNote.items.item', 'creditNote.customer'])
-                ->get()
-                ->map(function ($link) {
-                    return $link->creditNote;
-                })
-                ->filter()
-                ->values();
-            
-            // Enrich invoice with payment and credit note information
-            $enrichedInvoice = $this->enrichInvoiceWithPaymentInfo($invoice);
-            $invoiceData = $enrichedInvoice->toArray();
-            $invoiceData['credit_notes'] = $creditNotes;
-            
-            return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
-        }
+        // Get linked credit notes if any
+        $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+            ->with(['creditNote.items.detail', 'creditNote.items.item', 'creditNote.customer'])
+            ->get()
+            ->map(function ($link) {
+                return $link->creditNote;
+            })
+            ->filter()
+            ->values();
         
-        return makeResponse(200, 'Invoice retrieved successfully.', $invoice);
+        $invoiceData['credit_notes'] = $creditNotes;
+        
+        return makeResponse(200, 'Invoice retrieved successfully.', $invoiceData);
     }
 
     /**
@@ -834,6 +830,90 @@ class InvoiceController extends Controller
         $invoice->setAttribute('net_amount', $netAmount);
         $invoice->setAttribute('paid_amount', $totalPayments);
         $invoice->setAttribute('outstanding_amount', $outstandingAmount);
+        
+        return $invoice;
+    }
+
+    /**
+     * Convert an Order to an Artran-like format for invoice display.
+     * This allows viewing invoices from the orders table (new table) instead of just artrans (old table).
+     *
+     * @param \App\Models\Order $order
+     * @return \App\Models\Artran
+     */
+    private function convertOrderToInvoice($order)
+    {
+        // Check if there's a linked artrans record via invoice_orders pivot table
+        $linkedArtran = null;
+        $invoiceOrders = DB::table('invoice_orders')
+            ->where('order_id', $order->id)
+            ->first();
+        
+        if ($invoiceOrders) {
+            // Try to find the linked artrans record by REFNO
+            $linkedArtran = Artran::where('REFNO', $invoiceOrders->invoice_refno)->first();
+        }
+        
+        // Create a new Artran instance with order data
+        $invoice = new Artran();
+        
+        // Use artrans_id from linked artrans if available, otherwise use order id
+        // This ensures credit notes can be found if they're linked to the artrans record
+        $invoice->artrans_id = $linkedArtran ? $linkedArtran->artrans_id : $order->id;
+        $invoice->REFNO = $order->reference_no;
+        $invoice->TYPE = $order->type ?? 'INV';
+        $invoice->CUSTNO = $order->customer_code;
+        $invoice->NAME = $order->customer_name;
+        $invoice->DATE = $order->order_date ? $order->order_date->format('Y-m-d') : now()->format('Y-m-d');
+        $invoice->GROSS_BIL = (float) ($order->gross_amount ?? 0);
+        $invoice->TAX1_BIL = (float) ($order->tax1 ?? 0);
+        $invoice->GRAND_BIL = (float) ($order->grand_amount ?? 0);
+        $invoice->NET_BIL = (float) ($order->net_amount ?? $order->grand_amount ?? 0);
+        $invoice->DEBIT_BIL = (float) ($order->net_amount ?? $order->grand_amount ?? 0);
+        $invoice->CREDIT_BIL = 0;
+        $invoice->NOTE = $order->remarks;
+        
+        // Set customer relationship
+        $invoice->setRelation('customer', $order->customer);
+        
+        // Convert order items to ArTransItem format
+        $invoiceItems = [];
+        $itemCount = 1;
+        foreach ($order->items as $orderItem) {
+            $invoiceItem = new ArTransItem();
+            $invoiceItem->id = $orderItem->id;
+            $invoiceItem->REFNO = $order->reference_no;
+            $invoiceItem->TYPE = $order->type ?? 'INV';
+            $invoiceItem->CUSTNO = $order->customer_code;
+            $invoiceItem->DATE = $order->order_date ? $order->order_date->format('Y-m-d') : now()->format('Y-m-d');
+            $invoiceItem->ITEMCOUNT = $itemCount++;
+            $invoiceItem->ITEMNO = $orderItem->product_no;
+            $invoiceItem->TRANCODE = $orderItem->product_no;
+            $invoiceItem->DESP = $orderItem->product_name ?? $orderItem->description ?? 'Unknown Product';
+            $invoiceItem->QTY = (float) $orderItem->quantity;
+            $invoiceItem->PRICE = (float) $orderItem->unit_price;
+            $invoiceItem->AMT_BIL = (float) $orderItem->amount;
+            $invoiceItem->DISAMT = (float) ($orderItem->discount ?? 0);
+            $invoiceItem->SIGN = $orderItem->is_trade_return ? -1 : 1;
+            
+            // Set item relationship (icitem)
+            if ($orderItem->relationLoaded('item')) {
+                $invoiceItem->setRelation('item', $orderItem->item);
+            }
+            
+            // Set detail relationship if it exists (for trade returns)
+            if ($orderItem->is_trade_return) {
+                $detail = new \App\Models\ArTransItemDetail();
+                $detail->is_trade_return = true;
+                $detail->return_status = $orderItem->trade_return_is_good ? 'good' : 'bad';
+                $invoiceItem->setRelation('detail', $detail);
+            }
+            
+            $invoiceItems[] = $invoiceItem;
+        }
+        
+        // Set items relationship
+        $invoice->setRelation('items', collect($invoiceItems));
         
         return $invoice;
     }

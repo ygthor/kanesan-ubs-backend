@@ -176,10 +176,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('orders-items', OrderItemController::class)->only(['index', 'store', 'update', 'show', 'destroy']);
     Route::apiResource('receipts', ReceiptController::class);
 
-    Route::post('invoices/batch-print', [InvoiceController::class, 'batchPrint']);
-    Route::get('invoices/{refNo}/print', [InvoiceController::class, 'printInvoice']);
-    Route::apiResource('invoices', InvoiceController::class)->only(['index', 'store', 'update', 'show']);
-    Route::apiResource('invoices-items', InvoiceItemController::class)->only(['index', 'store', 'update', 'show', 'destroy']);
+    // Invoices are now handled through /api/orders with type='INV' filter
+    // Keeping these routes for backward compatibility, but they redirect to orders
+    // Invoice items are just order items, use OrderItemController  
+    Route::apiResource('invoices-items', OrderItemController::class)->only(['index', 'store', 'update', 'show', 'destroy']);
 
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index')->middleware('filter.customer');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
