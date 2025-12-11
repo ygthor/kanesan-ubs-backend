@@ -44,34 +44,46 @@ class ReportController extends Controller
             }
         }
 
-        // Example tables: invoices, receipts (adjust to your schema!)
+        // Use Orders table - artrans is deprecated
+
+        // Get user's allowed customer IDs for filtering
+        $allowedCustomerIds = null;
+        if ($allowedCustomerCodes) {
+            $allowedCustomerIds = DB::table('customers')
+                ->whereIn('customer_code', $allowedCustomerCodes)
+                ->pluck('id')
+                ->toArray();
+        }
 
         // --- Sales ---
-        $caSalesQuery = DB::table('artrans')
-            ->whereBetween('DATE', [$fromDate, $toDate])
-            ->where('TYPE', 'CS');
-        if ($allowedCustomerCodes) {
-            $caSalesQuery->whereIn('CUSTNO', $allowedCustomerCodes);
+        // CA Sales: Cash Sales (type='CS')
+        $caSalesQuery = DB::table('orders')
+            ->whereBetween('order_date', [$fromDate, $toDate])
+            ->where('type', 'CS');
+        if ($allowedCustomerIds) {
+            $caSalesQuery->whereIn('customer_id', $allowedCustomerIds);
         }
-        $caSales = $caSalesQuery->sum('NET_BIL');
+        $caSales = $caSalesQuery->sum('net_amount');
 
-        $crSalesQuery = DB::table('artrans')
-            ->whereBetween('DATE', [$fromDate, $toDate])
-            ->where('TYPE', 'INV');
-        if ($allowedCustomerCodes) {
-            $crSalesQuery->whereIn('CUSTNO', $allowedCustomerCodes);
+        // CR Sales: Credit Sales/Invoices (type='INV')
+        $crSalesQuery = DB::table('orders')
+            ->whereBetween('order_date', [$fromDate, $toDate])
+            ->where('type', 'INV');
+        if ($allowedCustomerIds) {
+            $crSalesQuery->whereIn('customer_id', $allowedCustomerIds);
         }
-        $crSales = $crSalesQuery->sum('NET_BIL');
+        $crSales = $crSalesQuery->sum('net_amount');
 
         $totalSales = $caSales + $crSales;
 
-        $returnsQuery = DB::table('artrans')
-            ->whereBetween('DATE', [$fromDate, $toDate])
-            ->where('TYPE', 'CN');
-        if ($allowedCustomerCodes) {
-            $returnsQuery->whereIn('CUSTNO', $allowedCustomerCodes);
+        // Returns: Credit Notes (type='CN')
+        $returnsQuery = DB::table('orders')
+            ->whereBetween('order_date', [$fromDate, $toDate])
+            ->where('type', 'CN');
+        if ($allowedCustomerIds) {
+            $returnsQuery->whereIn('customer_id', $allowedCustomerIds);
         }
-        $returns = $returnsQuery->sum('NET_BIL');
+        $returns = $returnsQuery->sum('net_amount');
 
         $nettSales = $totalSales - $returns;
 
