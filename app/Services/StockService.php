@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 class StockService
 {
     /**
-     * Calculate stock totals for an agent and item
+     * Calculate stock totals for an agent and item from orders AND item_transactions
      * 
      * @param string $agentNo Agent number (user name)
      * @param string $itemNo Item number (ITEMNO from icitem)
@@ -19,32 +19,72 @@ class StockService
      */
     public function calculateStockTotals(string $agentNo, string $itemNo): array
     {
-        // Get all transactions for this agent and item
-        $transactions = ItemTransaction::where('agent_no', $agentNo)
-            ->where('ITEMNO', $itemNo)
-            ->get();
-
         $stockIn = 0;
         $stockOut = 0;
         $returnGood = 0;
         $returnBad = 0;
 
-        foreach ($transactions as $transaction) {
-            $qty = (float) $transaction->quantity;
+        // Calculate from orders
+        $orders = Order::where('agent_no', $agentNo)
+            ->with('items')
+            ->get();
 
-            if ($transaction->transaction_type === 'in') {
-                if ($transaction->return_type === 'good') {
-                    $returnGood += $qty;
-                } else {
+        foreach ($orders as $order) {
+            // Get order items matching this item number
+            $orderItems = $order->items()->where('product_no', $itemNo)->get();
+
+            foreach ($orderItems as $orderItem) {
+                $qty = (float) $orderItem->quantity;
+                $isTradeReturn = $orderItem->is_trade_return ?? false;
+                $tradeReturnIsGood = $orderItem->trade_return_is_good ?? true;
+
+                if ($order->type === 'DO') {
+                    // DO orders = Stock IN
                     $stockIn += $qty;
-                }
-            } elseif ($transaction->transaction_type === 'out') {
-                if ($transaction->return_type === 'bad') {
-                    $returnBad += $qty;
-                } else {
-                    $stockOut += $qty;
+                } elseif ($order->type === 'INV') {
+                    if ($isTradeReturn) {
+                        if ($tradeReturnIsGood) {
+                            // Trade return good = Stock IN (returnGood)
+                            $returnGood += $qty;
+                        } else {
+                            // Trade return bad = Stock OUT (returnBad)
+                            $returnBad += $qty;
+                        }
+                    } else {
+                        // Normal INV item = Stock OUT
+                        $stockOut += $qty;
+                    }
                 }
             }
+        }
+
+        // Also calculate from item_transactions (if table exists and has data)
+        try {
+            $transactions = ItemTransaction::where('agent_no', $agentNo)
+                ->where('ITEMNO', $itemNo)
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $qty = (float) $transaction->quantity;
+
+                if ($transaction->transaction_type === 'in') {
+                    if ($transaction->return_type === 'good') {
+                        $returnGood += $qty;
+                    } else {
+                        $stockIn += $qty;
+                    }
+                } elseif ($transaction->transaction_type === 'out') {
+                    if ($transaction->return_type === 'bad') {
+                        $returnBad += $qty;
+                    } else {
+                        $stockOut += $qty;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // If item_transactions table doesn't exist, just skip it
+            // We'll rely on orders only
+            Log::debug("item_transactions table not available or error: " . $e->getMessage());
         }
 
         // Available stock = stockIn + returnGood - stockOut - returnBad
@@ -309,22 +349,61 @@ class StockService
      */
     public function getAgentStockSummary(string $agentNo): array
     {
-        // Get all unique items for this agent
-        $itemNos = ItemTransaction::where('agent_no', $agentNo)
-            ->distinct()
-            ->pluck('ITEMNO')
-            ->toArray();
+        // Get all unique items from orders for this agent
+        $orders = Order::where('agent_no', $agentNo)
+            ->with('items')
+            ->get();
 
+        $itemTotals = [];
+
+        foreach ($orders as $order) {
+            foreach ($order->items as $orderItem) {
+                $itemNo = $orderItem->product_no;
+                if (!$itemNo) {
+                    continue;
+                }
+
+                if (!isset($itemTotals[$itemNo])) {
+                    $itemTotals[$itemNo] = [
+                        'ITEMNO' => $itemNo,
+                        'stockIn' => 0,
+                        'stockOut' => 0,
+                        'returnGood' => 0,
+                        'returnBad' => 0,
+                    ];
+                }
+
+                $qty = (float) $orderItem->quantity;
+                $isTradeReturn = $orderItem->is_trade_return ?? false;
+                $tradeReturnIsGood = $orderItem->trade_return_is_good ?? true;
+
+                if ($order->type === 'DO') {
+                    $itemTotals[$itemNo]['stockIn'] += $qty;
+                } elseif ($order->type === 'INV') {
+                    if ($isTradeReturn) {
+                        if ($tradeReturnIsGood) {
+                            $itemTotals[$itemNo]['returnGood'] += $qty;
+                        } else {
+                            $itemTotals[$itemNo]['returnBad'] += $qty;
+                        }
+                    } else {
+                        $itemTotals[$itemNo]['stockOut'] += $qty;
+                    }
+                }
+            }
+        }
+
+        // Calculate available for each item
         $summary = [];
-        foreach ($itemNos as $itemNo) {
-            $totals = $this->calculateStockTotals($agentNo, $itemNo);
+        foreach ($itemTotals as $itemNo => $totals) {
+            $available = $totals['stockIn'] + $totals['returnGood'] - $totals['stockOut'] - $totals['returnBad'];
             $summary[] = [
                 'ITEMNO' => $itemNo,
                 'stockIn' => $totals['stockIn'],
                 'stockOut' => $totals['stockOut'],
                 'returnGood' => $totals['returnGood'],
                 'returnBad' => $totals['returnBad'],
-                'available' => $totals['available'],
+                'available' => max(0, $available),
             ];
         }
 
