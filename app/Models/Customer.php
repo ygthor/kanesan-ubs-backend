@@ -49,6 +49,7 @@ class Customer extends Model
         'max_discount',     // Consider casting to float/decimal if it's numeric
         'lot_type',
         'avatar_url',       // URL to the customer's avatar/logo
+        'agent_no',         // Agent number/name (mirrors assigned user)
         // 'is_active',     // Example: if you add an active status
         // 'created_by',
         // 'updated_by',

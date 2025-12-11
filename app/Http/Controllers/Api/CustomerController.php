@@ -148,6 +148,7 @@ class CustomerController extends Controller
             'name' => 'nullable|string|max:255', // General name field if used
             'address' => 'nullable|string|max:1000', // General address field if used
             'assigned_user_id' => 'nullable|integer|exists:users,id',
+            'agent_no' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -187,13 +188,22 @@ class CustomerController extends Controller
                 'segment',
                 'payment_type',
                 'name',
-                'address'
+                'address',
+                'agent_no',
                 // Ensure this list matches the $fillable array in your Customer model
                 // and the fields sent from your Flutter "Detailed Form".
             ]);
             
             // Add the generated customer_code
             $customerData['customer_code'] = $customerCode;
+            
+            // Derive agent_no from assigned_user_id if provided, else creator
+            if ($request->filled('assigned_user_id')) {
+                $assignedUser = \App\Models\User::find($request->assigned_user_id);
+                $customerData['agent_no'] = $assignedUser?->name ?? $assignedUser?->username ?? $customerData['agent_no'] ?? null;
+            } else {
+                $customerData['agent_no'] = $customerData['agent_no'] ?? ($user->name ?? $user->username ?? null);
+            }
             
             $customer = Customer::create($customerData);
 
@@ -319,6 +329,7 @@ class CustomerController extends Controller
             'name' => 'sometimes|nullable|string|max:255',
             'address' => 'sometimes|nullable|string|max:1000',
             'assigned_user_id' => 'sometimes|nullable|integer|exists:users,id',
+            'agent_no' => 'sometimes|nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -354,7 +365,8 @@ class CustomerController extends Controller
                 'segment',
                 'payment_type',
                 'name',
-                'address'
+                'address',
+                'agent_no',
             ]));
 
             // Handle user assignment using many-to-many relationship
@@ -469,6 +481,13 @@ class CustomerController extends Controller
                 $codeParts = explode('/', $code);
                 if (count($codeParts) === 2 && is_numeric($codeParts[1])) {
                     $numbers[] = (int)$codeParts[1];
+                }
+                
+                // Update agent_no based on assigned_user_id when provided
+                if ($request->assigned_user_id) {
+                    $assignedUser = \App\Models\User::find($request->assigned_user_id);
+                    $customer->agent_no = $assignedUser?->name ?? $assignedUser?->username ?? $customer->agent_no;
+                    $customer->save();
                 }
             }
             if (!empty($numbers)) {
