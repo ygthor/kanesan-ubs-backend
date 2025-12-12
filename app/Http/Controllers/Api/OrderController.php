@@ -51,10 +51,13 @@ class OrderController extends Controller
 
         // --- Apply filters conditionally ---
 
-        // Filter by customer name
+        // Filter by customer name (search in both name and company_name)
         if ($customerName) {
             $orders->whereHas('customer', function ($query) use ($customerName) {
-                $query->where('name', 'like', "%{$customerName}%");
+                $query->where(function ($q) use ($customerName) {
+                    $q->where('name', 'like', "%{$customerName}%")
+                      ->orWhere('company_name', 'like', "%{$customerName}%");
+                });
             });
         }
         if($customerCode){
