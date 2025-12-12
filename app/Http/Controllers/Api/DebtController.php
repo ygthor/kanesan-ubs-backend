@@ -37,20 +37,20 @@ class DebtController extends Controller
                 'customers.payment_type',
                 'customers.payment_term',
                 DB::raw('COALESCE((
-                    SELECT SUM(receipt_invoices.amount_applied)
-                    FROM receipt_invoices
-                    INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
-                    WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
+                    SELECT SUM(receipt_orders.amount_applied)
+                    FROM receipt_orders
+                    INNER JOIN receipts ON receipt_orders.receipt_id = receipts.id
+                    WHERE receipt_orders.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
                     AND receipts.deleted_at IS NULL
                 ), 0) as total_payments')
             ])
             ->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
             ->where('orders.type', 'INV')
             ->whereRaw('COALESCE((
-                SELECT SUM(receipt_invoices.amount_applied)
-                FROM receipt_invoices
-                INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
-                WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
+                SELECT SUM(receipt_orders.amount_applied)
+                FROM receipt_orders
+                INNER JOIN receipts ON receipt_orders.receipt_id = receipts.id
+                WHERE receipt_orders.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
                 AND receipts.deleted_at IS NULL
             ), 0) < (COALESCE(orders.net_amount, orders.grand_amount, 0) - 0.01)');
 

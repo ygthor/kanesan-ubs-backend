@@ -14,7 +14,7 @@ class ReceiptInvoice extends Model
      *
      * @var string
      */
-    protected $table = 'receipt_invoices';
+    protected $table = 'receipt_orders';
 
     /**
      * The attributes that are mass assignable.
@@ -23,7 +23,7 @@ class ReceiptInvoice extends Model
      */
     protected $fillable = [
         'receipt_id',
-        'invoice_refno',
+        'order_refno',
         'amount_applied',
     ];
 
@@ -37,7 +37,7 @@ class ReceiptInvoice extends Model
     ];
 
     /**
-     * Get the receipt that this invoice link belongs to.
+     * Get the receipt that this order link belongs to.
      */
     public function receipt()
     {
