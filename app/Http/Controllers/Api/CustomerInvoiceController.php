@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Artran;
+use App\Models\Order;
 use App\Models\ArtransCreditNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -57,36 +57,36 @@ class CustomerInvoiceController extends Controller
             }
         }
 
-        // Build query to get invoices with payment calculations
-        $query = Artran::select([
-                'artrans.*',
+        // Build query to get invoices with payment calculations from orders table
+        $query = Order::select([
+                'orders.*',
                 // Calculate total payments made for this invoice (from non-deleted receipts)
                 DB::raw('COALESCE((
                     SELECT SUM(receipt_invoices.amount_applied)
                     FROM receipt_invoices
                     INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
-                    WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = artrans.REFNO COLLATE utf8mb4_unicode_ci
+                    WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
                     AND receipts.deleted_at IS NULL
                 ), 0) as total_payments')
             ])
-            ->where('artrans.CUSTNO', $customerCode)
-            ->where('artrans.TYPE', 'INV');
+            ->where('orders.customer_code', $customerCode)
+            ->where('orders.type', 'INV');
 
         // Only filter out fully paid invoices if include_paid is false
         if (!$includePaid) {
-            // Outstanding definition: total_payments < NET_BIL
-            // Show invoices where total payments < NET_BIL (allowing 0.01 tolerance for floating point)
+            // Outstanding definition: total_payments < net_amount
+            // Show invoices where total payments < net_amount (allowing 0.01 tolerance for floating point)
             $query->whereRaw('COALESCE((
                 SELECT SUM(receipt_invoices.amount_applied)
                 FROM receipt_invoices
                 INNER JOIN receipts ON receipt_invoices.receipt_id = receipts.id
-                WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = artrans.REFNO COLLATE utf8mb4_unicode_ci
+                WHERE receipt_invoices.invoice_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
                 AND receipts.deleted_at IS NULL
-            ), 0) < (artrans.NET_BIL - 0.01)');
+            ), 0) < (COALESCE(orders.net_amount, orders.grand_amount, 0) - 0.01)');
         }
 
         $invoices = $query->with(['customer'])
-            ->orderBy('DATE', 'desc')
+            ->orderBy('order_date', 'desc')
             ->get();
 
         \Log::info("Found {$invoices->count()} invoices for customer {$customerCode}");
@@ -96,9 +96,18 @@ class CustomerInvoiceController extends Controller
             $totalPayments = (float) ($invoice->total_payments ?? 0);
             
             // Calculate total credit notes amount for this invoice
+            // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
             $totalCreditNotes = 0;
-            if ($invoice->artrans_id) {
-                $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+            // Try to find linked artrans record via invoice_orders pivot table
+            $linkedArtran = DB::table('invoice_orders')
+                ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
+                ->where('invoice_orders.order_id', $invoice->id)
+                ->where('artrans.TYPE', 'INV')
+                ->select('artrans.artrans_id')
+                ->first();
+            
+            if ($linkedArtran && $linkedArtran->artrans_id) {
+                $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
                     ->with('creditNote')
                     ->get();
                 foreach ($creditNotes as $cnLink) {
@@ -109,49 +118,49 @@ class CustomerInvoiceController extends Controller
             }
             
             // Adjust amounts by deducting credit notes (for INV type)
-            $originalNetBil = (float) $invoice->NET_BIL;
-            $originalGrandBil = (float) $invoice->GRAND_BIL;
-            $originalGrossBil = (float) $invoice->GROSS_BIL;
-            $originalTax1Bil = (float) $invoice->TAX1_BIL;
+            $originalNetAmount = (float) ($invoice->net_amount ?? 0);
+            $originalGrandAmount = (float) ($invoice->grand_amount ?? 0);
+            $originalGrossAmount = (float) ($invoice->gross_amount ?? 0);
+            $originalTax1 = (float) ($invoice->tax1 ?? 0);
             
-            $netBil = $originalNetBil;
-            $grandBil = $originalGrandBil;
-            $grossBil = $originalGrossBil;
-            $tax1Bil = $originalTax1Bil;
+            $netAmount = $originalNetAmount;
+            $grandAmount = $originalGrandAmount;
+            $grossAmount = $originalGrossAmount;
+            $tax1 = $originalTax1;
             
             if ($totalCreditNotes > 0) {
-                $netBil = max(0, $originalNetBil - $totalCreditNotes);
-                $grandBil = max(0, $originalGrandBil - $totalCreditNotes);
-                $grossBil = max(0, $originalGrossBil - $totalCreditNotes);
+                $netAmount = max(0, $originalNetAmount - $totalCreditNotes);
+                $grandAmount = max(0, $originalGrandAmount - $totalCreditNotes);
+                $grossAmount = max(0, $originalGrossAmount - $totalCreditNotes);
                 
                 // Proportionally adjust tax
-                if ($originalGrandBil > 0) {
-                    $creditNoteRatio = $totalCreditNotes / $originalGrandBil;
-                    $tax1Bil = max(0, $originalTax1Bil * (1 - $creditNoteRatio));
+                if ($originalGrandAmount > 0) {
+                    $creditNoteRatio = $totalCreditNotes / $originalGrandAmount;
+                    $tax1 = max(0, $originalTax1 * (1 - $creditNoteRatio));
                 }
             }
             
             // Outstanding balance = adjusted invoice amount - payments made
-            $outstandingBalance = max(0, $netBil - $totalPayments);
+            $outstandingBalance = max(0, $netAmount - $totalPayments);
 
             return [
                 'id' => $invoice->id,
-                'REFNO' => $invoice->REFNO,
-                'TYPE' => $invoice->TYPE,
-                'NAME' => $invoice->NAME,
-                'CUSTNO' => $invoice->CUSTNO,
-                'DATE' => $invoice->DATE ? $invoice->DATE->toDateString() : null,  // Return date-only format (YYYY-MM-DD)
-                'NET_BIL' => $netBil, // Adjusted amount (deducting CN)
-                'GRAND_BIL' => $grandBil, // Adjusted amount (deducting CN)
-                'GROSS_BILL' => $grossBil, // Adjusted amount (deducting CN)
-                'TAX1_BIL' => $tax1Bil, // Adjusted amount (proportionally)
-                'NOTE' => $invoice->NOTE,
+                'REFNO' => $invoice->reference_no,
+                'TYPE' => $invoice->type,
+                'NAME' => $invoice->customer_name ?? 'N/A',
+                'CUSTNO' => $invoice->customer_code,
+                'DATE' => $invoice->order_date ? $invoice->order_date->toDateString() : null,  // Return date-only format (YYYY-MM-DD)
+                'NET_BIL' => $netAmount, // Adjusted amount (deducting CN)
+                'GRAND_BIL' => $grandAmount, // Adjusted amount (deducting CN)
+                'GROSS_BILL' => $grossAmount, // Adjusted amount (deducting CN)
+                'TAX1_BIL' => $tax1, // Adjusted amount (proportionally)
+                'NOTE' => $invoice->remarks ?? '',
                 'status' => $invoice->status ?? 'pending',
                 'total_payments' => $totalPayments,
                 'outstanding_balance' => $outstandingBalance,
                 'total_credit_notes' => $totalCreditNotes, // Total amount of linked credit notes
                 // items excluded for cleaner JSON and better performance
-                // customer excluded as customer info is already in invoice (NAME, CUSTNO)
+                // customer excluded as customer info is already in invoice (customer_name, customer_code)
             ];
         });
 

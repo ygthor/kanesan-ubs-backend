@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Receipt;
 use App\Models\ReceiptInvoice;
 use App\Models\Customer;
-use App\Models\Artran;
+use App\Models\Order;
 use App\Models\ArtransCreditNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -169,8 +169,8 @@ class ReceiptController extends Controller
             if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
                 foreach ($invoiceRefNos as $invoiceRefNo) {
                     if (!empty($invoiceRefNo)) {
-                        // Get the invoice
-                        $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                        // Get the invoice from orders table
+                        $invoice = Order::where('reference_no', $invoiceRefNo)->where('type', 'INV')->first();
                         if (!$invoice) {
                             DB::rollBack();
                             return makeResponse(404, "Invoice not found: {$invoiceRefNo}", null);
@@ -184,9 +184,18 @@ class ReceiptController extends Controller
                             ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
                         // Calculate total credit notes for this invoice
+                        // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
                         $totalCreditNotes = 0;
-                        if ($invoice->artrans_id) {
-                            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                        // Try to find linked artrans record via invoice_orders pivot table
+                        $linkedArtran = DB::table('invoice_orders')
+                            ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
+                            ->where('invoice_orders.order_id', $invoice->id)
+                            ->where('artrans.TYPE', 'INV')
+                            ->select('artrans.artrans_id')
+                            ->first();
+                        
+                        if ($linkedArtran && $linkedArtran->artrans_id) {
+                            $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
                                 ->with('creditNote')
                                 ->get();
                             foreach ($creditNotes as $cnLink) {
@@ -196,8 +205,9 @@ class ReceiptController extends Controller
                             }
                         }
 
-                        // Calculate outstanding amount: NET_BIL minus payments and credit notes
-                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
+                        // Calculate outstanding amount: net_amount minus payments and credit notes
+                        $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
+                        $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
 
                         // Get the amount being applied in this receipt
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -226,8 +236,8 @@ class ReceiptController extends Controller
             if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
                 foreach ($invoiceRefNos as $invoiceRefNo) {
                     if (!empty($invoiceRefNo)) {
-                        // Get the invoice to calculate outstanding
-                        $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                        // Get the invoice from orders table
+                        $invoice = Order::where('reference_no', $invoiceRefNo)->where('type', 'INV')->first();
                         
                         // Calculate existing payments (excluding current receipt being created)
                         $existingPayments = DB::table('receipt_invoices')
@@ -237,9 +247,18 @@ class ReceiptController extends Controller
                             ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
                         // Calculate total credit notes for this invoice
+                        // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
                         $totalCreditNotes = 0;
-                        if ($invoice->artrans_id) {
-                            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                        // Try to find linked artrans record via invoice_orders pivot table
+                        $linkedArtran = DB::table('invoice_orders')
+                            ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
+                            ->where('invoice_orders.order_id', $invoice->id)
+                            ->where('artrans.TYPE', 'INV')
+                            ->select('artrans.artrans_id')
+                            ->first();
+                        
+                        if ($linkedArtran && $linkedArtran->artrans_id) {
+                            $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
                                 ->with('creditNote')
                                 ->get();
                             foreach ($creditNotes as $cnLink) {
@@ -249,8 +268,9 @@ class ReceiptController extends Controller
                             }
                         }
 
-                        // Calculate outstanding amount: NET_BIL minus payments and credit notes
-                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
+                        // Calculate outstanding amount: net_amount minus payments and credit notes
+                        $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
+                        $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
 
                         // Get amount from invoice_amounts map, or use outstanding amount as default
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -413,8 +433,8 @@ class ReceiptController extends Controller
             if ($request->has('invoice_refnos') && !empty($invoiceRefNos) && is_array($invoiceRefNos)) {
                 foreach ($invoiceRefNos as $invoiceRefNo) {
                     if (!empty($invoiceRefNo)) {
-                        // Get the invoice
-                        $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                        // Get the invoice from orders table
+                        $invoice = Order::where('reference_no', $invoiceRefNo)->where('type', 'INV')->first();
                         if (!$invoice) {
                             DB::rollBack();
                             return makeResponse(404, "Invoice not found: {$invoiceRefNo}", null);
@@ -429,9 +449,18 @@ class ReceiptController extends Controller
                             ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
                         // Calculate total credit notes for this invoice
+                        // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
                         $totalCreditNotes = 0;
-                        if ($invoice->artrans_id) {
-                            $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                        // Try to find linked artrans record via invoice_orders pivot table
+                        $linkedArtran = DB::table('invoice_orders')
+                            ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
+                            ->where('invoice_orders.order_id', $invoice->id)
+                            ->where('artrans.TYPE', 'INV')
+                            ->select('artrans.artrans_id')
+                            ->first();
+                        
+                        if ($linkedArtran && $linkedArtran->artrans_id) {
+                            $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
                                 ->with('creditNote')
                                 ->get();
                             foreach ($creditNotes as $cnLink) {
@@ -441,8 +470,9 @@ class ReceiptController extends Controller
                             }
                         }
 
-                        // Calculate outstanding amount: NET_BIL minus payments and credit notes
-                        $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
+                        // Calculate outstanding amount: net_amount minus payments and credit notes
+                        $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
+                        $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
 
                         // Get the amount being applied in this receipt
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -476,8 +506,8 @@ class ReceiptController extends Controller
                 if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
                     foreach ($invoiceRefNos as $invoiceRefNo) {
                         if (!empty($invoiceRefNo)) {
-                            // Get the invoice to calculate outstanding
-                            $invoice = Artran::where('REFNO', $invoiceRefNo)->where('TYPE', 'INV')->first();
+                            // Get the invoice from orders table
+                            $invoice = Order::where('reference_no', $invoiceRefNo)->where('type', 'INV')->first();
                             
                             // Calculate existing payments (excluding current receipt being updated)
                             $existingPayments = DB::table('receipt_invoices')
@@ -488,9 +518,18 @@ class ReceiptController extends Controller
                                 ->sum('receipt_invoices.amount_applied') ?? 0.00;
 
                             // Calculate total credit notes for this invoice
+                            // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
                             $totalCreditNotes = 0;
-                            if ($invoice->artrans_id) {
-                                $creditNotes = ArtransCreditNote::where('invoice_id', $invoice->artrans_id)
+                            // Try to find linked artrans record via invoice_orders pivot table
+                            $linkedArtran = DB::table('invoice_orders')
+                                ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
+                                ->where('invoice_orders.order_id', $invoice->id)
+                                ->where('artrans.TYPE', 'INV')
+                                ->select('artrans.artrans_id')
+                                ->first();
+                            
+                            if ($linkedArtran && $linkedArtran->artrans_id) {
+                                $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
                                     ->with('creditNote')
                                     ->get();
                                 foreach ($creditNotes as $cnLink) {
@@ -500,8 +539,9 @@ class ReceiptController extends Controller
                                 }
                             }
 
-                            // Calculate outstanding amount: NET_BIL minus payments and credit notes
-                            $outstandingAmount = (float) $invoice->NET_BIL - (float) $existingPayments - (float) $totalCreditNotes;
+                            // Calculate outstanding amount: net_amount minus payments and credit notes
+                            $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
+                            $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
 
                             // Get amount from invoice_amounts map, or use outstanding amount as default
                             $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
