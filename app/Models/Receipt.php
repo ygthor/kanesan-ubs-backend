@@ -23,7 +23,7 @@ class Receipt extends Model
         'receipt_date',
         'payment_type',
         'debt_amount',
-        'transaction_amount',
+        'trade_return_amount',
         'paid_amount',
         'cheque_no',
         'cheque_type',
@@ -41,7 +41,7 @@ class Receipt extends Model
         'receipt_date' => 'date',  // Use 'date' instead of 'datetime' to prevent timezone conversion
         'cheque_date' => 'date',   // Use 'date' for consistency
         'debt_amount' => 'decimal:2',
-        'transaction_amount' => 'decimal:2',
+        'trade_return_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
     ];
 

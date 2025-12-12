@@ -4,10 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Receipt;
-use App\Models\ReceiptInvoice;
 use App\Models\Customer;
 use App\Models\Order;
-use App\Models\ArtransCreditNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +20,7 @@ class ReceiptController extends Controller
     {
         $user = auth()->user();
         
-        $receiptsQuery = Receipt::with(['customer:id,customer_code,company_name', 'receiptInvoices']);
+        $receiptsQuery = Receipt::with(['customer:id,customer_code,company_name']);
         
         // Debug logging for filter parameters
         \Log::info('Receipt filter parameters:', [
@@ -67,10 +65,13 @@ class ReceiptController extends Controller
             \Log::info('Applied customer filter by code (explicit):', ['customer_code' => $request->customer_code]);
         }
         
-        // Filter by invoice_refno - only show receipts linked to this specific invoice
+        // Filter by invoice_refno (order_refno) - only show receipts linked to this specific invoice
         if ($request->has('invoice_refno') && $request->invoice_refno) {
-            $receiptsQuery->whereHas('receiptInvoices', function($query) use ($request) {
-                $query->where('invoice_refno', $request->invoice_refno);
+            $receiptsQuery->whereExists(function($query) use ($request) {
+                $query->select(DB::raw(1))
+                    ->from('receipt_orders')
+                    ->whereColumn('receipt_orders.receipt_id', 'receipts.id')
+                    ->where('receipt_orders.order_refno', $request->invoice_refno);
             });
             \Log::info('Applied invoice filter:', ['invoice_refno' => $request->invoice_refno]);
         }
@@ -109,7 +110,7 @@ class ReceiptController extends Controller
             'receipt_date' => 'required|date',
             'payment_type' => 'required|string|max:255',
             'debt_amount' => 'required|numeric|min:0',
-            'transaction_amount' => 'required|numeric|min:0',
+            'trade_return_amount' => 'required|numeric|min:0',
             'paid_amount' => 'required|numeric|min:0',
             'payment_reference_no' => 'nullable|string|max:255',
             'cheque_no' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
@@ -176,38 +177,16 @@ class ReceiptController extends Controller
                             return makeResponse(404, "Invoice not found: {$invoiceRefNo}", null);
                         }
 
-                        // Calculate existing payments for this invoice
-                        $existingPayments = DB::table('receipt_invoices')
-                            ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
-                            ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
+                        // Calculate existing payments for this invoice from receipt_orders table
+                        $existingPayments = DB::table('receipt_orders')
+                            ->join('receipts', 'receipt_orders.receipt_id', '=', 'receipts.id')
+                            ->where('receipt_orders.order_refno', $invoiceRefNo)
                             ->whereNull('receipts.deleted_at')
-                            ->sum('receipt_invoices.amount_applied') ?? 0.00;
+                            ->sum('receipt_orders.amount_applied') ?? 0.00;
 
-                        // Calculate total credit notes for this invoice
-                        // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
-                        $totalCreditNotes = 0;
-                        // Try to find linked artrans record via invoice_orders pivot table
-                        $linkedArtran = DB::table('invoice_orders')
-                            ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
-                            ->where('invoice_orders.order_id', $invoice->id)
-                            ->where('artrans.TYPE', 'INV')
-                            ->select('artrans.artrans_id')
-                            ->first();
-                        
-                        if ($linkedArtran && $linkedArtran->artrans_id) {
-                            $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
-                                ->with('creditNote')
-                                ->get();
-                            foreach ($creditNotes as $cnLink) {
-                                if ($cnLink->creditNote) {
-                                    $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
-                                }
-                            }
-                        }
-
-                        // Calculate outstanding amount: net_amount minus payments and credit notes
+                        // Calculate outstanding amount: net_amount minus payments
                         $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
-                        $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
+                        $outstandingAmount = $invoiceAmount - (float) $existingPayments;
 
                         // Get the amount being applied in this receipt
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -240,37 +219,15 @@ class ReceiptController extends Controller
                         $invoice = Order::where('reference_no', $invoiceRefNo)->where('type', 'INV')->first();
                         
                         // Calculate existing payments (excluding current receipt being created)
-                        $existingPayments = DB::table('receipt_invoices')
-                            ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
-                            ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
+                        $existingPayments = DB::table('receipt_orders')
+                            ->join('receipts', 'receipt_orders.receipt_id', '=', 'receipts.id')
+                            ->where('receipt_orders.order_refno', $invoiceRefNo)
                             ->whereNull('receipts.deleted_at')
-                            ->sum('receipt_invoices.amount_applied') ?? 0.00;
+                            ->sum('receipt_orders.amount_applied') ?? 0.00;
 
-                        // Calculate total credit notes for this invoice
-                        // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
-                        $totalCreditNotes = 0;
-                        // Try to find linked artrans record via invoice_orders pivot table
-                        $linkedArtran = DB::table('invoice_orders')
-                            ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
-                            ->where('invoice_orders.order_id', $invoice->id)
-                            ->where('artrans.TYPE', 'INV')
-                            ->select('artrans.artrans_id')
-                            ->first();
-                        
-                        if ($linkedArtran && $linkedArtran->artrans_id) {
-                            $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
-                                ->with('creditNote')
-                                ->get();
-                            foreach ($creditNotes as $cnLink) {
-                                if ($cnLink->creditNote) {
-                                    $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
-                                }
-                            }
-                        }
-
-                        // Calculate outstanding amount: net_amount minus payments and credit notes
+                        // Calculate outstanding amount: net_amount minus payments
                         $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
-                        $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
+                        $outstandingAmount = $invoiceAmount - (float) $existingPayments;
 
                         // Get amount from invoice_amounts map, or use outstanding amount as default
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -280,10 +237,13 @@ class ReceiptController extends Controller
                         // Ensure it doesn't exceed outstanding (safety check)
                         $amountApplied = min($amountApplied, $outstandingAmount);
 
-                        ReceiptInvoice::create([
+                        // Insert into receipt_orders table
+                        DB::table('receipt_orders')->insert([
                             'receipt_id' => $receipt->id,
-                            'invoice_refno' => $invoiceRefNo,
+                            'order_refno' => $invoiceRefNo,
                             'amount_applied' => $amountApplied,
+                            'created_at' => now(),
+                            'updated_at' => now(),
                         ]);
                     }
                 }
@@ -291,8 +251,11 @@ class ReceiptController extends Controller
 
             DB::commit();
 
-            // Load receipt with invoice links for response
-            $receipt->load('receiptInvoices');
+            // Load receipt with order links for response (manually attach receipt_orders data)
+            $receiptOrders = DB::table('receipt_orders')
+                ->where('receipt_id', $receipt->id)
+                ->get();
+            $receipt->setAttribute('receipt_orders', $receiptOrders);
 
             return makeResponse(201, 'Receipt created successfully.', $receipt);
         } catch (\Exception $e) {
@@ -316,7 +279,12 @@ class ReceiptController extends Controller
             return makeResponse(403, 'Access denied. You do not have permission to view this receipt.', null);
         }
         
-        $receipt->load(['customer', 'receiptInvoices']); // Load related customer and invoice links
+        $receipt->load(['customer']); // Load related customer
+        // Load receipt_orders manually
+        $receiptOrders = DB::table('receipt_orders')
+            ->where('receipt_id', $receipt->id)
+            ->get();
+        $receipt->setAttribute('receipt_orders', $receiptOrders);
         return makeResponse(200, 'Receipt retrieved successfully.', $receipt);
     }
 
@@ -331,7 +299,7 @@ class ReceiptController extends Controller
             'receipt_date' => 'sometimes|required|date',
             'payment_type' => 'sometimes|required|string|max:255',
             'debt_amount' => 'sometimes|required|numeric|min:0',
-            'transaction_amount' => 'sometimes|required|numeric|min:0',
+            'trade_return_amount' => 'sometimes|required|numeric|min:0',
             'paid_amount' => 'sometimes|required|numeric|min:0',
             'payment_reference_no' => 'nullable|string|max:255',
             'cheque_no' => 'nullable|required_if:payment_type,CHEQUE|string|max:255',
@@ -441,38 +409,16 @@ class ReceiptController extends Controller
                         }
 
                         // Calculate existing payments for this invoice (excluding current receipt being updated)
-                        $existingPayments = DB::table('receipt_invoices')
-                            ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
-                            ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
-                            ->where('receipt_invoices.receipt_id', '!=', $receipt->id) // Exclude current receipt
+                        $existingPayments = DB::table('receipt_orders')
+                            ->join('receipts', 'receipt_orders.receipt_id', '=', 'receipts.id')
+                            ->where('receipt_orders.order_refno', $invoiceRefNo)
+                            ->where('receipt_orders.receipt_id', '!=', $receipt->id) // Exclude current receipt
                             ->whereNull('receipts.deleted_at')
-                            ->sum('receipt_invoices.amount_applied') ?? 0.00;
+                            ->sum('receipt_orders.amount_applied') ?? 0.00;
 
-                        // Calculate total credit notes for this invoice
-                        // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
-                        $totalCreditNotes = 0;
-                        // Try to find linked artrans record via invoice_orders pivot table
-                        $linkedArtran = DB::table('invoice_orders')
-                            ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
-                            ->where('invoice_orders.order_id', $invoice->id)
-                            ->where('artrans.TYPE', 'INV')
-                            ->select('artrans.artrans_id')
-                            ->first();
-                        
-                        if ($linkedArtran && $linkedArtran->artrans_id) {
-                            $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
-                                ->with('creditNote')
-                                ->get();
-                            foreach ($creditNotes as $cnLink) {
-                                if ($cnLink->creditNote) {
-                                    $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
-                                }
-                            }
-                        }
-
-                        // Calculate outstanding amount: net_amount minus payments and credit notes
+                        // Calculate outstanding amount: net_amount minus payments
                         $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
-                        $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
+                        $outstandingAmount = $invoiceAmount - (float) $existingPayments;
 
                         // Get the amount being applied in this receipt
                         $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -500,7 +446,7 @@ class ReceiptController extends Controller
             // Update invoice links if provided
             if ($request->has('invoice_refnos')) {
                 // Delete existing invoice links
-                ReceiptInvoice::where('receipt_id', $receipt->id)->delete();
+                DB::table('receipt_orders')->where('receipt_id', $receipt->id)->delete();
 
                 // Create new invoice links if provided
                 if (!empty($invoiceRefNos) && is_array($invoiceRefNos)) {
@@ -510,38 +456,16 @@ class ReceiptController extends Controller
                             $invoice = Order::where('reference_no', $invoiceRefNo)->where('type', 'INV')->first();
                             
                             // Calculate existing payments (excluding current receipt being updated)
-                            $existingPayments = DB::table('receipt_invoices')
-                                ->join('receipts', 'receipt_invoices.receipt_id', '=', 'receipts.id')
-                                ->where('receipt_invoices.invoice_refno', $invoiceRefNo)
-                                ->where('receipt_invoices.receipt_id', '!=', $receipt->id) // Exclude current receipt
+                            $existingPayments = DB::table('receipt_orders')
+                                ->join('receipts', 'receipt_orders.receipt_id', '=', 'receipts.id')
+                                ->where('receipt_orders.order_refno', $invoiceRefNo)
+                                ->where('receipt_orders.receipt_id', '!=', $receipt->id) // Exclude current receipt
                                 ->whereNull('receipts.deleted_at')
-                                ->sum('receipt_invoices.amount_applied') ?? 0.00;
+                                ->sum('receipt_orders.amount_applied') ?? 0.00;
 
-                            // Calculate total credit notes for this invoice
-                            // Note: Credit notes may still be in artrans table, so we check via invoice_orders pivot
-                            $totalCreditNotes = 0;
-                            // Try to find linked artrans record via invoice_orders pivot table
-                            $linkedArtran = DB::table('invoice_orders')
-                                ->join('artrans', 'invoice_orders.invoice_refno', '=', 'artrans.REFNO')
-                                ->where('invoice_orders.order_id', $invoice->id)
-                                ->where('artrans.TYPE', 'INV')
-                                ->select('artrans.artrans_id')
-                                ->first();
-                            
-                            if ($linkedArtran && $linkedArtran->artrans_id) {
-                                $creditNotes = ArtransCreditNote::where('invoice_id', $linkedArtran->artrans_id)
-                                    ->with('creditNote')
-                                    ->get();
-                                foreach ($creditNotes as $cnLink) {
-                                    if ($cnLink->creditNote) {
-                                        $totalCreditNotes += (float) ($cnLink->creditNote->NET_BIL ?? 0);
-                                    }
-                                }
-                            }
-
-                            // Calculate outstanding amount: net_amount minus payments and credit notes
+                            // Calculate outstanding amount: net_amount minus payments
                             $invoiceAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
-                            $outstandingAmount = $invoiceAmount - (float) $existingPayments - (float) $totalCreditNotes;
+                            $outstandingAmount = $invoiceAmount - (float) $existingPayments;
 
                             // Get amount from invoice_amounts map, or use outstanding amount as default
                             $amountApplied = isset($invoiceAmounts[$invoiceRefNo]) 
@@ -551,10 +475,13 @@ class ReceiptController extends Controller
                             // Ensure it doesn't exceed outstanding (safety check)
                             $amountApplied = min($amountApplied, $outstandingAmount);
 
-                            ReceiptInvoice::create([
+                            // Insert into receipt_orders table
+                            DB::table('receipt_orders')->insert([
                                 'receipt_id' => $receipt->id,
-                                'invoice_refno' => $invoiceRefNo,
+                                'order_refno' => $invoiceRefNo,
                                 'amount_applied' => $amountApplied,
+                                'created_at' => now(),
+                                'updated_at' => now(),
                             ]);
                         }
                     }
@@ -563,8 +490,11 @@ class ReceiptController extends Controller
 
             DB::commit();
 
-            // Load receipt with invoice links for response
-            $receipt->load('receiptInvoices');
+            // Load receipt with order links for response (manually attach receipt_orders data)
+            $receiptOrders = DB::table('receipt_orders')
+                ->where('receipt_id', $receipt->id)
+                ->get();
+            $receipt->setAttribute('receipt_orders', $receiptOrders);
 
             return makeResponse(200, 'Receipt updated successfully.', $receipt);
         } catch (\Exception $e) {
