@@ -99,12 +99,34 @@ class DebtController extends Controller
 
                 // Calculate total payments made
                 $totalPayments = (float) ($invoice->total_payments ?? 0);
-                $netAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
-                $outstandingBalance = max(0, $netAmount - $totalPayments);
+                
+                // Calculate trade return amount from order items
+                $tradeReturnAmount = 0.0;
+                $salesAmount = 0.0;
+                
+                if ($invoice->relationLoaded('items')) {
+                    foreach ($invoice->items as $item) {
+                        $itemAmount = (float) ($item->amount ?? 0.0);
+                        if ($item->is_trade_return) {
+                            // Trade return items count as return amount (negative)
+                            $tradeReturnAmount += abs($itemAmount);
+                        } else {
+                            // Non-trade return items count as sales amount
+                            $salesAmount += $itemAmount;
+                        }
+                    }
+                } else {
+                    // Fallback: if items not loaded, use net/grand amount as sales amount
+                    // This shouldn't happen as we load items with ->with(['items', 'customer'])
+                    $salesAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
+                }
+                
+                // Outstanding balance = sales amount - return amount - payments
+                $outstandingBalance = max(0, $salesAmount - $tradeReturnAmount - $totalPayments);
                 
                 // Debug logging for partially paid invoices
                 if ($totalPayments > 0 && $outstandingBalance > 0) {
-                    \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, net_amount={$netAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
+                    \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
                 }
 
                 return [
@@ -113,9 +135,9 @@ class DebtController extends Controller
                     'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $firstInvoice->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
-                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments
-                    'salesAmount' => (float) ($invoice->grand_amount ?? $netAmount), // Grand total amount
-                    'returnAmount' => 0.0, // Returns not tracked in orders table
+                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments and returns
+                    'salesAmount' => $salesAmount, // Sales amount (excluding trade returns)
+                    'returnAmount' => $tradeReturnAmount, // Trade return amount
                     'creditAmount' => 0.0, // Credit notes not tracked here
                     'amountPaid' => $totalPayments, // Amount paid from receipts
                     'currency' => 'RM', // Default currency
