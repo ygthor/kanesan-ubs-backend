@@ -186,7 +186,19 @@ class OrderController extends Controller
                 'discount'
             ]);
 
-            $orderData['order_date'] = $orderData['order_date'] ?? now();
+            // Handle order_date: parse datetime if provided, otherwise use current time
+            if (isset($orderData['order_date'])) {
+                $dateStr = $orderData['order_date'];
+                // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+                    $orderData['order_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                } else {
+                    // If it's datetime format (yyyy-MM-dd HH:mm:ss), parse it directly
+                    $orderData['order_date'] = \Carbon\Carbon::parse($dateStr);
+                }
+            } else {
+                $orderData['order_date'] = now();
+            }
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
             // If called from /api/invoices route, default to 'INV', otherwise use request or default to INV
             if (request()->is('api/invoices*')) {
