@@ -253,6 +253,14 @@ class ReceiptController extends Controller
                 }
             }
 
+            // Update receipt.paid_amount as sum of amount_applied from receipt_orders
+            $totalPaidAmount = DB::table('receipt_orders')
+                ->where('receipt_id', $receipt->id)
+                ->sum('amount_applied') ?? 0.00;
+
+            // Update the receipt's paid_amount field
+            $receipt->update(['paid_amount' => $totalPaidAmount]);
+
             DB::commit();
 
             // Load receipt with order links for response (manually attach receipt_orders data)
@@ -458,6 +466,12 @@ class ReceiptController extends Controller
 
             // Update invoice links if provided
             if ($request->has('invoice_refnos')) {
+                // Get old invoice refnos before deleting (for updating paid_amount later)
+                $oldReceiptOrders = DB::table('receipt_orders')
+                    ->where('receipt_id', $receipt->id)
+                    ->pluck('order_refno')
+                    ->toArray();
+
                 // Delete existing invoice links
                 DB::table('receipt_orders')->where('receipt_id', $receipt->id)->delete();
 
@@ -500,6 +514,14 @@ class ReceiptController extends Controller
                     }
                 }
             }
+
+            // Update receipt.paid_amount as sum of amount_applied from receipt_orders
+            $totalPaidAmount = DB::table('receipt_orders')
+                ->where('receipt_id', $receipt->id)
+                ->sum('amount_applied') ?? 0.00;
+
+            // Update the receipt's paid_amount field
+            $receipt->update(['paid_amount' => $totalPaidAmount]);
 
             DB::commit();
 
