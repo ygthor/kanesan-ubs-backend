@@ -38,7 +38,7 @@ class Receipt extends Model
      * @var array
      */
     protected $casts = [
-        'receipt_date' => 'date',  // Use 'date' instead of 'datetime' to prevent timezone conversion
+        'receipt_date' => 'datetime',  // Use 'datetime' to store full datetime with time
         'cheque_date' => 'date',   // Use 'date' for consistency
         'debt_amount' => 'decimal:2',
         'trade_return_amount' => 'decimal:2',
@@ -59,15 +59,5 @@ class Receipt extends Model
     public function receiptInvoices()
     {
         return $this->hasMany(ReceiptInvoice::class);
-    }
-
-    /**
-     * Override date serialization to return date-only format (YYYY-MM-DD)
-     * This prevents timezone conversion issues when retrieving dates from the database
-     * and ensures dates are always returned as date-only strings in API responses
-     */
-    protected function serializeDate(\DateTimeInterface $date)
-    {
-        return $date->format('Y-m-d');
     }
 }

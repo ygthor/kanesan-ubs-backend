@@ -145,7 +145,7 @@ class ReceiptController extends Controller
             // Remove invoice fields from validated data as they're not part of receipts table
             unset($validated['invoice_refnos'], $validated['invoice_amounts']);
             
-            // Normalize receipt_date to start of day in app timezone
+            // Normalize receipt_date to datetime in app timezone
             // Since app timezone is set to 'Asia/Kuala_Lumpur' in config/app.php,
             // Carbon::parse() will use that timezone automatically
             // MySQL timestamp column will automatically convert to UTC when storing
@@ -154,6 +154,10 @@ class ReceiptController extends Controller
                 // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
                     $validated['receipt_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
+                } else {
+                    // If it's datetime format (yyyy-MM-dd HH:mm:ss), parse it directly
+                    // Carbon will handle the datetime string properly
+                    $validated['receipt_date'] = \Carbon\Carbon::parse($dateStr);
                 }
             }
             
@@ -358,7 +362,7 @@ class ReceiptController extends Controller
             // Remove customer fields if they were sent (they shouldn't be editable, but remove them to be safe)
             unset($validated['customer_id'], $validated['customer_name'], $validated['customer_code']);
             
-            // Normalize receipt_date to start of day in app timezone
+            // Normalize receipt_date to datetime in app timezone
             // Since app timezone is set to 'Asia/Kuala_Lumpur' in config/app.php,
             // Carbon::parse() will use that timezone automatically
             // MySQL timestamp column will automatically convert to UTC when storing
@@ -367,12 +371,21 @@ class ReceiptController extends Controller
                 // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
                     $newDate = \Carbon\Carbon::parse($dateStr)->startOfDay();
-                    // Only update if the date actually changed (compare date parts only, ignore time)
-                    // This prevents unnecessary timestamp updates that could change the sort order
-                    if ($receipt->receipt_date->format('Y-m-d') !== $newDate->format('Y-m-d')) {
+                    // Only update if the datetime actually changed
+                    if ($receipt->receipt_date->format('Y-m-d H:i:s') !== $newDate->format('Y-m-d H:i:s')) {
                         $validated['receipt_date'] = $newDate;
                     } else {
-                        // Date hasn't changed, don't update it to avoid unnecessary timestamp changes
+                        // Datetime hasn't changed, don't update it to avoid unnecessary timestamp changes
+                        unset($validated['receipt_date']);
+                    }
+                } else {
+                    // If it's datetime format (yyyy-MM-dd HH:mm:ss), parse it directly
+                    $newDate = \Carbon\Carbon::parse($dateStr);
+                    // Only update if the datetime actually changed
+                    if ($receipt->receipt_date->format('Y-m-d H:i:s') !== $newDate->format('Y-m-d H:i:s')) {
+                        $validated['receipt_date'] = $newDate;
+                    } else {
+                        // Datetime hasn't changed, don't update it
                         unset($validated['receipt_date']);
                     }
                 }
