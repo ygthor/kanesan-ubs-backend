@@ -122,7 +122,7 @@ class CustomerController extends Controller
         
         $validator = Validator::make($request->all(), [
             'customer_code' => 'sometimes|nullable|string|max:255|unique:customers,customer_code',
-            'customer_type' => 'required|string|max:255|in:Creditor,Cash Sales, Cash',
+            'customer_type' => 'required|string|max:255|in:Creditor,Cash Sales,Cash',
             'company_name' => 'required|string|max:255',
             'company_name2' => 'nullable|string|max:255',
             'address1' => 'required|string|max:255',
@@ -467,6 +467,8 @@ class CustomerController extends Controller
                 // Fallback for Cash Sales with invalid username
                 throw new \Exception('Cash Sales is only available for users S01, S02, or S03. Your username: ' . $username);
             }
+        } elseif ($customerType === 'Cash') {
+            $prefix = '3050';
         } else {
             throw new \Exception('Invalid customer type: ' . $customerType);
         }
