@@ -130,7 +130,6 @@ class OrderController extends Controller
      *
      * @bodyParam customer_id string required The ID of the customer. Example: "1"
      * @bodyParam customer_name string required The name of the customer. Example: "AHS3185 S02 KANESAN"
-     * @bodyParam order_date string nullable The date of the order (YYYY-MM-DD HH:MM:SS). Defaults to now. Example: "2025-05-20 10:00:00"
      * @bodyParam remarks string nullable Any remarks for the order.
      * @bodyParam items array required An array of order items.
      * @bodyParam items.*.product_id string required The ID of the product. Example: "p1" (or integer ID from your products table)
@@ -159,7 +158,6 @@ class OrderController extends Controller
         $validator = Validator::make($request->all(), [
             // 'type' => 'required',
             'customer_id' => 'required|exists:customers,id',
-            // 'order_date' => 'nullable|date',
             'remarks' => 'nullable|string',
             // 'items' => 'required|array|min:1',
             // 'items.*.product_id' => 'required|exists:product,id',
@@ -180,25 +178,13 @@ class OrderController extends Controller
             $orderData = $request->only([
                 'branch_id',
                 'customer_id',
-                'order_date',
                 'remarks',
                 'tax1_percentage',
                 'discount'
             ]);
 
-            // Handle order_date: parse datetime if provided, otherwise use current time
-            if (isset($orderData['order_date'])) {
-                $dateStr = $orderData['order_date'];
-                // If it's date-only format (yyyy-MM-dd), parse it in app timezone at start of day
-                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
-                    $orderData['order_date'] = \Carbon\Carbon::parse($dateStr)->startOfDay();
-                } else {
-                    // If it's datetime format (yyyy-MM-dd HH:mm:ss), parse it directly
-                    $orderData['order_date'] = \Carbon\Carbon::parse($dateStr);
-                }
-            } else {
-                $orderData['order_date'] = now();
-            }
+            // Always use current time for order_date
+            $orderData['order_date'] = now();
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
             // If called from /api/invoices route, default to 'INV', otherwise use request or default to INV
             if (request()->is('api/invoices*')) {
