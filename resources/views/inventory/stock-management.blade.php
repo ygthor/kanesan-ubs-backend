@@ -4,6 +4,82 @@
 
 @section('page-title', 'Stock Management')
 
+@push('styles')
+<style>
+    /* Compact styling for Stock Management page */
+    #stockSummaryTable,
+    #openingBalanceTable {
+        font-size: 0.85rem;
+    }
+    
+    #stockSummaryTable thead th,
+    #openingBalanceTable thead th {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.5rem;
+        font-weight: 600;
+    }
+    
+    #stockSummaryTable tbody td,
+    #openingBalanceTable tbody td {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    #stockSummaryTable .btn-sm,
+    #openingBalanceTable .btn-sm {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+    }
+    
+    /* Reduce card header sizes */
+    .card-header h5 {
+        font-size: 1rem;
+        margin-bottom: 0;
+    }
+    
+    /* Reduce form label sizes */
+    .form-group label {
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    /* Reduce alert font size */
+    .alert {
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+    }
+    
+    /* Reduce button sizes slightly */
+    .btn {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    /* Reduce table row height */
+    #stockSummaryTable tbody tr,
+    #openingBalanceTable tbody tr {
+        line-height: 1.4;
+    }
+    
+    /* Compact DataTables controls */
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_filter,
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate {
+        font-size: 0.8rem;
+    }
+    
+    /* Reduce modal font sizes */
+    #addOpeningBalanceModal .modal-body {
+        font-size: 0.9rem;
+    }
+    
+    #addOpeningBalanceModal .form-group label {
+        font-size: 0.875rem;
+    }
+</style>
+@endpush
+
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="/dashboard">Home</a></li>
     <li class="breadcrumb-item active">Stock Management</li>
@@ -17,7 +93,7 @@
         <div class="card-header bg-primary text-white">
             <h5 class="card-title mb-0"><i class="fas fa-user"></i> Select Agent</h5>
         </div>
-        <div class="card-body">
+        <div class="card-body p-1">
             <form method="GET" action="{{ route('inventory.stock-management') }}" id="agentSelectionForm">
                 <div class="row">
                     <div class="col-md-4">
@@ -60,7 +136,7 @@
             <div class="card-header bg-info text-white">
                 <h5 class="card-title mb-0"><i class="fas fa-search"></i> Search & Filter</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body p-1">
                 <form id="searchForm">
                     <input type="hidden" name="agent_no" value="{{ $selectedAgent }}">
                     <div class="row">
@@ -117,7 +193,7 @@
                     </li>
                 </ul>
             </div>
-            <div class="card-body">
+            <div class="card-body p-1">
                 <div class="tab-content" id="stockTabsContent">
                     <!-- Opening Balance Tab -->
                     <div class="tab-pane fade show active" id="opening-balance" role="tabpanel" aria-labelledby="opening-balance-tab">
@@ -321,8 +397,8 @@ $(document).ready(function() {
                     @if($selectedAgent && $inventory->count() > 0)
                     stockSummaryTable = $('#stockSummaryTable').DataTable({
                         responsive: true,
-                        pageLength: 25,
-                        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                        pageLength: 50,
+                        lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
                         order: [[0, 'asc']], // Sort by Item Code by default
                         columnDefs: [
                             {
@@ -468,8 +544,8 @@ $(document).ready(function() {
                         if ($('#transactions').hasClass('active') && items.length > 0) {
                             stockSummaryTable = $('#stockSummaryTable').DataTable({
                                 responsive: true,
-                                pageLength: 25,
-                                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                                pageLength: 50,
+                                lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
                                 order: [[0, 'asc']],
                                 columnDefs: [
                                     {
@@ -663,8 +739,8 @@ $(document).ready(function() {
     if ($('#transactions').hasClass('active')) {
         stockSummaryTable = $('#stockSummaryTable').DataTable({
             responsive: true,
-            pageLength: 25,
-            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            pageLength: 50,
+            lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
             order: [[0, 'asc']], // Sort by Item Code by default
             columnDefs: [
                 {
