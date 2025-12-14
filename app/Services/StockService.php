@@ -403,6 +403,49 @@ class StockService
             }
         }
 
+        // Also include item_transactions (opening balance, manual adjustments, etc.)
+        try {
+            $transactions = ItemTransaction::where('agent_no', $agentNo)
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $itemNo = $transaction->ITEMNO;
+                if (!$itemNo) {
+                    continue;
+                }
+
+                if (!isset($itemTotals[$itemNo])) {
+                    $itemTotals[$itemNo] = [
+                        'ITEMNO' => $itemNo,
+                        'stockIn' => 0,
+                        'stockOut' => 0,
+                        'returnGood' => 0,
+                        'returnBad' => 0,
+                    ];
+                }
+
+                $qty = (float) $transaction->quantity;
+
+                if ($transaction->transaction_type === 'in') {
+                    if ($transaction->return_type === 'good') {
+                        $itemTotals[$itemNo]['returnGood'] += $qty;
+                    } else {
+                        // Opening balance and other stock-in transactions
+                        $itemTotals[$itemNo]['stockIn'] += $qty;
+                    }
+                } elseif ($transaction->transaction_type === 'out') {
+                    if ($transaction->return_type === 'bad') {
+                        $itemTotals[$itemNo]['returnBad'] += $qty;
+                    } else {
+                        $itemTotals[$itemNo]['stockOut'] += $qty;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // If item_transactions table doesn't exist, just skip it
+            Log::debug("item_transactions table not available or error: " . $e->getMessage());
+        }
+
         // Calculate available for each item
         $summary = [];
         foreach ($itemTotals as $itemNo => $totals) {
