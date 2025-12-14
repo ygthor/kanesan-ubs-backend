@@ -122,7 +122,7 @@ class CustomerController extends Controller
         
         $validator = Validator::make($request->all(), [
             'customer_code' => 'sometimes|nullable|string|max:255|unique:customers,customer_code',
-            'customer_type' => 'required|string|max:255|in:Creditor,Cash Sales',
+            'customer_type' => 'required|string|max:255|in:Creditor,Cash Sales, Cash',
             'company_name' => 'required|string|max:255',
             'company_name2' => 'nullable|string|max:255',
             'address1' => 'required|string|max:255',
