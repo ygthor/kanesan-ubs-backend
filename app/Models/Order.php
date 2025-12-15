@@ -101,21 +101,18 @@ class Order extends BaseModel
     public function calculate()
     {
         $regularTotal = 0;
-        $tradeReturnTotal = 0;
         $itemDiscounts = 0;
 
+        // Trade returns are now in separate CN orders, so INV orders only have regular items
+        // CN orders contain all trade return items
         foreach ($this->items as $item) {
             $lineAmount = $item->amount;
-            if ($item->is_trade_return) {
-                $tradeReturnTotal += $lineAmount;
-            } else {
-                $regularTotal += $lineAmount;
-            }
+            $regularTotal += $lineAmount; // All items in this order are regular items
             $itemDiscounts += ($item->discount ?? 0);
         }
 
-        // Gross amount excludes trade returns
-        $this->gross_amount = $regularTotal - $tradeReturnTotal;
+        // Gross amount is sum of all items (no trade returns to exclude)
+        $this->gross_amount = $regularTotal;
 
         // Total discounts = item-level + order-level
         $orderDiscount = $this->discount ?? 0;
