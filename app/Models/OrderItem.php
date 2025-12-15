@@ -88,6 +88,24 @@ class OrderItem extends BaseModel
      */
     protected $hidden = ['item'];
 
+    /**
+     * Product name fallback: prefer stored product_name, otherwise use icitem NAME.
+     */
+    public function getProductNameAttribute($value)
+    {
+        if (!empty($value)) {
+            return $value;
+        }
+
+        // When item relation is eager loaded (with items.item), use its NAME
+        if ($this->relationLoaded('item') && $this->item) {
+            return $this->item->NAME ?? null;
+        }
+
+        // Lazy load as a final fallback (should rarely happen because item is eager loaded)
+        return $this->item ? $this->item->NAME : null;
+    }
+
     public function calculate()
     {
         if ($this->is_free_good) {
