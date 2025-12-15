@@ -633,14 +633,29 @@ class OrderController extends Controller
         $formattedInvoices = $invoices->map(function ($invoice) {
             $totalPayments = (float) ($invoice->total_payments ?? 0);
             
-            // Get invoice amounts (no credit note adjustments needed - artrans is no longer used)
+            // Get invoice amounts
             $netAmount = (float) ($invoice->net_amount ?? 0);
             $grandAmount = (float) ($invoice->grand_amount ?? 0);
             $grossAmount = (float) ($invoice->gross_amount ?? 0);
             $tax1 = (float) ($invoice->tax1 ?? 0);
             
-            // Outstanding balance = invoice amount - payments made
-            $outstandingBalance = max(0, $netAmount - $totalPayments);
+            // Deduct linked credit notes (CN orders) from invoice amounts
+            $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
+                ->where('type', 'CN')
+                ->get();
+            
+            $cnTotal = 0.0;
+            foreach ($linkedCNs as $cnOrder) {
+                $cnTotal += (float) ($cnOrder->net_amount ?? 0);
+            }
+            
+            // Adjust amounts by deducting linked CN totals
+            $adjustedNetAmount = max(0, $netAmount - $cnTotal);
+            $adjustedGrandAmount = max(0, $grandAmount - $cnTotal);
+            $adjustedGrossAmount = max(0, $grossAmount - $cnTotal);
+            
+            // Outstanding balance = adjusted invoice amount - payments made
+            $outstandingBalance = max(0, $adjustedNetAmount - $totalPayments);
 
             return [
                 'id' => $invoice->id,
@@ -650,9 +665,9 @@ class OrderController extends Controller
                 'customer_name' => $invoice->customer_name ?? 'N/A',
                 'customer_code' => $invoice->customer_code,
                 'order_date' => $invoice->order_date ? $invoice->order_date->toDateString() : null,
-                'net_amount' => $netAmount,
-                'grand_amount' => $grandAmount,
-                'gross_amount' => $grossAmount,
+                'net_amount' => $adjustedNetAmount, // Adjusted amount (deducted linked CN totals)
+                'grand_amount' => $adjustedGrandAmount, // Adjusted amount (deducted linked CN totals)
+                'gross_amount' => $adjustedGrossAmount, // Adjusted amount (deducted linked CN totals)
                 'tax1' => $tax1,
                 'remarks' => $invoice->remarks ?? '',
                 'status' => $invoice->status ?? 'pending',
