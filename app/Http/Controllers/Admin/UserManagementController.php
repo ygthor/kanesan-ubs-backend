@@ -18,25 +18,7 @@ class UserManagementController extends Controller
     {
         $users = User::with(['roles'])->paginate(15);
 
-        // Load branches for listed users
-        $userIds = $users->pluck('id');
-        $branchesByUser = DB::table('users_branches as ub')
-            ->join('branches as b', 'b.branch_id', '=', 'ub.branch_id')
-            ->whereIn('ub.user_id', $userIds)
-            ->select('ub.user_id', 'b.branch_id', 'b.branch_name')
-            ->orderBy('b.branch_name')
-            ->get()
-            ->groupBy('user_id');
-
-        // Map user_id => list of branches [ ['id'=>..., 'name'=>...], ...]
-        $userBranchesMap = [];
-        foreach ($branchesByUser as $uid => $rows) {
-            $userBranchesMap[$uid] = $rows->map(function($r){
-                return ['id' => $r->branch_id, 'name' => $r->branch_name];
-            })->values()->all();
-        }
-
-        return view('admin.users.index', compact('users', 'userBranchesMap'));
+        return view('admin.users.index', compact('users'));
     }
 
     /**
@@ -45,11 +27,7 @@ class UserManagementController extends Controller
     public function create()
     {
         $roles = Role::all();
-        $branches = DB::table('branches')
-            ->select('branch_id', 'branch_name')
-            ->orderBy('branch_name')
-            ->get();
-        return view('admin.users.create', compact('roles', 'branches'));
+        return view('admin.users.create', compact('roles'));
     }
 
     /**
@@ -64,8 +42,6 @@ class UserManagementController extends Controller
             'password' => 'required|string|min:8|confirmed',
             'roles' => 'array',
             'roles.*' => 'exists:roles,role_id',
-            'branches' => 'array',
-            'branches.*' => 'exists:branches,branch_id'
         ]);
 
         $user = User::create([
@@ -73,20 +49,11 @@ class UserManagementController extends Controller
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'email_verified_at' => now(), // Auto-verify since only admins create users
         ]);
 
         if ($request->has('roles')) {
             $user->roles()->attach($request->roles);
-        }
-
-        if ($request->has('branches')) {
-            $branches = $request->branches; // e.g. ['Ipoh', 'Penang'] ids
-            foreach ($branches as $branchId) {
-                DB::table('users_branches')->insert([
-                    'user_id' => $user->id,
-                    'branch_id' => $branchId,
-                ]);
-            }
         }
 
         return redirect()->route('admin.users.index')
@@ -109,15 +76,7 @@ class UserManagementController extends Controller
     {
         $roles = Role::all();
         $user->load(['roles']);
-        $branches = DB::table('branches')
-            ->select('branch_id', 'branch_name')
-            ->orderBy('branch_name')
-            ->get();
-        $userBranchIds = DB::table('users_branches')
-            ->where('user_id', $user->id)
-            ->pluck('branch_id')
-            ->toArray();
-        return view('admin.users.edit', compact('user', 'roles', 'branches', 'userBranchIds'));
+        return view('admin.users.edit', compact('user', 'roles'));
     }
 
     /**
@@ -132,8 +91,6 @@ class UserManagementController extends Controller
             'password' => 'nullable|string|min:8|confirmed',
             'roles' => 'array',
             'roles.*' => 'exists:roles,role_id',
-            'branches' => 'array',
-            'branches.*' => 'exists:branches,branch_id'
         ]);
 
         $user->update([
@@ -163,19 +120,6 @@ class UserManagementController extends Controller
                 DB::table('user_roles')->insert($insertData);
             }
             
-        }
-
-        if ($request->has('branches')) {
-            $branches = $request->branches; // array of branch_ids (varchar)
-            // Delete existing branches
-            DB::table('users_branches')->where('user_id', $user->id)->delete();
-            // Insert new branches
-            foreach ($branches as $branchId) {
-                DB::table('users_branches')->insert([
-                    'user_id' => $user->id,
-                    'branch_id' => $branchId,
-                ]);
-            }
         }
 
         return redirect()->route('admin.users.index')

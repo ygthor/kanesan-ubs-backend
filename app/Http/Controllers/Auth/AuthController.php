@@ -25,6 +25,7 @@ class AuthController extends Controller
 
     /**
      * Handle user login.
+     * Only allows admin/KBS users to login to the web system.
      */
     public function login(Request $request)
     {
@@ -42,6 +43,23 @@ class AuthController extends Controller
         ];
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            $user = Auth::user();
+            
+            // Check if user is KBS or has admin role
+            $isKBS = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
+            $isAdmin = $user->hasRole('admin');
+            
+            if (!$isKBS && !$isAdmin) {
+                // User is not admin/KBS, logout and deny access
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                
+                throw ValidationException::withMessages([
+                    'login' => ['Access denied. Only administrators can login to the web system.'],
+                ]);
+            }
+            
             $request->session()->regenerate();
 
             return redirect()->intended('/dashboard');

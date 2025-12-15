@@ -91,23 +91,6 @@
         @enderror
         <div class="help-text">Hold Ctrl/Cmd to select multiple roles</div>
     </div>
-
-    <div class="form-group">
-        <label for="branches" class="form-label">Branches</label>
-        <select class="form-select @error('branches') is-invalid @enderror" 
-                id="branches" name="branches[]" multiple>
-            @foreach(($branches ?? []) as $branch)
-                <option value="{{ $branch->branch_id }}" 
-                        {{ in_array($branch->branch_id, old('branches', [])) ? 'selected' : '' }}>
-                    {{ $branch->branch_name }} ({{ $branch->branch_id }})
-                </option>
-            @endforeach
-        </select>
-        @error('branches')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Hold Ctrl/Cmd to select multiple branches</div>
-    </div>
 @endsection
 
 @section('form-sidebar')
@@ -124,17 +107,6 @@
                     <option value="suspended" {{ old('status') == 'suspended' ? 'selected' : '' }}>Suspended</option>
                 </select>
                 <div class="help-text">Set user account status</div>
-            </div>
-
-            <div class="form-group">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="email_verified" 
-                           name="email_verified" value="1" {{ old('email_verified') ? 'checked' : '' }}>
-                    <label class="form-check-label" for="email_verified">
-                        Email Verified
-                    </label>
-                </div>
-                <div class="help-text">Mark email as verified</div>
             </div>
 
             <div class="form-group">
@@ -202,14 +174,6 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#roles').select2({
         theme: 'bootstrap-5',
         placeholder: 'Select roles...',
-        allowClear: true,
-        width: '100%',
-        closeOnSelect: false
-    });
-
-    $('#branches').select2({
-        theme: 'bootstrap-5',
-        placeholder: 'Select branches...',
         allowClear: true,
         width: '100%',
         closeOnSelect: false

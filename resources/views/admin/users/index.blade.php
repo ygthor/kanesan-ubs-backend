@@ -49,7 +49,6 @@
                     <th>Name</th>
                     <th>Username</th>
                     <th>Email</th>
-                    <th>Branches</th>
                     <th>Roles</th>
                     <th>Status</th>
                     <th>Created</th>
@@ -65,16 +64,6 @@
                         </td>
                         <td>{{ $user->username }}</td>
                         <td>{{ $user->email }}</td>
-                        <td>
-                            @php($branches = ($userBranchesMap[$user->id] ?? []))
-                            @if(count($branches) > 0)
-                                @foreach($branches as $branch)
-                                    <span class="badge badge-info">{{ $branch['name'] }}</span>
-                                @endforeach
-                            @else
-                                <span class="text-muted">—</span>
-                            @endif
-                        </td>
                         <td>
                             @foreach($user->roles as $role)
                                 <span class="badge badge-primary">{{ $role->name }}</span>
@@ -116,7 +105,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted">
+                        <td colspan="7" class="text-center text-muted">
                             <i class="fas fa-users fa-3x mb-3"></i>
                             <p>No users found.</p>
                             <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
