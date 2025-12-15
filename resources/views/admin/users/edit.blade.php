@@ -110,7 +110,6 @@
                 <select class="form-select @error('status') is-invalid @enderror" 
                         id="status" name="status">
                     <option value="active" {{ old('status', $user->status ?? 'active') == 'active' ? 'selected' : '' }}>Active</option>
-                    <option value="inactive" {{ old('status', $user->status ?? 'active') == 'inactive' ? 'selected' : '' }}>Inactive</option>
                     <option value="suspended" {{ old('status', $user->status ?? 'active') == 'suspended' ? 'selected' : '' }}>Suspended</option>
                 </select>
                 @error('status')

@@ -51,12 +51,8 @@ class AuthController extends Controller
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
                 
-                $statusMessage = $user->status === 'suspended' 
-                    ? 'Your account has been suspended. Please contact your administrator.' 
-                    : 'Your account is inactive. Please contact your administrator.';
-                
                 throw ValidationException::withMessages([
-                    'login' => [$statusMessage],
+                    'login' => ['Your account has been suspended. Please contact your administrator.'],
                 ]);
             }
             

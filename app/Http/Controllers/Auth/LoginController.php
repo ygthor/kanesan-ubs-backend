@@ -29,6 +29,13 @@ class LoginController extends Controller
             ]);
         }
 
+        // Check if user is active
+        if ($user->status !== 'active') {
+            throw ValidationException::withMessages([
+                'email' => ['Your account has been suspended. Please contact your administrator.'],
+            ]);
+        }
+
         // Create token
         $token = $user->createToken('auth-token')->plainTextToken;
 

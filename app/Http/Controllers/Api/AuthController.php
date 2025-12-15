@@ -43,6 +43,11 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
+        // Check if user is active
+        if ($user->status !== 'active') {
+            return response()->json(['message' => 'Your account has been suspended. Please contact your administrator.'], 403);
+        }
+
         // Revoke all old tokens for the user to ensure only one active token (optional, but good practice)
         // $user->tokens()->delete();
 

@@ -40,7 +40,7 @@ class UserManagementController extends Controller
             'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'status' => 'nullable|string|in:active,inactive,suspended',
+            'status' => 'nullable|string|in:active,suspended',
             'roles' => 'array',
             'roles.*' => 'exists:roles,role_id',
         ]);
@@ -91,7 +91,7 @@ class UserManagementController extends Controller
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:8|confirmed',
-            'status' => 'nullable|string|in:active,inactive,suspended',
+            'status' => 'nullable|string|in:active,suspended',
             'roles' => 'array',
             'roles.*' => 'exists:roles,role_id',
         ]);

@@ -103,7 +103,6 @@
                 <label for="status" class="form-label">Status</label>
                 <select class="form-select" id="status" name="status">
                     <option value="active" {{ old('status') == 'active' ? 'selected' : '' }}>Active</option>
-                    <option value="inactive" {{ old('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
                     <option value="suspended" {{ old('status') == 'suspended' ? 'selected' : '' }}>Suspended</option>
                 </select>
                 <div class="help-text">Set user account status</div>
