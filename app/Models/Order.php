@@ -95,19 +95,37 @@ class Order extends BaseModel
     /**
      * Calculate the total amount for the order based on its items.
      * This can be called before saving or used as an accessor.
+     * Gross amount excludes trade returns (regular items only).
      */
     public function calculate()
     {
-        $total = 0;
-        foreach ($this->items as $item) {
-            // This assumes OrderItem model has an 'amount' accessor or calculates it
-            $total += $item->amount; // You'll define getSubtotal() in OrderItem
-        }
-        $this->gross_amount = $total;
+        $regularTotal = 0;
+        $tradeReturnTotal = 0;
+        $itemDiscounts = 0;
 
-        $this->tax1 = $total * $this->tax1_percentage / 100;
+        foreach ($this->items as $item) {
+            $lineAmount = $item->amount;
+            if ($item->is_trade_return) {
+                $tradeReturnTotal += $lineAmount;
+            } else {
+                $regularTotal += $lineAmount;
+            }
+            $itemDiscounts += ($item->discount ?? 0);
+        }
+
+        // Gross amount excludes trade returns
+        $this->gross_amount = $regularTotal - $tradeReturnTotal;
+
+        // Total discounts = item-level + order-level
+        $orderDiscount = $this->discount ?? 0;
+        $totalDiscount = $itemDiscounts + $orderDiscount;
+
+        // Tax on gross
+        $this->tax1 = $this->gross_amount * $this->tax1_percentage / 100;
         $this->grand_amount = $this->gross_amount + $this->tax1;
-        $this->net_amount = $this->grand_amount - $this->discount;
+
+        // Net to pay mirrors _calculateNetToPay: gross - discounts
+        $this->net_amount = $this->grand_amount - $totalDiscount;
         $this->updated_at = timestamp();
     }
 

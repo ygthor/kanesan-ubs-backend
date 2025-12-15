@@ -170,6 +170,7 @@ class CustomerController extends Controller
                 'company_name2',
                 'address1',
                 'address2',
+                'address3',
                 'postcode',
                 'state',
                 'territory',

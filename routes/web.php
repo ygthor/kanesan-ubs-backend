@@ -181,3 +181,32 @@ Route::get('/test/add-stock-all', function(){
         ], 500);
     }
 });
+
+
+
+Route::get('/maintenance/recalc-orders', function () {
+    $recalculated = 0;
+    $errors = [];
+
+    // Stream through to avoid loading everything at once
+    \App\Models\Order::with('items')->chunk(200, function ($orders) use (&$recalculated, &$errors) {
+        foreach ($orders as $order) {
+            try {
+                $order->calculate(); // uses updated gross/net logic (trade returns minus, discounts included)
+                $order->save();
+                $recalculated++;
+            } catch (\Throwable $e) {
+                $errors[] = [
+                    'reference_no' => $order->reference_no,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+    });
+
+    return response()->json([
+        'status' => 'ok',
+        'recalculated' => $recalculated,
+        'errors' => $errors,
+    ]);
+});
