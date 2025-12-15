@@ -153,6 +153,8 @@ class ReportController extends Controller
         $fromDate = $request->input('from_date', date('Y-m-01'));
         $toDate   = $request->input('to_date', date('Y-m-d'));
         $customerId = $request->input('customer_id');
+        $agentNo = $request->input('agent_no');
+        $customerSearch = $request->input('customer_search'); // Search by customer code or name
         $type = $request->input('type', 'Sales Order'); // Sales Order, Invoice, etc.
 
         // Ensure dates include full time range for datetime fields
@@ -166,11 +168,23 @@ class ReportController extends Controller
 
         $query = DB::table('orders')
             ->where('type', 'INV')
-            ->select('id', 'reference_no', 'order_date', 'net_amount', 'customer_code', 'customer_name', 'customer_id', 'status')
+            ->select('id', 'reference_no', 'order_date', 'net_amount', 'customer_code', 'customer_name', 'customer_id', 'status', 'agent_no')
             ->whereBetween('order_date', [$fromDate, $toDate]);
 
         if ($customerId) {
             $query->where('customer_id', $customerId);
+        }
+
+        if ($agentNo) {
+            $query->where('agent_no', $agentNo);
+        }
+
+        if ($customerSearch) {
+            $query->where(function($q) use ($customerSearch) {
+                $q->where('customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('name', 'like', "%{$customerSearch}%")
+                  ->orWhere('company_name', 'like', "%{$customerSearch}%");
+            });
         }
 
         $orders = $query->orderBy('order_date')->get();
