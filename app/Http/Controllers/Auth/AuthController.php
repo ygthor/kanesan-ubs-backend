@@ -45,6 +45,21 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $user = Auth::user();
             
+            // Check if user is active
+            if ($user->status !== 'active') {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                
+                $statusMessage = $user->status === 'suspended' 
+                    ? 'Your account has been suspended. Please contact your administrator.' 
+                    : 'Your account is inactive. Please contact your administrator.';
+                
+                throw ValidationException::withMessages([
+                    'login' => [$statusMessage],
+                ]);
+            }
+            
             // Check if user is KBS or has admin role
             $isKBS = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
             $isAdmin = $user->hasRole('admin');

@@ -70,8 +70,12 @@
                             @endforeach
                         </td>
                         <td>
-                            @if($user->email_verified_at)
-                                <span class="badge badge-success">Verified</span>
+                            @if($user->status === 'active')
+                                <span class="badge badge-success">Active</span>
+                            @elseif($user->status === 'inactive')
+                                <span class="badge badge-secondary">Inactive</span>
+                            @elseif($user->status === 'suspended')
+                                <span class="badge badge-danger">Suspended</span>
                             @else
                                 <span class="badge badge-warning">Pending</span>
                             @endif

@@ -106,16 +106,36 @@
         </div>
         <div class="card-body">
             <div class="form-group">
-                <label class="form-label">Current Status</label>
-                <div class="alert alert-info">
-                    <strong>Created:</strong> {{ $user->created_at?->format('M d, Y H:i') ?? 'N/A' }}<br>
-                    <strong>Last Updated:</strong> {{ $user->updated_at?->format('M d, Y H:i') ?? 'N/A' }}<br>
-                    <strong>Email Verified:</strong> 
-                    @if($user->email_verified_at)
-                        <span class="badge badge-success">Yes</span>
-                    @else
-                        <span class="badge badge-warning">No</span>
-                    @endif
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select @error('status') is-invalid @enderror" 
+                        id="status" name="status">
+                    <option value="active" {{ old('status', $user->status ?? 'active') == 'active' ? 'selected' : '' }}>Active</option>
+                    <option value="inactive" {{ old('status', $user->status ?? 'active') == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                    <option value="suspended" {{ old('status', $user->status ?? 'active') == 'suspended' ? 'selected' : '' }}>Suspended</option>
+                </select>
+                @error('status')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+                <div class="help-text">Set user account status</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Account Information</label>
+                <div class="bg-light p-3 rounded border">
+                    <div class="mb-2">
+                        <strong>Created:</strong> {{ $user->created_at?->format('M d, Y H:i') ?? 'N/A' }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Last Updated:</strong> {{ $user->updated_at?->format('M d, Y H:i') ?? 'N/A' }}
+                    </div>
+                    <div>
+                        <strong>Last Login:</strong> 
+                        @if($user->last_login_at)
+                            {{ $user->last_login_at->format('M d, Y H:i') }}
+                        @else
+                            <span class="text-muted">Never</span>
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -131,6 +151,7 @@
             </div>
         </div>
     </div>
+
 
     <div class="card">
         <div class="card-header">
