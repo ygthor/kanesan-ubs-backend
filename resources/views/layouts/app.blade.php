@@ -99,6 +99,12 @@
                                 <p>Territory Management</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a href="/admin/announcements" class="nav-link {{ request()->is('admin/announcements*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-bullhorn"></i>
+                                <p>Announcement Management</p>
+                            </a>
+                        </li>
                         @endif
                         
                     </ul>

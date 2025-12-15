@@ -54,6 +54,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     
     // Territory Management
     Route::resource('territories', \App\Http\Controllers\Admin\TerritoryManagementController::class);
+
+    // Announcement Management
+    Route::resource('announcements', \App\Http\Controllers\Admin\AnnouncementController::class);
 });
 
 

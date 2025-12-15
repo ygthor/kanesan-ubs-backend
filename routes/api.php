@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\OrderItemController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoiceItemController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\AnnouncementController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -148,6 +149,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/branches', [UserController::class, 'branches'])->name('user.branches');
 
     Route::get('/dashboard', [DashboardController::class, 'getSummary'])->name('dashboard.summary');
+    Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
 
     // CRUD API routes for the Customer model
     // Custom customer routes must be defined BEFORE apiResource to avoid route conflicts
