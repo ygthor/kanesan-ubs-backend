@@ -453,7 +453,7 @@ class CustomerController extends Controller
         
         if ($customerType === 'Creditor') {
             $prefix = '3000';
-        } elseif ($customerType === 'Cash Sales') {
+        } elseif ($customerType === 'Cash Sales' || $customerType === 'Cash') {
             $usernameUpper = strtoupper($username);
             if ($usernameUpper === 'S01') {
                 $prefix = '3010';
@@ -463,12 +463,20 @@ class CustomerController extends Controller
                 $prefix = '3030';
             } elseif ($usernameUpper === 'S04') {
                 $prefix = '3040';
+            } elseif ($usernameUpper === 'S05') {
+                $prefix = '3050';
+            } elseif ($usernameUpper === 'S06') {
+                $prefix = '3060';
+            } elseif ($usernameUpper === 'S07') {
+                $prefix = '3070';
+            } elseif ($usernameUpper === 'S08') {
+                $prefix = '3080';
+            } elseif ($usernameUpper === 'S09') {
+                $prefix = '3090';
             } else {
                 // Fallback for Cash Sales with invalid username
-                throw new \Exception('Cash Sales is only available for users S01, S02, or S03. Your username: ' . $username);
+                throw new \Exception('Cash Sales is only available for users S01, S02, S03, S04, S05, S06, S07, S08, or S09. Your username: ' . $username);
             }
-        } elseif ($customerType === 'Cash') {
-            $prefix = '3050';
         } else {
             throw new \Exception('Invalid customer type: ' . $customerType);
         }
