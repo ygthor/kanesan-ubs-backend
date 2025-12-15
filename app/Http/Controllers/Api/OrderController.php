@@ -455,7 +455,23 @@ class OrderController extends Controller
         
         // Load items and customer relationship for detailed view
         $order->load('items.item', 'customer');
-        return makeResponse(200, 'Order retrieved successfully.', $order);
+        
+        // If this is an INV order, also load linked CN orders
+        $linkedCreditNotes = [];
+        if ($order->type === 'INV') {
+            $linkedCreditNotes = Order::where('credit_invoice_no', $order->reference_no)
+                ->where('type', 'CN')
+                ->with('items.item', 'customer')
+                ->get()
+                ->toArray();
+        }
+        
+        $responseData = $order->toArray();
+        if (!empty($linkedCreditNotes)) {
+            $responseData['linked_credit_notes'] = $linkedCreditNotes;
+        }
+        
+        return makeResponse(200, 'Order retrieved successfully.', $responseData);
     }
 
 

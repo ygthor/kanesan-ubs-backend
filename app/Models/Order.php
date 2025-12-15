@@ -133,7 +133,15 @@ class Order extends BaseModel
     public function getReferenceNo()
     {
         $type = $this->type;
-        $prefix = $type === 'INV' ? 'I' : $type;
+        // Use CNI prefix for CN type to prevent conflicts with existing numbering
+        if ($type === 'INV') {
+            $prefix = 'I';
+        } elseif ($type === 'CN') {
+            $prefix = 'CNI';
+        } else {
+            $prefix = $type;
+        }
+        
         $count = Order::where('type', "=", $type)->count();
 
         $found = false;
