@@ -12,7 +12,7 @@ class StockService
 {
     /**
      * Calculate stock totals for an agent and item from orders AND item_transactions
-     * 
+     *
      * @param string $agentNo Agent number (user name)
      * @param string $itemNo Item number (ITEMNO from icitem)
      * @return array ['stockIn', 'stockOut', 'returnGood', 'returnBad', 'available']
@@ -80,7 +80,7 @@ class StockService
                     if ($transaction->return_type === 'bad') {
                         $returnBad += $qty;
                     } else {
-                        $stockOut += $qty;
+                        //$stockOut += $qty;
                     }
                 }
             }
@@ -104,7 +104,7 @@ class StockService
 
     /**
      * Get available stock for an agent and item
-     * 
+     *
      * @param string $agentNo Agent number
      * @param string $itemNo Item number
      * @return float Available stock quantity
@@ -117,7 +117,7 @@ class StockService
 
     /**
      * Check if sufficient stock is available
-     * 
+     *
      * @param string $agentNo Agent number
      * @param string $itemNo Item number
      * @param float $requiredQty Required quantity
@@ -131,7 +131,7 @@ class StockService
 
     /**
      * Validate stock availability for order items
-     * 
+     *
      * @param string $agentNo Agent number
      * @param array $items Array of order items with product_no and quantity
      * @return array ['valid' => bool, 'errors' => array]
@@ -173,7 +173,7 @@ class StockService
 
     /**
      * Record stock movement for an order
-     * 
+     *
      * @param Order $order The order
      * @return void
      */
@@ -260,7 +260,7 @@ class StockService
 
     /**
      * Record a stock movement transaction
-     * 
+     *
      * @param string $agentNo Agent number
      * @param string $itemNo Item number
      * @param float $quantity Quantity (positive for in, negative for out)
@@ -283,7 +283,7 @@ class StockService
     ): ItemTransaction {
         // Ensure quantity is positive (we use transaction_type to indicate direction)
         $quantity = abs($quantity);
-        
+
         // Get stock before
         $stockBefore = $this->getAvailableStock($agentNo, $itemNo);
 
@@ -315,7 +315,7 @@ class StockService
 
     /**
      * Reverse stock movements for an order (used when updating or deleting)
-     * 
+     *
      * @param Order $order The order
      * @return void
      */
@@ -329,7 +329,7 @@ class StockService
         foreach ($transactions as $transaction) {
             // Reverse the transaction by creating opposite movement
             $reverseType = $transaction->transaction_type === 'in' ? 'out' : 'in';
-            
+
             // Use the recordMovement method to ensure consistency
             $this->recordMovement(
                 $transaction->agent_no,
@@ -346,7 +346,7 @@ class StockService
 
     /**
      * Get stock summary for all items for an agent
-     * 
+     *
      * @param string $agentNo Agent number
      * @return array Array of items with stock totals
      */
