@@ -120,7 +120,7 @@
                 Showing {{ $territories->firstItem() }} to {{ $territories->lastItem() }} of {{ $territories->total() }} results
             </div>
             <div>
-                {{ $territories->links() }}
+                {{ $territories->links('pagination::bootstrap-5') }}
             </div>
         </div>
     @endif

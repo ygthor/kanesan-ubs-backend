@@ -19,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Use Bootstrap pagination views instead of Tailwind
+        \Illuminate\Pagination\Paginator::useBootstrap();
     }
 }

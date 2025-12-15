@@ -54,6 +54,22 @@
             margin-top: 1rem;
         }
         
+        .pagination-wrapper .pagination {
+            margin-bottom: 0;
+        }
+        
+        .pagination-wrapper .pagination .page-link {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        
+        .pagination-wrapper .pagination .page-link i,
+        .pagination-wrapper .pagination .page-link svg {
+            font-size: 0.875rem;
+            width: 0.875rem;
+            height: 0.875rem;
+        }
+        
         .per-page-selector {
             width: auto;
             display: inline-block;
