@@ -262,11 +262,21 @@ class OrderController extends Controller
                 }
             }
             
+            // Helper function to get product by product_id or product_no
+            $getProduct = function($itemData) {
+                if (isset($itemData['product_id'])) {
+                    return Product::find($itemData['product_id']);
+                } elseif (isset($itemData['product_no'])) {
+                    return Product::where('product_no', $itemData['product_no'])->first();
+                }
+                return null;
+            };
+            
             // Prepare items for stock validation (for INV orders - regular items only)
             if ($orderData['type'] === 'INV' && !empty($regularItems)) {
                 $itemsForValidation = [];
                 foreach ($regularItems as $itemData) {
-                    $product = Product::find($itemData['product_id'] ?? null);
+                    $product = $getProduct($itemData);
                     if (!$product) {
                         continue;
                     }
@@ -294,10 +304,11 @@ class OrderController extends Controller
 
             // Add regular items to INV order
             foreach ($regularItems as $itemData) {
-                $product = Product::find($itemData['product_id']);
+                $product = $getProduct($itemData);
                 if (!$product) {
                     DB::rollBack();
-                    return makeResponse(400, 'Invalid product ID: ' . $itemData['product_id']);
+                    $productId = $itemData['product_id'] ?? $itemData['product_no'] ?? 'unknown';
+                    return makeResponse(400, 'Invalid product ID or product_no: ' . $productId);
                 }
 
                 $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);
@@ -354,10 +365,11 @@ class OrderController extends Controller
                 $cnItemCount = 1;
 
                 foreach ($tradeReturnItems as $itemData) {
-                    $product = Product::find($itemData['product_id']);
+                    $product = $getProduct($itemData);
                     if (!$product) {
                         DB::rollBack();
-                        return makeResponse(400, 'Invalid product ID: ' . $itemData['product_id']);
+                        $productId = $itemData['product_id'] ?? $itemData['product_no'] ?? 'unknown';
+                        return makeResponse(400, 'Invalid product ID or product_no: ' . $productId);
                     }
 
                     $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);

@@ -113,12 +113,54 @@ class OrderItemController extends Controller
                 return makeResponse(404, 'Order not found.');
             }
 
-            $item_count = DB::table('order_items')->where('order_id', $order_id)->count() + 1;
+            // Check if this is a trade return item
+            $isTradeReturn = $orderData['is_trade_return'] ?? false;
+            
+            // Determine which order to add the item to
+            $targetOrder = $order;
+            
+            if ($isTradeReturn && $order->type === 'INV') {
+                // Trade return item should go to CN order, not INV order
+                // Check if CN order already exists for this invoice
+                $cnOrder = Order::where('credit_invoice_no', $order->reference_no)
+                    ->where('type', 'CN')
+                    ->first();
+                
+                if (!$cnOrder) {
+                    // Create CN order for this invoice
+                    $cnOrderData = [
+                        'type' => 'CN',
+                        'branch_id' => $order->branch_id,
+                        'customer_id' => $order->customer_id,
+                        'customer_code' => $order->customer_code,
+                        'customer_name' => $order->customer_name,
+                        'order_date' => $order->order_date,
+                        'status' => $order->status,
+                        'agent_no' => $order->agent_no,
+                        'tax1_percentage' => $order->tax1_percentage ?? 0,
+                        'discount' => 0, // CN orders typically don't have order-level discount
+                        'remarks' => $order->remarks,
+                        'credit_invoice_no' => $order->reference_no, // Link to INV order
+                        'created_by' => $order->created_by,
+                    ];
+                    
+                    $cnOrder = Order::create($cnOrderData);
+                    $cnOrder->reference_no = $cnOrder->getReferenceNo();
+                    $cnOrder->save();
+                }
+                
+                $targetOrder = $cnOrder;
+            }
 
-            $orderData['reference_no'] = $order->reference_no;
-            $orderData['order_id'] = $order_id;
+            // Calculate item count for the target order
+            $item_count = DB::table('order_items')
+                ->where('order_id', $targetOrder->id)
+                ->count() + 1;
+
+            $orderData['reference_no'] = $targetOrder->reference_no;
+            $orderData['order_id'] = $targetOrder->id;
             $orderData['item_count'] = $item_count;
-            $orderData['unique_key'] = $order->reference_no . '|' . $item_count;
+            $orderData['unique_key'] = $targetOrder->reference_no . '|' . $item_count;
 
 
             $orderData['order_date'] = $orderData['order_date'] ?? now();
@@ -145,9 +187,14 @@ class OrderItemController extends Controller
             if ($orderData['amount'] < 0) {
                 $orderData['amount'] = 0;
             }
+            
+            // Trade return items in CN orders should not be marked as is_trade_return
+            // They're already in a CN order, so the flag is not needed
+            if ($targetOrder->type === 'CN') {
+                $orderData['is_trade_return'] = false;
+            }
+            
             $orderData['updated_at'] = timestamp();
-
-
 
             if ($id) {
                 // ✅ Update mode
@@ -159,8 +206,15 @@ class OrderItemController extends Controller
                 $orderItem->save();
             }
 
-            $order->calculate();
-            $order->save();
+            // Recalculate the target order (INV or CN)
+            $targetOrder->calculate();
+            $targetOrder->save();
+            
+            // Also recalculate the original INV order if item was added to CN
+            if ($targetOrder->id !== $order->id) {
+                $order->calculate();
+                $order->save();
+            }
 
             DB::commit();
 
