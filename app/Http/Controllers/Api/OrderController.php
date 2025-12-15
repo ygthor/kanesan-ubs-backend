@@ -115,8 +115,38 @@ class OrderController extends Controller
         // Paginate the results
         if($paginate){
             $orders = $orders->paginate($request->input('per_page', 15));
+            $ordersCollection = $orders->getCollection();
         }else{
             $orders = $orders->get();
+            $ordersCollection = $orders;
+        }
+
+        // Calculate adjusted net amount for INV orders (deduct linked CN totals)
+        foreach ($ordersCollection as $order) {
+            if ($order->type === 'INV') {
+                // Get linked CN orders for this invoice
+                $linkedCNs = Order::where('credit_invoice_no', $order->reference_no)
+                    ->where('type', 'CN')
+                    ->with('items')
+                    ->get();
+                
+                // Calculate total from linked CN orders
+                $cnTotal = 0.0;
+                foreach ($linkedCNs as $cnOrder) {
+                    foreach ($cnOrder->items as $item) {
+                        $cnTotal += ($item->quantity * $item->unit_price);
+                    }
+                }
+                
+                // Calculate adjusted net amount (original net_amount - CN total)
+                $adjustedNetAmount = ($order->net_amount ?? 0.0) - $cnTotal;
+                
+                // Add adjusted_net_amount to the order data
+                $order->setAttribute('adjusted_net_amount', $adjustedNetAmount);
+            } else {
+                // For non-INV orders, adjusted_net_amount is the same as net_amount
+                $order->setAttribute('adjusted_net_amount', $order->net_amount ?? 0.0);
+            }
         }
 
         return makeResponse(200, 'Orders retrieved successfully.', $orders);
