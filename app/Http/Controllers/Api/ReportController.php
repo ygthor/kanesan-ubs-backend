@@ -27,6 +27,15 @@ class ReportController extends Controller
             return response()->json(['error' => 'from_date and to_date are required'], 422);
         }
         
+        // Ensure dates include full time range for datetime fields
+        // fromDate should start at 00:00:00, toDate should end at 23:59:59
+        if (strlen($fromDate) == 10) {
+            $fromDate .= ' 00:00:00';
+        }
+        if (strlen($toDate) == 10) {
+            $toDate .= ' 23:59:59';
+        }
+        
         // Get user's allowed customer codes (unless KBS user)
         $allowedCustomerCodes = null;
         if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
@@ -145,6 +154,15 @@ class ReportController extends Controller
         $toDate   = $request->input('to_date', date('Y-m-d'));
         $customerId = $request->input('customer_id');
         $type = $request->input('type', 'Sales Order'); // Sales Order, Invoice, etc.
+
+        // Ensure dates include full time range for datetime fields
+        // fromDate should start at 00:00:00, toDate should end at 23:59:59
+        if (strlen($fromDate) == 10) {
+            $fromDate .= ' 00:00:00';
+        }
+        if (strlen($toDate) == 10) {
+            $toDate .= ' 23:59:59';
+        }
 
         $query = DB::table('orders')
             ->where('type', 'SO')
