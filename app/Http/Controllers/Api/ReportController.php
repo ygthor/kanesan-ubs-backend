@@ -165,7 +165,7 @@ class ReportController extends Controller
         }
 
         $query = DB::table('orders')
-            ->where('type', 'SO')
+            ->where('type', 'INV')
             ->select('id', 'reference_no', 'order_date', 'net_amount', 'customer_code', 'customer_name', 'customer_id', 'status')
             ->whereBetween('order_date', [$fromDate, $toDate]);
 
