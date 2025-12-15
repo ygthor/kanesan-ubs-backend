@@ -181,13 +181,40 @@ class ReportController extends Controller
         if ($customerSearch) {
             $query->where(function($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('name', 'like', "%{$customerSearch}%")
-                  ->orWhere('company_name', 'like', "%{$customerSearch}%");
+                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
 
         $orders = $query->orderBy('order_date')->get();
 
-        return response()->json($orders);
+        // Calculate adjusted net amount for each invoice (deduct linked CN totals)
+        $adjustedOrders = $orders->map(function ($order) {
+            // Get linked CN orders for this invoice
+            $linkedCNs = DB::table('orders')
+                ->where('credit_invoice_no', $order->reference_no)
+                ->where('type', 'CN')
+                ->get();
+            
+            // Calculate total from linked CN orders
+            $cnTotal = $linkedCNs->sum('net_amount');
+            
+            // Calculate adjusted net amount (original net_amount - CN total)
+            $adjustedNetAmount = max(0, ($order->net_amount ?? 0) - $cnTotal);
+            
+            // Return order with adjusted amount
+            return (object) [
+                'id' => $order->id,
+                'reference_no' => $order->reference_no,
+                'order_date' => $order->order_date,
+                'net_amount' => $adjustedNetAmount, // Adjusted amount (deducted linked CN totals)
+                'customer_code' => $order->customer_code,
+                'customer_name' => $order->customer_name,
+                'customer_id' => $order->customer_id,
+                'status' => $order->status,
+                'agent_no' => $order->agent_no,
+            ];
+        });
+
+        return response()->json($adjustedOrders->values());
     }
 }
