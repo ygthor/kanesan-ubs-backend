@@ -42,7 +42,7 @@ class OrderController extends Controller
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
             $orders->whereHas('customer', function ($query) use ($user) {
-                $query->whereIn('agent_no', $user->name);
+                $query->whereIn('agent_no', [$user->name]);
             });
         }
 

@@ -56,7 +56,7 @@ class DebtController extends Controller
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
-            $invoicesQuery->whereIn('customers.agent_no', $user->name);
+            $invoicesQuery->whereIn('customers.agent_no', [$user->name]);
         }
 
         // Apply search filter if provided

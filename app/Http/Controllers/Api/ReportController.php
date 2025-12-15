@@ -43,7 +43,7 @@ class ReportController extends Controller
         $allowedCustomerCodes = null;
         if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
             $allowedCustomerIds = DB::table('customers')
-                ->whereIn('agent_no', $user->name)
+                ->whereIn('agent_no', [$user->name])
                 ->pluck('id')
                 ->toArray();
             if (empty($allowedCustomerIds)) {
@@ -58,7 +58,7 @@ class ReportController extends Controller
                 ]);
             }
             $allowedCustomerCodes = DB::table('customers')
-                ->whereIn('agent_no', $user->name)
+                ->whereIn('agent_no', [$user->name])
                 ->pluck('customer_code')
                 ->toArray();
         }

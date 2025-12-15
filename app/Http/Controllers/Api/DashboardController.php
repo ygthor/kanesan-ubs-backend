@@ -38,7 +38,7 @@ class DashboardController extends Controller
         // Build customer filter query (only filter by user's allowed customers if applicable)
         $customerFilterQuery = Customer::query();
         if ($user && !hasFullAccess()) {
-            $customerFilterQuery->whereIn('agent_no', $user->name);
+            $customerFilterQuery->whereIn('agent_no', [$user->name]);
         }
         $filteredCustomerIds = $customerFilterQuery->pluck('id')->filter()->toArray();
         $filteredCustomerCodes = $customerFilterQuery->pluck('customer_code')

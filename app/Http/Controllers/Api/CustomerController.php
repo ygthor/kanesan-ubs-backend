@@ -41,7 +41,7 @@ class CustomerController extends Controller
             // No filtering needed for KBS user
         } else {
             // Filter by agent_no matching user's name
-            $query->whereIn('agent_no', $user->name);
+            $query->whereIn('agent_no', [$user->name]);
         }
         
         // Handle sorting
@@ -90,7 +90,7 @@ class CustomerController extends Controller
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
-            $query->whereIn('agent_no', $user->name);
+            $query->whereIn('agent_no', [$user->name]);
         }
         
         $states = $query->pluck('state')->toArray();
