@@ -13,6 +13,7 @@ class Order extends BaseModel
     protected $fillable = [
         'type',    // type
         'reference_no',
+        'credit_invoice_no',  // Reference number of the invoice (INV) this credit note (CN) is linked to
         'branch_id',
         'customer_id',    // Foreign key to customers table
         'customer_code',  // Denormalized customer name for quick display

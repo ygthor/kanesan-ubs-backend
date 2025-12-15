@@ -250,10 +250,22 @@ class OrderController extends Controller
 
             $items = $request->input('items') ?? [];
             
-            // Prepare items for stock validation (for INV orders)
-            if ($orderData['type'] === 'INV') {
+            // Separate regular items from trade return items
+            $regularItems = [];
+            $tradeReturnItems = [];
+            
+            foreach ($items as $itemData) {
+                if ($itemData['is_trade_return'] ?? false) {
+                    $tradeReturnItems[] = $itemData;
+                } else {
+                    $regularItems[] = $itemData;
+                }
+            }
+            
+            // Prepare items for stock validation (for INV orders - regular items only)
+            if ($orderData['type'] === 'INV' && !empty($regularItems)) {
                 $itemsForValidation = [];
-                foreach ($items as $itemData) {
+                foreach ($regularItems as $itemData) {
                     $product = Product::find($itemData['product_id'] ?? null);
                     if (!$product) {
                         continue;
@@ -261,22 +273,27 @@ class OrderController extends Controller
                     $itemsForValidation[] = [
                         'product_no' => $product->product_no,
                         'quantity' => $itemData['quantity'] ?? 0,
-                        'is_trade_return' => $itemData['is_trade_return'] ?? false,
+                        'is_trade_return' => false,
                     ];
                 }
                 
                 // Validate stock availability for INV orders
-                $stockValidation = $stockService->validateOrderStock($agentNo, $itemsForValidation);
-                if (!$stockValidation['valid']) {
-                    DB::rollBack();
-                    return makeResponse(422, 'Stock validation failed.', ['errors' => $stockValidation['errors']]);
+                if (!empty($itemsForValidation)) {
+                    $stockValidation = $stockService->validateOrderStock($agentNo, $itemsForValidation);
+                    if (!$stockValidation['valid']) {
+                        DB::rollBack();
+                        return makeResponse(422, 'Stock validation failed.', ['errors' => $stockValidation['errors']]);
+                    }
                 }
             }
 
-            $reference_no = $order->reference_no;
-            $item_count = 1;
+            // Create INV order with regular items only (even if no regular items, create empty INV for CN to link to)
+            $invOrder = $order;
+            $invReferenceNo = $order->reference_no;
+            $invItemCount = 1;
 
-            foreach ($items as $itemData) {
+            // Add regular items to INV order
+            foreach ($regularItems as $itemData) {
                 $product = Product::find($itemData['product_id']);
                 if (!$product) {
                     DB::rollBack();
@@ -286,13 +303,13 @@ class OrderController extends Controller
                 $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);
                 $quantity = $itemData['quantity'];
                 $discount = $itemData['discount'] ?? 0;
-                $unique_key = "$reference_no|$item_count";
+                $unique_key = "$invReferenceNo|$invItemCount";
 
-                $orderItem = $order->items()->create([
+                $orderItem = $invOrder->items()->create([
                     'unique_key' => $unique_key,
-                    'reference_no' => $reference_no,
-                    'order_id' => $order->id, // Keep for backward compatibility, but relationship uses reference_no
-                    'item_count' => $item_count,
+                    'reference_no' => $invReferenceNo,
+                    'order_id' => $invOrder->id,
+                    'item_count' => $invItemCount,
                     'product_id' => $product->id,
                     'product_no' => $product->product_no,
                     'product_name' => $product->product_name,
@@ -302,27 +319,96 @@ class OrderController extends Controller
                     'unit_price' => $unitPrice,
                     'discount' => $discount,
                     'is_free_good' => $itemData['is_free_good'] ?? false,
-                    'is_trade_return' => $itemData['is_trade_return'] ?? false,
-                    'trade_return_is_good' => $itemData['is_trade_return'] ? ($itemData['trade_return_is_good'] ?? true) : true,
+                    'is_trade_return' => false, // Regular items are not trade returns
+                    'trade_return_is_good' => true,
                     'item_group' => $itemData['item_group'] ?? null,
                 ]);
                 $orderItem->calculate();
                 $orderItem->save();
-                $item_count++;
+                $invItemCount++;
             }
 
-            $order->calculate();
-            $order->save();
+            $invOrder->calculate();
+            $invOrder->save();
 
-            // Reload order with items for stock movement recording
-            $order->load('items');
+            // Reload INV order with items for stock movement recording
+            $invOrder->load('items');
 
-            // Record stock movements for the order
-            $stockService->recordOrderMovements($order);
+            // Record stock movements for the INV order
+            $stockService->recordOrderMovements($invOrder);
+
+            // Create CN order for trade return items if any exist
+            $cnOrder = null;
+            if (!empty($tradeReturnItems)) {
+                // Create CN order
+                $cnOrderData = $orderData;
+                $cnOrderData['type'] = 'CN';
+                $cnOrderData['credit_invoice_no'] = $invOrder->reference_no; // Link to INV order
+                
+                $cnOrder = Order::create($cnOrderData);
+                $cnOrder->reference_no = $cnOrder->getReferenceNo();
+                $cnOrder->save();
+
+                // Add trade return items to CN order
+                $cnReferenceNo = $cnOrder->reference_no;
+                $cnItemCount = 1;
+
+                foreach ($tradeReturnItems as $itemData) {
+                    $product = Product::find($itemData['product_id']);
+                    if (!$product) {
+                        DB::rollBack();
+                        return makeResponse(400, 'Invalid product ID: ' . $itemData['product_id']);
+                    }
+
+                    $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);
+                    $quantity = $itemData['quantity'];
+                    $discount = $itemData['discount'] ?? 0;
+                    $unique_key = "$cnReferenceNo|$cnItemCount";
+
+                    $orderItem = $cnOrder->items()->create([
+                        'unique_key' => $unique_key,
+                        'reference_no' => $cnReferenceNo,
+                        'order_id' => $cnOrder->id,
+                        'item_count' => $cnItemCount,
+                        'product_id' => $product->id,
+                        'product_no' => $product->product_no,
+                        'product_name' => $product->product_name,
+                        'description' => $product->product_name,
+                        'sku_code' => $product->sku_code,
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'discount' => $discount,
+                        'is_free_good' => $itemData['is_free_good'] ?? false,
+                        'is_trade_return' => false, // CN items are not marked as trade return anymore
+                        'trade_return_is_good' => $itemData['trade_return_is_good'] ?? true,
+                        'item_group' => $itemData['item_group'] ?? null,
+                    ]);
+                    $orderItem->calculate();
+                    $orderItem->save();
+                    $cnItemCount++;
+                }
+
+                $cnOrder->calculate();
+                $cnOrder->save();
+
+                // Reload CN order with items for stock movement recording
+                $cnOrder->load('items');
+
+                // Record stock movements for the CN order
+                $stockService->recordOrderMovements($cnOrder);
+            }
 
             DB::commit();
 
-            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $order->load('items.item', 'customer'));
+            // Return INV order with items, and include CN order if created
+            $invOrder->load('items.item', 'customer');
+            
+            // Prepare response data - return INV order as main data
+            // Frontend can fetch CN order separately using credit_invoice_no if needed
+            // For now, just return the INV order (CN order is already created and linked)
+            $responseData = $invOrder;
+
+            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $responseData);
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Order save failed: ' . $e->getMessage());
