@@ -16,22 +16,8 @@ class FilterCustomerData
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $user = Auth::user();
-        
-        // If user is KBS admin, allow access to all customer data
-        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
-            return $next($request);
-        }
-        
-        // If user is authenticated, filter customer data based on assignments
-        if ($user) {
-            // Get customer IDs assigned to this user
-            $assignedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
-            
-            // Store the customer IDs in the request for controllers to use
-            $request->merge(['allowed_customer_ids' => $assignedCustomerIds]);
-        }
-        
+        // Filtering is now handled directly in controllers using agent_no
+        // This middleware is kept for backward compatibility but does nothing
         return $next($request);
     }
 }

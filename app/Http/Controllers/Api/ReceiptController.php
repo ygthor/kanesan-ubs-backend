@@ -34,12 +34,9 @@ class ReceiptController extends Controller
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
-            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
-            if (empty($allowedCustomerIds)) {
-                // User has no assigned customers, return empty result
-                return makeResponse(200, 'No receipts accessible.', ['data' => [], 'total' => 0]);
-            }
-            $receiptsQuery->whereIn('customer_id', $allowedCustomerIds);
+            $receiptsQuery->whereHas('customer', function ($query) use ($user) {
+                $query->whereIn('agent_no', $user->name);
+            });
         }
         
         // Apply customer filter if provided (supports both customer_id and customer_code)

@@ -56,12 +56,7 @@ class DebtController extends Controller
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
-            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
-            if (empty($allowedCustomerIds)) {
-                // User has no assigned customers, return empty result
-                return makeResponse(200, 'No debts accessible.', []);
-            }
-            $invoicesQuery->whereIn('customers.id', $allowedCustomerIds);
+            $invoicesQuery->whereIn('customers.agent_no', $user->name);
         }
 
         // Apply search filter if provided

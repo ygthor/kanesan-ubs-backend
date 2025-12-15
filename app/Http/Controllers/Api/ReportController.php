@@ -36,11 +36,17 @@ class ReportController extends Controller
             $toDate .= ' 23:59:59';
         }
         
-        // Get user's allowed customer codes (unless KBS user)
+        // Use Orders table - artrans is deprecated
+
+        // Get user's allowed customer IDs for filtering (unless KBS user)
+        $allowedCustomerIds = null;
         $allowedCustomerCodes = null;
         if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
-            $allowedCustomerCodes = $user->customers()->pluck('customers.customer_code')->toArray();
-            if (empty($allowedCustomerCodes)) {
+            $allowedCustomerIds = DB::table('customers')
+                ->whereIn('agent_no', $user->name)
+                ->pluck('id')
+                ->toArray();
+            if (empty($allowedCustomerIds)) {
                 // User has no assigned customers, return empty report
                 return makeResponse(200, 'Business summary retrieved successfully.', [
                     'totalSales' => 0,
@@ -51,16 +57,9 @@ class ReportController extends Controller
                     'receiptsIssued' => 0,
                 ]);
             }
-        }
-
-        // Use Orders table - artrans is deprecated
-
-        // Get user's allowed customer IDs for filtering
-        $allowedCustomerIds = null;
-        if ($allowedCustomerCodes) {
-            $allowedCustomerIds = DB::table('customers')
-                ->whereIn('customer_code', $allowedCustomerCodes)
-                ->pluck('id')
+            $allowedCustomerCodes = DB::table('customers')
+                ->whereIn('agent_no', $user->name)
+                ->pluck('customer_code')
                 ->toArray();
         }
 

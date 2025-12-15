@@ -41,12 +41,9 @@ class OrderController extends Controller
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
-            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
-            if (empty($allowedCustomerIds)) {
-                // User has no assigned customers, return empty result
-                return makeResponse(200, 'No orders accessible.', $paginate ? ['data' => [], 'total' => 0] : []);
-            }
-            $orders->whereIn('customer_id', $allowedCustomerIds);
+            $orders->whereHas('customer', function ($query) use ($user) {
+                $query->whereIn('agent_no', $user->name);
+            });
         }
 
         // --- Apply filters conditionally ---
@@ -325,7 +322,7 @@ class OrderController extends Controller
 
             DB::commit();
 
-            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $order->load('items.item'));
+            return makeResponse($id ? 200 : 201, $id ? 'Order updated successfully.' : 'Order created successfully.', $order->load('items.item', 'customer'));
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Order save failed: ' . $e->getMessage());

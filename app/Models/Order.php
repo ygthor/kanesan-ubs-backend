@@ -44,11 +44,11 @@ class Order extends BaseModel
 
     /**
      * Get the customer that owns the order.
+     * Uses customer_code to join with customers table.
      */
     public function customer()
     {
-        // Assuming your Customer model is App\Models\Customer
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(Customer::class, 'customer_code', 'customer_code');
     }
 
     /**

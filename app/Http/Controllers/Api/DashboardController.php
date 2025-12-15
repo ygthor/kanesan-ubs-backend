@@ -35,31 +35,10 @@ class DashboardController extends Controller
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
 
-        // Get user's allowed customer IDs (unless KBS user or admin role)
-        $allowedCustomerIds = null;
-        if ($user && !hasFullAccess()) {
-            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
-            if (empty($allowedCustomerIds)) {
-                // User has no assigned customers, return empty dashboard
-                return makeResponse(200, 'Dashboard summary retrieved successfully.', [
-                    'totalRevenue' => 'RM 0.00',
-                    'nettSales' => 'RM 0.00',
-                    'totalCollections' => 'RM 0.00',
-                    'outstandingDebt' => 'RM 0.00',
-                    'inventoryValue' => 'RM 0.00',
-                    'invoicesIssued' => '0',
-                    'receiptsIssued' => '0',
-                    'newCustomers' => '0',
-                    'pendingOrders' => '0',
-                    'lowStockItems' => '0',
-                ]);
-            }
-        }
-        
         // Build customer filter query (only filter by user's allowed customers if applicable)
         $customerFilterQuery = Customer::query();
-        if ($allowedCustomerIds) {
-            $customerFilterQuery->whereIn('id', $allowedCustomerIds);
+        if ($user && !hasFullAccess()) {
+            $customerFilterQuery->whereIn('agent_no', $user->name);
         }
         $filteredCustomerIds = $customerFilterQuery->pluck('id')->filter()->toArray();
         $filteredCustomerCodes = $customerFilterQuery->pluck('customer_code')
@@ -71,7 +50,7 @@ class DashboardController extends Controller
         
         // Debug: Log the filtered customer codes to help diagnose
         \Log::info('Dashboard Query', [
-            'allowedCustomerIds' => $allowedCustomerIds ? count($allowedCustomerIds) : 'all',
+            'allowedCustomerIds' => !empty($filteredCustomerIds) ? count($filteredCustomerIds) : 'all',
             'filteredCustomerIds' => count($filteredCustomerIds),
             'filteredCustomerCodes' => count($filteredCustomerCodes),
             'sampleCodes' => array_slice($filteredCustomerCodes, 0, 5),

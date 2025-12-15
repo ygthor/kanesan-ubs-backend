@@ -40,13 +40,8 @@ class CustomerController extends Controller
         if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
             // No filtering needed for KBS user
         } else {
-            // Filter by allowed customer IDs if middleware has set them
-            if ($request->has('allowed_customer_ids') && !empty($request->allowed_customer_ids)) {
-                $query->whereIn('id', $request->allowed_customer_ids);
-            } else {
-                // If no allowed customer IDs, return empty result
-                return makeResponse(200, 'No customers accessible.', []);
-            }
+            // Filter by agent_no matching user's name
+            $query->whereIn('agent_no', $user->name);
         }
         
         // Handle sorting
@@ -95,13 +90,7 @@ class CustomerController extends Controller
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
-            $allowedCustomerIds = $user->customers()->pluck('customers.id')->toArray();
-            if (!empty($allowedCustomerIds)) {
-                $query->whereIn('id', $allowedCustomerIds);
-            } else {
-                // User has no assigned customers, return empty result
-                return makeResponse(200, 'No states accessible.', []);
-            }
+            $query->whereIn('agent_no', $user->name);
         }
         
         $states = $query->pluck('state')->toArray();
