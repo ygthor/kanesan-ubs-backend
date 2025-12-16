@@ -38,25 +38,12 @@ class ReportController extends Controller
         
         // Use Orders table - artrans is deprecated
 
-        // Get user's allowed customer IDs for filtering (unless user has full access)
-        $allowedCustomerIds = null;
+        // Get user's agent_no for filtering orders directly (unless user has full access)
+        $userAgentNo = null;
+        // Get user's allowed customer codes for filtering receipts (unless user has full access)
         $allowedCustomerCodes = null;
         if ($user && !hasFullAccess()) {
-            $allowedCustomerIds = DB::table('customers')
-                ->whereIn('agent_no', [$user->name])
-                ->pluck('id')
-                ->toArray();
-            if (empty($allowedCustomerIds)) {
-                // User has no assigned customers, return empty report
-                return makeResponse(200, 'Business summary retrieved successfully.', [
-                    'totalSales' => 0,
-                    'nettSales' => 0,
-                    'collections' => 0,
-                    'outstandingDebt' => 0,
-                    'invoicesIssued' => 0,
-                    'receiptsIssued' => 0,
-                ]);
-            }
+            $userAgentNo = $user->name;
             $allowedCustomerCodes = DB::table('customers')
                 ->whereIn('agent_no', [$user->name])
                 ->pluck('customer_code')
@@ -68,8 +55,9 @@ class ReportController extends Controller
         $caSalesQuery = DB::table('orders')
             ->whereBetween('order_date', [$fromDate, $toDate])
             ->where('type', 'CS');
-        if ($allowedCustomerIds) {
-            $caSalesQuery->whereIn('customer_id', $allowedCustomerIds);
+        // Filter by agent_no directly on orders table (if user doesn't have full access)
+        if ($userAgentNo) {
+            $caSalesQuery->where('agent_no', $userAgentNo);
         }
         $caSales = $caSalesQuery->sum('net_amount');
 
@@ -77,8 +65,9 @@ class ReportController extends Controller
         $crSalesQuery = DB::table('orders')
             ->whereBetween('order_date', [$fromDate, $toDate])
             ->where('type', 'INV');
-        if ($allowedCustomerIds) {
-            $crSalesQuery->whereIn('customer_id', $allowedCustomerIds);
+        // Filter by agent_no directly on orders table (if user doesn't have full access)
+        if ($userAgentNo) {
+            $crSalesQuery->where('agent_no', $userAgentNo);
         }
         $crSales = $crSalesQuery->sum('net_amount');
 
@@ -88,8 +77,9 @@ class ReportController extends Controller
         $returnsQuery = DB::table('orders')
             ->whereBetween('order_date', [$fromDate, $toDate])
             ->where('type', 'CN');
-        if ($allowedCustomerIds) {
-            $returnsQuery->whereIn('customer_id', $allowedCustomerIds);
+        // Filter by agent_no directly on orders table (if user doesn't have full access)
+        if ($userAgentNo) {
+            $returnsQuery->where('agent_no', $userAgentNo);
         }
         $returns = $returnsQuery->sum('net_amount');
 
@@ -177,13 +167,14 @@ class ReportController extends Controller
         }
 
         // Filter by agent: if user doesn't have full access, only show their own data
-        // If agentNo is explicitly provided in request, use it (for filtering purposes)
-        // Otherwise, if user doesn't have full access, automatically filter by their agent_no
-        if ($agentNo) {
-            $query->where('agent_no', $agentNo);
-        } elseif ($user && !hasFullAccess()) {
-            // Automatically filter by logged-in user's agent_no
+        // Users with full access can filter by any agent_no if provided
+        // Users without full access are always restricted to their own agent_no
+        if ($user && !hasFullAccess()) {
+            // Always filter by logged-in user's agent_no (ignore any agent_no in request)
             $query->where('agent_no', $user->name);
+        } elseif ($agentNo) {
+            // User has full access, allow filtering by provided agent_no
+            $query->where('agent_no', $agentNo);
         }
 
         if ($customerSearch) {
@@ -195,13 +186,22 @@ class ReportController extends Controller
 
         $orders = $query->orderBy('order_date')->get();
 
+        // Get user's agent_no for filtering linked CN orders (if user doesn't have full access)
+        $userAgentNo = ($user && !hasFullAccess()) ? $user->name : null;
+
         // Calculate adjusted net amount for each invoice (deduct linked CN totals)
-        $adjustedOrders = $orders->map(function ($order) {
+        $adjustedOrders = $orders->map(function ($order) use ($userAgentNo) {
             // Get linked CN orders for this invoice
-            $linkedCNs = DB::table('orders')
+            $linkedCNsQuery = DB::table('orders')
                 ->where('credit_invoice_no', $order->reference_no)
-                ->where('type', 'CN')
-                ->get();
+                ->where('type', 'CN');
+            
+            // Filter linked CN orders by agent_no if user doesn't have full access
+            if ($userAgentNo) {
+                $linkedCNsQuery->where('agent_no', $userAgentNo);
+            }
+            
+            $linkedCNs = $linkedCNsQuery->get();
             
             // Calculate total from linked CN orders
             $cnTotal = $linkedCNs->sum('net_amount');
