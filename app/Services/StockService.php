@@ -50,6 +50,7 @@ class StockService
                     if ($tradeReturnIsGood) {
                         // Trade return good = Stock IN (returnGood)
                         $returnGood += $qty;
+                        $stockIn += $qty;
                     } else {
                         // Trade return bad = Stock OUT (returnBad)
                         $returnBad += $qty;
