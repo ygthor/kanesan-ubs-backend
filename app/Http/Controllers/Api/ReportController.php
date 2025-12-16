@@ -38,17 +38,43 @@ class ReportController extends Controller
         
         // Use Orders table - artrans is deprecated
 
-        // Get user's agent_no for filtering orders directly (unless user has full access)
-        $userAgentNo = null;
+        // Get user's name and username for filtering orders directly (unless user has full access)
+        // Note: Orders can have agent_no stored as either user->name OR user->username
+        // So we need to check both to match all orders created by this user
+        $userName = null;
+        $userUsername = null;
         // Get user's allowed customer codes for filtering receipts (unless user has full access)
         $allowedCustomerCodes = null;
         if ($user && !hasFullAccess()) {
-            $userAgentNo = $user->name;
-            $allowedCustomerCodes = DB::table('customers')
-                ->whereIn('agent_no', [$user->name])
-                ->pluck('customer_code')
-                ->toArray();
+            $userName = $user->name;
+            $userUsername = $user->username;
+            // For customers, check both name and username as agent_no
+            $agentNos = array_filter([$userName, $userUsername]);
+            if (!empty($agentNos)) {
+                $allowedCustomerCodes = DB::table('customers')
+                    ->whereIn('agent_no', $agentNos)
+                    ->pluck('customer_code')
+                    ->toArray();
+            }
         }
+
+        // Helper function to apply agent_no filter (checks both name and username)
+        $applyAgentFilter = function($query) use ($userName, $userUsername) {
+            if ($userName || $userUsername) {
+                $query->where(function($q) use ($userName, $userUsername) {
+                    if ($userName) {
+                        $q->where('agent_no', $userName);
+                    }
+                    if ($userUsername) {
+                        if ($userName) {
+                            $q->orWhere('agent_no', $userUsername);
+                        } else {
+                            $q->where('agent_no', $userUsername);
+                        }
+                    }
+                });
+            }
+        };
 
         // --- Sales ---
         // CA Sales: Cash Sales (type='CS')
@@ -56,9 +82,7 @@ class ReportController extends Controller
             ->whereBetween('order_date', [$fromDate, $toDate])
             ->where('type', 'CS');
         // Filter by agent_no directly on orders table (if user doesn't have full access)
-        if ($userAgentNo) {
-            $caSalesQuery->where('agent_no', $userAgentNo);
-        }
+        $applyAgentFilter($caSalesQuery);
         $caSales = $caSalesQuery->sum('net_amount');
 
         // CR Sales: Credit Sales/Invoices (type='INV')
@@ -66,9 +90,7 @@ class ReportController extends Controller
             ->whereBetween('order_date', [$fromDate, $toDate])
             ->where('type', 'INV');
         // Filter by agent_no directly on orders table (if user doesn't have full access)
-        if ($userAgentNo) {
-            $crSalesQuery->where('agent_no', $userAgentNo);
-        }
+        $applyAgentFilter($crSalesQuery);
         $crSales = $crSalesQuery->sum('net_amount');
 
         $totalSales = $caSales + $crSales;
@@ -78,9 +100,7 @@ class ReportController extends Controller
             ->whereBetween('order_date', [$fromDate, $toDate])
             ->where('type', 'CN');
         // Filter by agent_no directly on orders table (if user doesn't have full access)
-        if ($userAgentNo) {
-            $returnsQuery->where('agent_no', $userAgentNo);
-        }
+        $applyAgentFilter($returnsQuery);
         $returns = $returnsQuery->sum('net_amount');
 
         $nettSales = $totalSales - $returns;
@@ -169,11 +189,27 @@ class ReportController extends Controller
         // Filter by agent: if user doesn't have full access, only show their own data
         // Users with full access can filter by any agent_no if provided
         // Users without full access are always restricted to their own agent_no
+        // Note: Orders can have agent_no stored as either user->name OR user->username
+        // So we need to check both to match all orders created by this user
         if ($user && !hasFullAccess()) {
             // Always filter by logged-in user's agent_no (ignore any agent_no in request)
-            $userAgentNo = $user->name ?? $user->username ?? null;
-            if ($userAgentNo) {
-                $query->where('agent_no', $userAgentNo);
+            $userName = $user->name;
+            $userUsername = $user->username;
+            
+            if ($userName || $userUsername) {
+                // Check if agent_no matches either name or username
+                $query->where(function($q) use ($userName, $userUsername) {
+                    if ($userName) {
+                        $q->where('agent_no', $userName);
+                    }
+                    if ($userUsername) {
+                        if ($userName) {
+                            $q->orWhere('agent_no', $userUsername);
+                        } else {
+                            $q->where('agent_no', $userUsername);
+                        }
+                    }
+                });
             } else {
                 // User has no agent_no, return empty result
                 return response()->json([]);
@@ -192,19 +228,33 @@ class ReportController extends Controller
 
         $orders = $query->orderBy('order_date')->get();
 
-        // Get user's agent_no for filtering linked CN orders (if user doesn't have full access)
-        $userAgentNo = ($user && !hasFullAccess()) ? ($user->name ?? $user->username ?? null) : null;
+        // Get user's name and username for filtering linked CN orders (if user doesn't have full access)
+        // Orders can have agent_no stored as either name or username, so we need both
+        $userName = ($user && !hasFullAccess()) ? $user->name : null;
+        $userUsername = ($user && !hasFullAccess()) ? $user->username : null;
 
         // Calculate adjusted net amount for each invoice (deduct linked CN totals)
-        $adjustedOrders = $orders->map(function ($order) use ($userAgentNo) {
+        $adjustedOrders = $orders->map(function ($order) use ($userName, $userUsername) {
             // Get linked CN orders for this invoice
             $linkedCNsQuery = DB::table('orders')
                 ->where('credit_invoice_no', $order->reference_no)
                 ->where('type', 'CN');
             
             // Filter linked CN orders by agent_no if user doesn't have full access
-            if ($userAgentNo) {
-                $linkedCNsQuery->where('agent_no', $userAgentNo);
+            // Check both name and username since orders can have either
+            if ($userName || $userUsername) {
+                $linkedCNsQuery->where(function($q) use ($userName, $userUsername) {
+                    if ($userName) {
+                        $q->where('agent_no', $userName);
+                    }
+                    if ($userUsername) {
+                        if ($userName) {
+                            $q->orWhere('agent_no', $userUsername);
+                        } else {
+                            $q->where('agent_no', $userUsername);
+                        }
+                    }
+                });
             }
             
             $linkedCNs = $linkedCNsQuery->get();
