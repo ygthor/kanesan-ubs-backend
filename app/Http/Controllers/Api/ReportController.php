@@ -186,7 +186,7 @@ class ReportController extends Controller
             $query->where('customer_id', $customerId);
         }
 
-        $q->where('agent_no', $user->name);
+        $query->where('agent_no', $user->name);
 
         // Filter by agent: if user doesn't have full access, only show their own data
         // Users with full access can filter by any agent_no if provided
