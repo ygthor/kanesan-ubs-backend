@@ -50,7 +50,6 @@ class StockService
                     if ($tradeReturnIsGood) {
                         // Trade return good = Stock IN (returnGood)
                         $returnGood += $qty;
-                        $stockIn += $qty;
                     } else {
                         // Trade return bad = Stock OUT (returnBad)
                         $returnBad += $qty;
@@ -58,6 +57,15 @@ class StockService
                 } else {
                     // Normal INV item = Stock OUT
                     $stockOut += $qty;
+                }
+            }
+            elseif ($orderItem->type === 'CN') {
+                if ($tradeReturnIsGood) {
+                    // Trade return good = Stock IN (returnGood)
+                    $returnGood += $qty;
+                } else {
+                    // Trade return bad = Stock OUT (returnBad)
+                    $returnBad += $qty;
                 }
             }
         }
@@ -75,7 +83,8 @@ class StockService
                     if ($transaction->return_type === 'good') {
                         $returnGood += $qty;
                     } else {
-                        $stockIn += $qty;
+                        //$stockIn += $qty;
+                        $returnGood += $qty;
                     }
                 } elseif ($transaction->transaction_type === 'out') {
                     if ($transaction->return_type === 'bad') {
