@@ -84,14 +84,14 @@
         align-items: center;
     }
     
-    .quantity-display {
-        padding: 2px 8px;
-        border-radius: 3px;
-        transition: background-color 0.2s;
+    .quantity-view-mode,
+    .quantity-edit-mode {
+        display: inline-flex;
+        align-items: center;
     }
     
-    .quantity-display:hover {
-        background-color: #f0f0f0;
+    .quantity-display {
+        font-weight: bold;
     }
     
     .quantity-input {
@@ -99,6 +99,7 @@
         display: inline-block !important;
     }
     
+    .btn-edit-quantity,
     .btn-save-quantity,
     .btn-cancel-quantity {
         padding: 0.2rem 0.4rem;
@@ -244,21 +245,28 @@
                                             <td>{{ $balance->item->GROUP ?? 'N/A' }}</td>
                                             <td>
                                                 <div class="quantity-editable" data-balance-id="{{ $balance->id }}">
-                                                    <span class="quantity-display text-success" style="cursor: pointer; font-weight: bold;">
-                                                        {{ number_format($balance->quantity, 2) }}
-                                                    </span>
-                                                    <input type="number" 
-                                                           class="form-control form-control-sm quantity-input d-none" 
-                                                           value="{{ $balance->quantity }}" 
-                                                           step="0.01" 
-                                                           min="0.01"
-                                                           style="width: 100px; display: inline-block;">
-                                                    <button type="button" class="btn btn-sm btn-success btn-save-quantity d-none" style="margin-left: 5px;">
-                                                        <i class="fas fa-check"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-sm btn-secondary btn-cancel-quantity d-none" style="margin-left: 2px;">
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
+                                                    <div class="quantity-view-mode">
+                                                        <span class="quantity-display text-success" style="font-weight: bold;">
+                                                            {{ number_format($balance->quantity, 2) }}
+                                                        </span>
+                                                        <button type="button" class="btn btn-sm btn-primary btn-edit-quantity" style="margin-left: 5px;">
+                                                            <i class="fas fa-edit"></i> Edit
+                                                        </button>
+                                                    </div>
+                                                    <div class="quantity-edit-mode d-none">
+                                                        <input type="number" 
+                                                               class="form-control form-control-sm quantity-input" 
+                                                               value="{{ $balance->quantity }}" 
+                                                               step="0.01" 
+                                                               min="0.01"
+                                                               style="width: 100px; display: inline-block;">
+                                                        <button type="button" class="btn btn-sm btn-success btn-save-quantity" style="margin-left: 5px;">
+                                                            <i class="fas fa-check"></i> Save
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-secondary btn-cancel-quantity" style="margin-left: 2px;">
+                                                            <i class="fas fa-times"></i> Cancel
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td>{{ $balance->CREATED_ON ? \Carbon\Carbon::parse($balance->CREATED_ON)->format('M d, Y H:i') : 'N/A' }}</td>
@@ -818,13 +826,12 @@ $(document).ready(function() {
     @endif
 });
 
-// Inline editing for opening balance quantity
-$(document).on('click', '.quantity-display', function() {
+// Inline editing for opening balance quantity - triggered by Edit button
+$(document).on('click', '.btn-edit-quantity', function() {
     const $container = $(this).closest('.quantity-editable');
-    const $display = $container.find('.quantity-display');
+    const $viewMode = $container.find('.quantity-view-mode');
+    const $editMode = $container.find('.quantity-edit-mode');
     const $input = $container.find('.quantity-input');
-    const $saveBtn = $container.find('.btn-save-quantity');
-    const $cancelBtn = $container.find('.btn-cancel-quantity');
     
     // Store original value in data attribute if not already stored
     if (!$container.data('original-value')) {
@@ -832,11 +839,9 @@ $(document).on('click', '.quantity-display', function() {
         $container.data('original-value', originalValue);
     }
     
-    // Hide display, show input and buttons
-    $display.addClass('d-none');
-    $input.removeClass('d-none');
-    $saveBtn.removeClass('d-none');
-    $cancelBtn.removeClass('d-none');
+    // Hide view mode, show edit mode
+    $viewMode.addClass('d-none');
+    $editMode.removeClass('d-none');
     
     // Focus on input
     $input.focus().select();
@@ -845,26 +850,25 @@ $(document).on('click', '.quantity-display', function() {
 // Cancel editing
 $(document).on('click', '.btn-cancel-quantity', function() {
     const $container = $(this).closest('.quantity-editable');
-    const $display = $container.find('.quantity-display');
+    const $viewMode = $container.find('.quantity-view-mode');
+    const $editMode = $container.find('.quantity-edit-mode');
     const $input = $container.find('.quantity-input');
-    const $saveBtn = $container.find('.btn-save-quantity');
-    const $cancelBtn = $container.find('.btn-cancel-quantity');
     
     // Reset input value to original
     const originalValue = $container.data('original-value') || parseFloat($input.val());
     $input.val(originalValue);
     $container.removeData('original-value');
     
-    // Hide input and buttons, show display
-    $input.addClass('d-none');
-    $saveBtn.addClass('d-none');
-    $cancelBtn.addClass('d-none');
-    $display.removeClass('d-none');
+    // Hide edit mode, show view mode
+    $editMode.addClass('d-none');
+    $viewMode.removeClass('d-none');
 });
 
 // Save quantity
 $(document).on('click', '.btn-save-quantity', function() {
     const $container = $(this).closest('.quantity-editable');
+    const $viewMode = $container.find('.quantity-view-mode');
+    const $editMode = $container.find('.quantity-edit-mode');
     const $display = $container.find('.quantity-display');
     const $input = $container.find('.quantity-input');
     const $saveBtn = $container.find('.btn-save-quantity');
@@ -880,7 +884,7 @@ $(document).on('click', '.btn-save-quantity', function() {
     }
     
     // Disable buttons during save
-    $saveBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+    $saveBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
     $cancelBtn.prop('disabled', true);
     
     // Save via AJAX
@@ -905,17 +909,19 @@ $(document).on('click', '.btn-save-quantity', function() {
                 // Clear original value data
                 $container.removeData('original-value');
                 
-                // Hide input and buttons, show display
-                $input.addClass('d-none');
-                $saveBtn.addClass('d-none').prop('disabled', false).html('<i class="fas fa-check"></i>');
-                $cancelBtn.addClass('d-none').prop('disabled', false);
-                $display.removeClass('d-none');
+                // Hide edit mode, show view mode
+                $editMode.addClass('d-none');
+                $viewMode.removeClass('d-none');
+                
+                // Reset button states
+                $saveBtn.prop('disabled', false).html('<i class="fas fa-check"></i> Save');
+                $cancelBtn.prop('disabled', false);
                 
                 // Show success message
                 alert(response.message);
             } else {
                 alert('Error: ' + response.message);
-                $saveBtn.prop('disabled', false).html('<i class="fas fa-check"></i>');
+                $saveBtn.prop('disabled', false).html('<i class="fas fa-check"></i> Save');
                 $cancelBtn.prop('disabled', false);
             }
         },
@@ -925,7 +931,7 @@ $(document).on('click', '.btn-save-quantity', function() {
                 errorMessage = xhr.responseJSON.message;
             }
             alert('Error: ' + errorMessage);
-            $saveBtn.prop('disabled', false).html('<i class="fas fa-check"></i>');
+            $saveBtn.prop('disabled', false).html('<i class="fas fa-check"></i> Save');
             $cancelBtn.prop('disabled', false);
         }
     });
