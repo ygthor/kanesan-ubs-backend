@@ -36,12 +36,27 @@ class CustomerController extends Controller
         
         $query = Customer::query();
         
-        // KBS user has full access to all customers
-        if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
-            // No filtering needed for KBS user
+        // KBS user or admin has full access to all customers
+        if ($user && hasFullAccess()) {
+            // No filtering needed for KBS user or admin
         } else {
-            // Filter by agent_no matching user's name
-            $query->whereIn('agent_no', [$user->name]);
+            // Filter by agent_no matching user's name (only if user and name exist)
+            if ($user && !empty($user->name)) {
+                $query->whereIn('agent_no', [$user->name]);
+            } else {
+                // If user has no name, return empty result for non-KBS users
+                $query->whereRaw('1 = 0'); // This ensures no results are returned
+            }
+        }
+        
+        // Handle territory filtering if provided
+        if ($request->has('territory') && $request->input('territory') !== null && $request->input('territory') !== '') {
+            $territory = $request->input('territory');
+            // Filter by territory (case-insensitive)
+            $query->where(function($q) use ($territory) {
+                $q->whereRaw('LOWER(territory) = ?', [strtolower($territory)])
+                  ->orWhereRaw('LOWER(territory) LIKE ?', ['%' . strtolower($territory) . '%']);
+            });
         }
         
         // Handle sorting
@@ -90,7 +105,12 @@ class CustomerController extends Controller
         
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
-            $query->whereIn('agent_no', [$user->name]);
+            if (!empty($user->name)) {
+                $query->whereIn('agent_no', [$user->name]);
+            } else {
+                // If user has no name, return empty result for non-KBS users
+                $query->whereRaw('1 = 0'); // This ensures no results are returned
+            }
         }
         
         $states = $query->pluck('state')->toArray();
