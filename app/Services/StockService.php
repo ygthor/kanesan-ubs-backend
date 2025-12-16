@@ -264,6 +264,33 @@ class StockService
                         "INV Order: {$order->reference_no}"
                     );
                 }
+            } elseif ($orderType === 'CN') {
+                // CN = Trade Return
+                if ($tradeReturnIsGood) {
+                    // Trade return good = Stock IN (return_type = 'good')
+                    $this->recordMovement(
+                        $agentNo,
+                        $itemNo,
+                        $quantity,
+                        'in',
+                        $referenceType,
+                        $referenceId,
+                        'good',
+                        "CN Trade Return Good: {$order->reference_no}"
+                    );
+                } else {
+                    // Trade return bad = Stock OUT (return_type = 'bad')
+                    $this->recordMovement(
+                        $agentNo,
+                        $itemNo,
+                        $quantity,
+                        'in',
+                        $referenceType,
+                        $referenceId,
+                        'bad',
+                        "CN Trade Return Bad: {$order->reference_no}"
+                    );
+                }
             }
         }
     }
@@ -409,6 +436,13 @@ class StockService
                     }
                 } else {
                     $itemTotals[$itemNo]['stockOut'] += $qty;
+                }
+            } elseif ($orderItem->type === 'CN') {
+                // CN = Trade Return
+                if ($tradeReturnIsGood) {
+                    $itemTotals[$itemNo]['returnGood'] += $qty;
+                } else {
+                    $itemTotals[$itemNo]['returnBad'] += $qty;
                 }
             }
         }
