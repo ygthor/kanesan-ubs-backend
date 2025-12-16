@@ -16,8 +16,8 @@ class StockService
      * IMPORTANT: Return Bad Logic
      * - Trade return GOOD adds to available stock (via returnGood)
      * - Trade return BAD does NOT affect stock (no stock change)
-     * - Formula: available = stockIn + returnGood - stockOut - returnBad
-     *   (returnBad is tracked for display/reporting but doesn't affect stock)
+     * - Formula: available = stockIn + returnGood - stockOut
+     *   (returnBad is tracked for display/reporting only, NOT subtracted from available)
      *
      * @param string $agentNo Agent number (user name)
      * @param string $itemNo Item number (ITEMNO from icitem)
@@ -101,8 +101,9 @@ class StockService
             Log::debug("item_transactions table not available or error: " . $e->getMessage());
         }
 
-        // Available stock = stockIn + returnGood - stockOut - returnBad
-        $available = $stockIn + $returnGood - $stockOut - $returnBad;
+        // Available stock = stockIn + returnGood - stockOut
+        // Note: returnBad is NOT subtracted (trade return bad doesn't affect stock)
+        $available = $stockIn + $returnGood - $stockOut;
 
         return [
             'stockIn' => $stockIn,
@@ -465,7 +466,9 @@ class StockService
         // Calculate available for each item
         $summary = [];
         foreach ($itemTotals as $itemNo => $totals) {
-            $available = $totals['stockIn'] + $totals['returnGood'] - $totals['stockOut'] - $totals['returnBad'];
+            // Available stock = stockIn + returnGood - stockOut
+            // Note: returnBad is NOT subtracted (trade return bad doesn't affect stock)
+            $available = $totals['stockIn'] + $totals['returnGood'] - $totals['stockOut'];
             $summary[] = [
                 'ITEMNO' => $itemNo,
                 'stockIn' => $totals['stockIn'],
