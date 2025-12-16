@@ -40,16 +40,8 @@ class ReportController extends Controller
 
         // Get user's name for filtering (unless user has full access)
         $userName = null;
-        // Get user's allowed customer codes for filtering receipts (unless user has full access)
-        $allowedCustomerCodes = null;
         if ($user && !hasFullAccess()) {
             $userName = $user->name;
-            if ($userName) {
-                $allowedCustomerCodes = DB::table('customers')
-                    ->where('agent_no', $userName)
-                    ->pluck('customer_code')
-                    ->toArray();
-            }
         }
 
         // Helper function to apply agent_no filter
@@ -89,37 +81,22 @@ class ReportController extends Controller
         $nettSales = $totalSales - $returns;
 
         // --- Collections ---
-        $totalCrCollectQuery = DB::table('receipts')
-            ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Card');
-        if ($allowedCustomerCodes) {
-            $totalCrCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
+        // Single query with GROUP BY for all payment types (more efficient - world standard)
+        $collectionsQuery = DB::table('receipts')
+            ->leftJoin('customers', 'receipts.customer_id', '=', 'customers.id')
+            ->whereBetween('receipts.receipt_date', [$fromDate, $toDate])
+            ->select('receipts.payment_type', DB::raw('SUM(receipts.paid_amount) as total'));
+        
+        if ($userName) {
+            $collectionsQuery->where('customers.agent_no', $userName);
         }
-        $totalCrCollect = $totalCrCollectQuery->sum('paid_amount');
-
-        $totalCashCollectQuery = DB::table('receipts')
-            ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Cash');
-        if ($allowedCustomerCodes) {
-            $totalCashCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
-        }
-        $totalCashCollect = $totalCashCollectQuery->sum('paid_amount');
-
-        $totalBankCollectQuery = DB::table('receipts')
-            ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Online Transfer');
-        if ($allowedCustomerCodes) {
-            $totalBankCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
-        }
-        $totalBankCollect = $totalBankCollectQuery->sum('paid_amount');
-
-        $chequeCollectQuery = DB::table('receipts')
-            ->whereBetween('receipt_date', [$fromDate, $toDate])
-            ->where('payment_type', 'Cheque');
-        if ($allowedCustomerCodes) {
-            $chequeCollectQuery->whereIn('customer_code', $allowedCustomerCodes);
-        }
-        $chequeCollect = $chequeCollectQuery->sum('paid_amount');
+        
+        $collections = $collectionsQuery->groupBy('receipts.payment_type')->pluck('total', 'payment_type');
+        
+        $totalCrCollect = $collections->get('Card', 0);
+        $totalCashCollect = $collections->get('Cash', 0);
+        $totalBankCollect = $collections->get('Online Transfer', 0);
+        $chequeCollect = $collections->get('Cheque', 0);
 
 
         $totalCollection = $totalCrCollect + $totalCashCollect + $chequeCollect + $totalBankCollect;
