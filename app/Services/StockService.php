@@ -13,6 +13,13 @@ class StockService
     /**
      * Calculate stock totals for an agent and item from orders AND item_transactions
      *
+     * IMPORTANT: Return Bad Logic
+     * - Return bad items are physically returned, so they are recorded as stock IN
+     *   to avoid double deduction (original INV already deducted once)
+     * - However, returnBad is still subtracted in available calculation because
+     *   bad quality items don't count toward usable stock
+     * - Formula: available = stockIn + returnGood - stockOut - returnBad
+     *
      * @param string $agentNo Agent number (user name)
      * @param string $itemNo Item number (ITEMNO from icitem)
      * @return array ['stockIn', 'stockOut', 'returnGood', 'returnBad', 'available']
@@ -51,7 +58,9 @@ class StockService
                         // Trade return good = Stock IN (returnGood)
                         $returnGood += $qty;
                     } else {
-                        // Trade return bad = Stock OUT (returnBad)
+                        // Trade return bad = Stock IN (physically returned)
+                        // Tracked as returnBad for display, but items are returned (stock IN)
+                        // to avoid double deduction (original INV already deducted once)
                         $returnBad += $qty;
                     }
                 } else {
@@ -64,7 +73,9 @@ class StockService
                     // Trade return good = Stock IN (returnGood)
                     $returnGood += $qty;
                 } else {
-                    // Trade return bad = Stock OUT (returnBad)
+                    // Trade return bad = Stock IN (physically returned)
+                    // Tracked as returnBad for display, but items are returned (stock IN)
+                    // to avoid double deduction (original INV already deducted once)
                     $returnBad += $qty;
                 }
             }
@@ -239,12 +250,14 @@ class StockService
                             "INV Trade Return Good: {$order->reference_no}"
                         );
                     } else {
-                        // Trade return bad = Stock OUT (return_type = 'bad')
+                        // Trade return bad = Stock IN (return_type = 'bad')
+                        // Items are physically returned, so stock IN to avoid double deduction
+                        // (original INV already deducted once)
                         $this->recordMovement(
                             $agentNo,
                             $itemNo,
                             $quantity,
-                            'out',
+                            'in',
                             $referenceType,
                             $referenceId,
                             'bad',
@@ -279,7 +292,9 @@ class StockService
                         "CN Trade Return Good: {$order->reference_no}"
                     );
                 } else {
-                    // Trade return bad = Stock OUT (return_type = 'bad')
+                    // Trade return bad = Stock IN (return_type = 'bad')
+                    // Items are physically returned, so stock IN to avoid double deduction
+                    // (original INV already deducted once)
                     $this->recordMovement(
                         $agentNo,
                         $itemNo,
