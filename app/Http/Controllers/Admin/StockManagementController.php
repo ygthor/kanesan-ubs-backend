@@ -755,6 +755,71 @@ class StockManagementController extends Controller
     }
     
     /**
+     * Update opening balance transaction
+     */
+    public function updateOpeningBalance(Request $request, $id)
+    {
+        $user = auth()->user();
+        
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            abort(403, 'Unauthorized access.');
+        }
+        
+        $request->validate([
+            'quantity' => 'required|numeric|min:0.01',
+        ]);
+        
+        try {
+            $transaction = ItemTransaction::findOrFail($id);
+            
+            // Verify it's an opening balance transaction
+            if ($transaction->reference_type !== 'opening balance' || $transaction->transaction_type !== 'in') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This is not an opening balance transaction.'
+                ], 400);
+            }
+            
+            $oldQuantity = $transaction->quantity;
+            $newQuantity = abs($request->quantity);
+            
+            // Calculate the difference
+            $quantityDiff = $newQuantity - $oldQuantity;
+            
+            // Get current stock before update
+            $stockService = new StockService();
+            $stockBefore = $stockService->getAvailableStock($transaction->agent_no, $transaction->ITEMNO);
+            
+            // Calculate new stock after update
+            $stockAfter = $stockBefore + $quantityDiff;
+            
+            // Update the transaction
+            $transaction->quantity = $newQuantity;
+            $transaction->stock_before = $stockBefore;
+            $transaction->stock_after = $stockAfter;
+            $transaction->UPDATED_BY = auth()->user()->id ?? null;
+            $transaction->UPDATED_ON = now();
+            $transaction->save();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Opening balance updated successfully!',
+                'data' => [
+                    'quantity' => $newQuantity,
+                    'stock_before' => $stockBefore,
+                    'stock_after' => $stockAfter
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update opening balance: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
      * Delete opening balance transaction
      */
     public function deleteOpeningBalance($id)
@@ -984,7 +1049,126 @@ class StockManagementController extends Controller
         // Sort by date descending
         $movements = $movements->sortByDesc('date')->values();
 
-        return view('inventory.item-movements', compact('movements', 'groups', 'agents', 'filters'));
+        // Calculate item summary (totals per item) from orders and item_transactions
+        $itemSummary = [];
+
+        // Process item_transactions for summary
+        foreach ($itemTransactions as $trans) {
+            $itemNo = $trans->ITEMNO;
+            
+            if (!isset($itemSummary[$itemNo])) {
+                $itemSummary[$itemNo] = [
+                    'item_no' => $itemNo,
+                    'item_name' => $trans->DESP ?? 'N/A',
+                    'item_group' => $trans->GROUP ?? 'N/A',
+                    'stock_in' => 0,
+                    'stock_out' => 0,
+                    'return_good' => 0,
+                    'return_bad' => 0,
+                ];
+            }
+
+            // Manual transactions from item_transactions
+            if ($trans->transaction_type === 'in') {
+                $itemSummary[$itemNo]['stock_in'] += (float) $trans->quantity;
+            } else {
+                $itemSummary[$itemNo]['stock_out'] += (float) $trans->quantity;
+            }
+        }
+
+        // Process orders for summary (re-query to get all order data)
+        $summaryOrdersQuery = DB::table('orders')
+            ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
+            ->join('icitem', function($join) {
+                $join->on(DB::raw('order_items.product_no COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
+            })
+            ->whereIn('orders.type', ['INV', 'DO', 'CN']);
+
+        if ($filters['agent_no']) {
+            $summaryOrdersQuery->where('orders.agent_no', $filters['agent_no']);
+        }
+
+        if ($filters['item_no']) {
+            $summaryOrdersQuery->where('order_items.product_no', $filters['item_no']);
+        }
+
+        if ($filters['item_group']) {
+            $summaryOrdersQuery->where('icitem.GROUP', $filters['item_group']);
+        }
+
+        if ($filters['date_from']) {
+            $summaryOrdersQuery->whereDate('orders.order_date', '>=', $filters['date_from']);
+        }
+
+        if ($filters['date_to']) {
+            $summaryOrdersQuery->whereDate('orders.order_date', '<=', $filters['date_to']);
+        }
+
+        $summaryOrders = $summaryOrdersQuery->select(
+            'order_items.product_no',
+            'order_items.quantity',
+            'order_items.is_trade_return',
+            'order_items.trade_return_is_good',
+            'orders.type',
+            'icitem.DESP',
+            'icitem.GROUP'
+        )->get();
+
+        foreach ($summaryOrders as $order) {
+            $itemNo = $order->product_no;
+            $qty = (float) $order->quantity;
+            
+            if (!isset($itemSummary[$itemNo])) {
+                $itemSummary[$itemNo] = [
+                    'item_no' => $itemNo,
+                    'item_name' => $order->DESP ?? 'N/A',
+                    'item_group' => $order->GROUP ?? 'N/A',
+                    'stock_in' => 0,
+                    'stock_out' => 0,
+                    'return_good' => 0,
+                    'return_bad' => 0,
+                ];
+            }
+
+            // Categorize based on order type and trade return flags
+            if ($order->type === 'DO') {
+                // DO = Stock IN
+                $itemSummary[$itemNo]['stock_in'] += $qty;
+            } elseif ($order->type === 'INV') {
+                if ($order->is_trade_return) {
+                    if ($order->trade_return_is_good) {
+                        // Trade return good = Return Good
+                        $itemSummary[$itemNo]['return_good'] += $qty;
+                    } else {
+                        // Trade return bad = Return Bad (for display only)
+                        $itemSummary[$itemNo]['return_bad'] += $qty;
+                    }
+                } else {
+                    // Regular INV = Stock OUT
+                    $itemSummary[$itemNo]['stock_out'] += $qty;
+                }
+            } elseif ($order->type === 'CN') {
+                if ($order->trade_return_is_good) {
+                    // Trade return good = Return Good
+                    $itemSummary[$itemNo]['return_good'] += $qty;
+                } else {
+                    // Trade return bad = Return Bad (for display only)
+                    $itemSummary[$itemNo]['return_bad'] += $qty;
+                }
+            }
+        }
+
+        // Calculate available stock for each item
+        // Available = stockIn + returnGood - stockOut (returnBad is NOT subtracted)
+        foreach ($itemSummary as $itemNo => &$summary) {
+            $summary['available'] = $summary['stock_in'] + $summary['return_good'] - $summary['stock_out'];
+        }
+        unset($summary);
+
+        // Convert to collection and sort by item_no
+        $itemSummary = collect($itemSummary)->sortBy('item_no')->values();
+
+        return view('inventory.item-movements', compact('movements', 'itemSummary', 'groups', 'agents', 'filters'));
     }
 }
 

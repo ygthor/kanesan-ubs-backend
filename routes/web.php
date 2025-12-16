@@ -28,6 +28,7 @@ Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(func
     Route::post('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'store'])->name('stock-management.store');
     Route::get('/stock-management/item/{itemno}/transactions', [\App\Http\Controllers\Admin\StockManagementController::class, 'showItemTransactions'])->name('stock-management.item.transactions');
     Route::post('/stock-management/opening-balance', [\App\Http\Controllers\Admin\StockManagementController::class, 'storeOpeningBalance'])->name('stock-management.opening-balance.store');
+    Route::put('/stock-management/opening-balance/{id}', [\App\Http\Controllers\Admin\StockManagementController::class, 'updateOpeningBalance'])->name('stock-management.opening-balance.update');
     Route::delete('/stock-management/opening-balance/{id}', [\App\Http\Controllers\Admin\StockManagementController::class, 'deleteOpeningBalance'])->name('stock-management.opening-balance.delete');
     Route::get('/item-movements', [\App\Http\Controllers\Admin\StockManagementController::class, 'itemMovements'])->name('item-movements');
 });

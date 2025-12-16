@@ -54,6 +54,27 @@
         background-color: #ffc107;
         color: black;
     }
+    
+    #summaryTable {
+        font-size: 0.9rem;
+    }
+    
+    #summaryTable thead th {
+        font-size: 0.85rem;
+        padding: 0.5rem;
+        font-weight: 600;
+        background-color: #f8f9fa;
+    }
+    
+    #summaryTable tbody td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    #summaryTable tbody td:nth-child(4) {
+        font-weight: bold;
+        background-color: #fff3cd;
+    }
 </style>
 @endpush
 
@@ -161,67 +182,122 @@
         </div>
     </div>
 
-    <!-- Movements Table -->
+    <!-- Tabs -->
     <div class="card">
         <div class="card-header bg-info text-white">
-            <h5 class="card-title mb-0">
-                <i class="fas fa-list"></i> Movements 
-                <span class="badge badge-light ml-2">{{ $movements->count() }} records</span>
-            </h5>
+            <ul class="nav nav-tabs card-header-tabs" id="movementTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="movements-tab" data-toggle="tab" href="#movements" role="tab" aria-controls="movements" aria-selected="true">
+                        <i class="fas fa-list"></i> Item Movement 
+                        <span class="badge badge-light ml-2">{{ $movements->count() }} records</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="summary-tab" data-toggle="tab" href="#summary" role="tab" aria-controls="summary" aria-selected="false">
+                        <i class="fas fa-chart-bar"></i> Item Summary 
+                        <span class="badge badge-light ml-2">{{ $itemSummary->count() }} items</span>
+                    </a>
+                </li>
+            </ul>
         </div>
         <div class="card-body">
-            @if($movements->count() > 0)
-                <div class="table-responsive">
-                    <table id="movementsTable" class="table table-striped table-bordered table-hover" style="width:100%">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Item Group</th>
-                                <th>Item No</th>
-                                <th>Item Name</th>
-                                <th>In/Out</th>
-                                <th>Qty</th>
-                                <th>Type</th>
-                                <th>Reference No</th>
-                                <th>Agent</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($movements as $movement)
-                                <tr>
-                                    <td>{{ \Carbon\Carbon::parse($movement['date'])->format('Y-m-d H:i') }}</td>
-                                    <td>{{ $movement['item_group'] }}</td>
-                                    <td>{{ $movement['item_no'] }}</td>
-                                    <td>{{ $movement['item_name'] }}</td>
-                                    <td>
-                                        <span class="badge {{ $movement['in_out'] == 'IN' ? 'badge-in' : 'badge-out' }}">
-                                            {{ $movement['in_out'] }}
-                                        </span>
-                                    </td>
-                                    <td>{{ number_format($movement['quantity'], 2) }}</td>
-                                    <td>
-                                        @if($movement['type'] == 'INV')
-                                            <span class="badge badge-inv">INV</span>
-                                        @elseif($movement['type'] == 'DO')
-                                            <span class="badge badge-do">DO</span>
-                                        @elseif($movement['type'] == 'CN')
-                                            <span class="badge badge-cn">CN</span>
-                                        @else
-                                            <span class="badge badge-secondary">{{ $movement['type'] }}</span>
-                                        @endif
-                                    </td>
-                                    <td>{{ $movement['reference_no'] }}</td>
-                                    <td>{{ $movement['agent_no'] ?? 'N/A' }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+            <div class="tab-content" id="movementTabsContent">
+                <!-- Tab 1: Item Movement -->
+                <div class="tab-pane fade show active" id="movements" role="tabpanel" aria-labelledby="movements-tab">
+                    @if($movements->count() > 0)
+                        <div class="table-responsive">
+                            <table id="movementsTable" class="table table-striped table-bordered table-hover" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Item Group</th>
+                                        <th>Item No</th>
+                                        <th>Item Name</th>
+                                        <th>In/Out</th>
+                                        <th>Qty</th>
+                                        <th>Type</th>
+                                        <th>Reference No</th>
+                                        <th>Agent</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($movements as $movement)
+                                        <tr>
+                                            <td>{{ \Carbon\Carbon::parse($movement['date'])->format('Y-m-d H:i') }}</td>
+                                            <td>{{ $movement['item_group'] }}</td>
+                                            <td>{{ $movement['item_no'] }}</td>
+                                            <td>{{ $movement['item_name'] }}</td>
+                                            <td>
+                                                <span class="badge {{ $movement['in_out'] == 'IN' ? 'badge-in' : 'badge-out' }}">
+                                                    {{ $movement['in_out'] }}
+                                                </span>
+                                            </td>
+                                            <td>{{ number_format($movement['quantity'], 2) }}</td>
+                                            <td>
+                                                @if($movement['type'] == 'INV')
+                                                    <span class="badge badge-inv">INV</span>
+                                                @elseif($movement['type'] == 'DO')
+                                                    <span class="badge badge-do">DO</span>
+                                                @elseif($movement['type'] == 'CN')
+                                                    <span class="badge badge-cn">CN</span>
+                                                @else
+                                                    <span class="badge badge-secondary">{{ $movement['type'] }}</span>
+                                                @endif
+                                            </td>
+                                            <td>{{ $movement['reference_no'] }}</td>
+                                            <td>{{ $movement['agent_no'] ?? 'N/A' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> No movements found for the selected filters.
+                        </div>
+                    @endif
                 </div>
-            @else
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> No movements found for the selected filters.
+
+                <!-- Tab 2: Item Summary -->
+                <div class="tab-pane fade" id="summary" role="tabpanel" aria-labelledby="summary-tab">
+                    @if($itemSummary->count() > 0)
+                        <div class="table-responsive">
+                            <table id="summaryTable" class="table table-striped table-bordered table-hover" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th>Item Group</th>
+                                        <th>Item No</th>
+                                        <th>Item Name</th>
+                                        <th>Available</th>
+                                        <th>IN</th>
+                                        <th>OUT</th>
+                                        <th>R.G</th>
+                                        <th>R.B</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($itemSummary as $item)
+                                        <tr>
+                                            <td>{{ $item['item_group'] }}</td>
+                                            <td>{{ $item['item_no'] }}</td>
+                                            <td>{{ $item['item_name'] }}</td>
+                                            <td><strong>{{ number_format($item['available'], 2) }}</strong></td>
+                                            <td>{{ number_format($item['stock_in'], 2) }}</td>
+                                            <td>{{ number_format($item['stock_out'], 2) }}</td>
+                                            <td>{{ number_format($item['return_good'], 2) }}</td>
+                                            <td>{{ number_format($item['return_bad'], 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> No items found for the selected filters.
+                        </div>
+                    @endif
                 </div>
-            @endif
+            </div>
         </div>
     </div>
 @endsection
@@ -229,15 +305,34 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
+        // Item Movement Table - No pagination, show all
         $('#movementsTable').DataTable({
             order: [[0, 'desc']], // Sort by date descending
-            pageLength: 25,
-            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            paging: false, // Disable pagination
+            searching: true,
+            info: true,
             responsive: true,
             dom: 'Bfrtip',
             buttons: [
                 'copy', 'csv', 'excel', 'pdf', 'print'
-            ]
+            ],
+            scrollY: '60vh',
+            scrollCollapse: true
+        });
+
+        // Item Summary Table - No pagination, show all
+        $('#summaryTable').DataTable({
+            order: [[1, 'asc']], // Sort by item no ascending
+            paging: false, // Disable pagination
+            searching: true,
+            info: true,
+            responsive: true,
+            dom: 'Bfrtip',
+            buttons: [
+                'copy', 'csv', 'excel', 'pdf', 'print'
+            ],
+            scrollY: '60vh',
+            scrollCollapse: true
         });
     });
 </script>

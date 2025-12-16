@@ -77,6 +77,33 @@
     #addOpeningBalanceModal .form-group label {
         font-size: 0.875rem;
     }
+    
+    /* Editable quantity styles */
+    .quantity-editable {
+        display: inline-flex;
+        align-items: center;
+    }
+    
+    .quantity-display {
+        padding: 2px 8px;
+        border-radius: 3px;
+        transition: background-color 0.2s;
+    }
+    
+    .quantity-display:hover {
+        background-color: #f0f0f0;
+    }
+    
+    .quantity-input {
+        width: 100px !important;
+        display: inline-block !important;
+    }
+    
+    .btn-save-quantity,
+    .btn-cancel-quantity {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+    }
 </style>
 @endpush
 
@@ -215,7 +242,25 @@
                                             <td><strong>{{ $balance->ITEMNO }}</strong></td>
                                             <td>{{ $balance->item->DESP ?? 'N/A' }}</td>
                                             <td>{{ $balance->item->GROUP ?? 'N/A' }}</td>
-                                            <td><strong class="text-success">{{ number_format($balance->quantity, 2) }}</strong></td>
+                                            <td>
+                                                <div class="quantity-editable" data-balance-id="{{ $balance->id }}">
+                                                    <span class="quantity-display text-success" style="cursor: pointer; font-weight: bold;">
+                                                        {{ number_format($balance->quantity, 2) }}
+                                                    </span>
+                                                    <input type="number" 
+                                                           class="form-control form-control-sm quantity-input d-none" 
+                                                           value="{{ $balance->quantity }}" 
+                                                           step="0.01" 
+                                                           min="0.01"
+                                                           style="width: 100px; display: inline-block;">
+                                                    <button type="button" class="btn btn-sm btn-success btn-save-quantity d-none" style="margin-left: 5px;">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-secondary btn-cancel-quantity d-none" style="margin-left: 2px;">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td>{{ $balance->CREATED_ON ? \Carbon\Carbon::parse($balance->CREATED_ON)->format('M d, Y H:i') : 'N/A' }}</td>
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-danger" onclick="deleteOpeningBalance({{ $balance->id }})">
@@ -771,6 +816,133 @@ $(document).ready(function() {
         });
     }
     @endif
+});
+
+// Inline editing for opening balance quantity
+$(document).on('click', '.quantity-display', function() {
+    const $container = $(this).closest('.quantity-editable');
+    const $display = $container.find('.quantity-display');
+    const $input = $container.find('.quantity-input');
+    const $saveBtn = $container.find('.btn-save-quantity');
+    const $cancelBtn = $container.find('.btn-cancel-quantity');
+    
+    // Store original value in data attribute if not already stored
+    if (!$container.data('original-value')) {
+        const originalValue = parseFloat($input.val());
+        $container.data('original-value', originalValue);
+    }
+    
+    // Hide display, show input and buttons
+    $display.addClass('d-none');
+    $input.removeClass('d-none');
+    $saveBtn.removeClass('d-none');
+    $cancelBtn.removeClass('d-none');
+    
+    // Focus on input
+    $input.focus().select();
+});
+
+// Cancel editing
+$(document).on('click', '.btn-cancel-quantity', function() {
+    const $container = $(this).closest('.quantity-editable');
+    const $display = $container.find('.quantity-display');
+    const $input = $container.find('.quantity-input');
+    const $saveBtn = $container.find('.btn-save-quantity');
+    const $cancelBtn = $container.find('.btn-cancel-quantity');
+    
+    // Reset input value to original
+    const originalValue = $container.data('original-value') || parseFloat($input.val());
+    $input.val(originalValue);
+    $container.removeData('original-value');
+    
+    // Hide input and buttons, show display
+    $input.addClass('d-none');
+    $saveBtn.addClass('d-none');
+    $cancelBtn.addClass('d-none');
+    $display.removeClass('d-none');
+});
+
+// Save quantity
+$(document).on('click', '.btn-save-quantity', function() {
+    const $container = $(this).closest('.quantity-editable');
+    const $display = $container.find('.quantity-display');
+    const $input = $container.find('.quantity-input');
+    const $saveBtn = $container.find('.btn-save-quantity');
+    const $cancelBtn = $container.find('.btn-cancel-quantity');
+    const balanceId = $container.data('balance-id');
+    const newQuantity = parseFloat($input.val());
+    
+    // Validate quantity
+    if (isNaN(newQuantity) || newQuantity < 0.01) {
+        alert('Please enter a valid quantity (minimum 0.01)');
+        $input.focus();
+        return;
+    }
+    
+    // Disable buttons during save
+    $saveBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+    $cancelBtn.prop('disabled', true);
+    
+    // Save via AJAX
+    $.ajax({
+        url: '/inventory/stock-management/opening-balance/' + balanceId,
+        method: 'POST',
+        data: {
+            _method: 'PUT',
+            quantity: newQuantity
+        },
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        success: function(response) {
+            if (response.success) {
+                // Update display with new value
+                $display.text(parseFloat(newQuantity).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }));
+                
+                // Clear original value data
+                $container.removeData('original-value');
+                
+                // Hide input and buttons, show display
+                $input.addClass('d-none');
+                $saveBtn.addClass('d-none').prop('disabled', false).html('<i class="fas fa-check"></i>');
+                $cancelBtn.addClass('d-none').prop('disabled', false);
+                $display.removeClass('d-none');
+                
+                // Show success message
+                alert(response.message);
+            } else {
+                alert('Error: ' + response.message);
+                $saveBtn.prop('disabled', false).html('<i class="fas fa-check"></i>');
+                $cancelBtn.prop('disabled', false);
+            }
+        },
+        error: function(xhr) {
+            let errorMessage = 'Failed to update opening balance.';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMessage = xhr.responseJSON.message;
+            }
+            alert('Error: ' + errorMessage);
+            $saveBtn.prop('disabled', false).html('<i class="fas fa-check"></i>');
+            $cancelBtn.prop('disabled', false);
+        }
+    });
+});
+
+// Allow Enter key to save
+$(document).on('keypress', '.quantity-input', function(e) {
+    if (e.which === 13) { // Enter key
+        $(this).closest('.quantity-editable').find('.btn-save-quantity').click();
+    }
+});
+
+// Allow Escape key to cancel
+$(document).on('keydown', '.quantity-input', function(e) {
+    if (e.which === 27) { // Escape key
+        $(this).closest('.quantity-editable').find('.btn-cancel-quantity').click();
+    }
 });
 
 function deleteOpeningBalance(id) {
