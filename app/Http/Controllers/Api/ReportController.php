@@ -82,9 +82,11 @@ class ReportController extends Controller
 
         // --- Collections ---
         // Single query with GROUP BY for all payment types (more efficient - world standard)
+        // Use INNER JOIN since customer_id is required (foreign key constraint)
         $collectionsQuery = DB::table('receipts')
-            ->leftJoin('customers', 'receipts.customer_id', '=', 'customers.id')
+            ->join('customers', 'receipts.customer_id', '=', 'customers.id')
             ->whereBetween('receipts.receipt_date', [$fromDate, $toDate])
+            ->whereNull('receipts.deleted_at') // Exclude soft-deleted receipts
             ->select('receipts.payment_type', DB::raw('SUM(receipts.paid_amount) as total'));
         
         if ($userName) {
