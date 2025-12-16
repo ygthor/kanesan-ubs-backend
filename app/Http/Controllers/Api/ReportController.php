@@ -95,10 +95,25 @@ class ReportController extends Controller
         
         $collections = $collectionsQuery->groupBy('receipts.payment_type')->pluck('total', 'payment_type');
         
-        $totalCrCollect = $collections->get('Card', 0);
-        $totalCashCollect = $collections->get('Cash', 0);
-        $totalBankCollect = $collections->get('Online Transfer', 0);
-        $chequeCollect = $collections->get('Cheque', 0);
+        // Handle case-insensitive matching (frontend sends: 'CASH', 'Card', 'Online Transfer', 'CHEQUE')
+        // Database might store in different cases, so we search case-insensitively
+        $totalCrCollect = 0;
+        $totalCashCollect = 0;
+        $totalBankCollect = 0;
+        $chequeCollect = 0;
+        
+        foreach ($collections as $paymentType => $total) {
+            $upperType = strtoupper(trim($paymentType));
+            if ($upperType === 'CARD') {
+                $totalCrCollect = $total;
+            } elseif ($upperType === 'CASH') {
+                $totalCashCollect = $total;
+            } elseif ($upperType === 'ONLINE TRANSFER') {
+                $totalBankCollect = $total;
+            } elseif ($upperType === 'CHEQUE') {
+                $chequeCollect = $total;
+            }
+        }
 
 
         $totalCollection = $totalCrCollect + $totalCashCollect + $chequeCollect + $totalBankCollect;
