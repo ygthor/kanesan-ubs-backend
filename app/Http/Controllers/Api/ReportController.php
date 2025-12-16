@@ -171,7 +171,13 @@ class ReportController extends Controller
         // Users without full access are always restricted to their own agent_no
         if ($user && !hasFullAccess()) {
             // Always filter by logged-in user's agent_no (ignore any agent_no in request)
-            $query->where('agent_no', $user->name);
+            $userAgentNo = $user->name ?? $user->username ?? null;
+            if ($userAgentNo) {
+                $query->where('agent_no', $userAgentNo);
+            } else {
+                // User has no agent_no, return empty result
+                return response()->json([]);
+            }
         } elseif ($agentNo) {
             // User has full access, allow filtering by provided agent_no
             $query->where('agent_no', $agentNo);
@@ -187,7 +193,7 @@ class ReportController extends Controller
         $orders = $query->orderBy('order_date')->get();
 
         // Get user's agent_no for filtering linked CN orders (if user doesn't have full access)
-        $userAgentNo = ($user && !hasFullAccess()) ? $user->name : null;
+        $userAgentNo = ($user && !hasFullAccess()) ? ($user->name ?? $user->username ?? null) : null;
 
         // Calculate adjusted net amount for each invoice (deduct linked CN totals)
         $adjustedOrders = $orders->map(function ($order) use ($userAgentNo) {
