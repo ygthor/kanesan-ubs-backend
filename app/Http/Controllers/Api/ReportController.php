@@ -38,10 +38,10 @@ class ReportController extends Controller
         
         // Use Orders table - artrans is deprecated
 
-        // Get user's allowed customer IDs for filtering (unless KBS user)
+        // Get user's allowed customer IDs for filtering (unless user has full access)
         $allowedCustomerIds = null;
         $allowedCustomerCodes = null;
-        if ($user && !($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
+        if ($user && !hasFullAccess()) {
             $allowedCustomerIds = DB::table('customers')
                 ->whereIn('agent_no', [$user->name])
                 ->pluck('id')
@@ -149,6 +149,8 @@ class ReportController extends Controller
 
     public function salesOrders(Request $request)
     {
+        $user = auth()->user();
+        
         $fromDate = $request->input('from_date', date('Y-m-01'));
         $toDate   = $request->input('to_date', date('Y-m-d'));
         $customerId = $request->input('customer_id');
@@ -174,8 +176,14 @@ class ReportController extends Controller
             $query->where('customer_id', $customerId);
         }
 
+        // Filter by agent: if user doesn't have full access, only show their own data
+        // If agentNo is explicitly provided in request, use it (for filtering purposes)
+        // Otherwise, if user doesn't have full access, automatically filter by their agent_no
         if ($agentNo) {
             $query->where('agent_no', $agentNo);
+        } elseif ($user && !hasFullAccess()) {
+            // Automatically filter by logged-in user's agent_no
+            $query->where('agent_no', $user->name);
         }
 
         if ($customerSearch) {
