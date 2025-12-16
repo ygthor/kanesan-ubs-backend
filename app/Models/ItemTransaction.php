@@ -20,7 +20,6 @@ class ItemTransaction extends BaseModel
         'quantity',
         'reference_type',
         'reference_id',
-        'return_type', // 'good' or 'bad' for trade returns
         'notes',
         'stock_before',
         'stock_after',

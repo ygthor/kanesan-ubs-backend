@@ -790,5 +790,201 @@ class StockManagementController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Display item movements page with filters
+     */
+    public function itemMovements(Request $request)
+    {
+        $user = auth()->user();
+        
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            abort(403, 'Unauthorized access. Item Movements is only available for administrators and KBS users.');
+        }
+
+        // Get all product groups for filter
+        $groups = Icgroup::select('name')
+            ->orderBy('name', 'asc')
+            ->get();
+
+        // Get all agents for filter
+        $agents = User::select('id', 'name', 'username', 'email')
+            ->where(function($query) {
+                $query->where('username', '!=', 'KBS')
+                      ->where('email', '!=', 'KBS@kanesan.my');
+            })
+            ->orderBy('name', 'asc')
+            ->get()
+            ->filter(function($user) {
+                return !$user->hasRole('admin');
+            })
+            ->values();
+
+        // Get filter values from request
+        $filters = [
+            'date_from' => $request->input('date_from', date('Y-m-01')), // Default to first day of current month
+            'date_to' => $request->input('date_to', date('Y-m-d')), // Default to today
+            'item_group' => $request->input('item_group'),
+            'item_no' => $request->input('item_no'),
+            'transaction_type' => $request->input('transaction_type'), // 'in' or 'out'
+            'order_type' => $request->input('order_type'), // 'INV', 'DO', 'CN'
+            'agent_no' => $request->input('agent_no'),
+        ];
+
+        $movements = collect([]);
+
+        // Get movements from item_transactions
+        $itemTransactionsQuery = ItemTransaction::with('item')
+            ->join('icitem', function($join) {
+                $join->on(DB::raw('item_transactions.ITEMNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
+            });
+
+        if ($filters['agent_no']) {
+            $itemTransactionsQuery->where('item_transactions.agent_no', $filters['agent_no']);
+        }
+
+        if ($filters['item_no']) {
+            $itemTransactionsQuery->where('item_transactions.ITEMNO', $filters['item_no']);
+        }
+
+        if ($filters['item_group']) {
+            $itemTransactionsQuery->where('icitem.GROUP', $filters['item_group']);
+        }
+
+        if ($filters['transaction_type']) {
+            $itemTransactionsQuery->where('item_transactions.transaction_type', $filters['transaction_type']);
+        }
+
+        if ($filters['date_from']) {
+            $itemTransactionsQuery->whereDate('item_transactions.CREATED_ON', '>=', $filters['date_from']);
+        }
+
+        if ($filters['date_to']) {
+            $itemTransactionsQuery->whereDate('item_transactions.CREATED_ON', '<=', $filters['date_to']);
+        }
+
+        $itemTransactions = $itemTransactionsQuery->select(
+            'item_transactions.*',
+            'icitem.DESP',
+            'icitem.GROUP'
+        )->get();
+
+        foreach ($itemTransactions as $trans) {
+            $orderType = 'Manual';
+            $referenceNo = $trans->notes ?? 'N/A';
+            
+            if ($trans->reference_type === 'order' && $trans->reference_id) {
+                $order = DB::table('orders')->where('id', $trans->reference_id)->first();
+                if ($order) {
+                    $orderType = $order->type;
+                    $referenceNo = $order->reference_no;
+                }
+            }
+            
+            $movements->push([
+                'date' => $trans->CREATED_ON,
+                'item_group' => $trans->GROUP ?? 'N/A',
+                'item_no' => $trans->ITEMNO,
+                'item_name' => $trans->DESP ?? 'N/A',
+                'in_out' => $trans->transaction_type === 'in' ? 'IN' : 'OUT',
+                'quantity' => (float) $trans->quantity,
+                'type' => $orderType,
+                'reference_no' => $referenceNo,
+                'agent_no' => $trans->agent_no,
+            ]);
+        }
+
+        // Get movements from orders
+        $ordersQuery = DB::table('orders')
+            ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
+            ->join('icitem', function($join) {
+                $join->on(DB::raw('order_items.product_no COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
+            })
+            ->whereIn('orders.type', ['INV', 'DO', 'CN']);
+
+        if ($filters['agent_no']) {
+            $ordersQuery->where('orders.agent_no', $filters['agent_no']);
+        }
+
+        if ($filters['item_no']) {
+            $ordersQuery->where('order_items.product_no', $filters['item_no']);
+        }
+
+        if ($filters['item_group']) {
+            $ordersQuery->where('icitem.GROUP', $filters['item_group']);
+        }
+
+        if ($filters['order_type']) {
+            $ordersQuery->where('orders.type', $filters['order_type']);
+        }
+
+        if ($filters['date_from']) {
+            $ordersQuery->whereDate('orders.order_date', '>=', $filters['date_from']);
+        }
+
+        if ($filters['date_to']) {
+            $ordersQuery->whereDate('orders.order_date', '<=', $filters['date_to']);
+        }
+
+        $orders = $ordersQuery->select(
+            'orders.id',
+            'orders.reference_no',
+            'orders.type',
+            'orders.order_date',
+            'orders.agent_no',
+            'order_items.product_no',
+            'order_items.quantity',
+            'order_items.is_trade_return',
+            'order_items.trade_return_is_good',
+            'icitem.DESP',
+            'icitem.GROUP'
+        )->get();
+
+        foreach ($orders as $order) {
+            $transactionType = null;
+            $qty = (float) $order->quantity;
+
+            // Determine transaction type based on order type
+            if ($order->type === 'DO') {
+                $transactionType = 'in';
+            } elseif ($order->type === 'INV') {
+                if ($order->is_trade_return && $order->trade_return_is_good) {
+                    $transactionType = 'in'; // Trade return good
+                } else {
+                    $transactionType = 'out'; // Regular INV or trade return bad
+                }
+            } elseif ($order->type === 'CN') {
+                if ($order->trade_return_is_good) {
+                    $transactionType = 'in'; // Trade return good
+                } else {
+                    // Trade return bad - skip (no stock change)
+                    continue;
+                }
+            }
+
+            // Apply transaction_type filter if set
+            if ($filters['transaction_type'] && $transactionType !== $filters['transaction_type']) {
+                continue;
+            }
+
+            $movements->push([
+                'date' => $order->order_date,
+                'item_group' => $order->GROUP ?? 'N/A',
+                'item_no' => $order->product_no,
+                'item_name' => $order->DESP ?? 'N/A',
+                'in_out' => strtoupper($transactionType),
+                'quantity' => $qty,
+                'type' => $order->type,
+                'reference_no' => $order->reference_no,
+                'agent_no' => $order->agent_no,
+            ]);
+        }
+
+        // Sort by date descending
+        $movements = $movements->sortByDesc('date')->values();
+
+        return view('inventory.item-movements', compact('movements', 'groups', 'agents', 'filters'));
+    }
 }
 

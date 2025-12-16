@@ -14,11 +14,10 @@ class StockService
      * Calculate stock totals for an agent and item from orders AND item_transactions
      *
      * IMPORTANT: Return Bad Logic
-     * - Return bad items are physically returned, so they are recorded as stock IN
-     *   to avoid double deduction (original INV already deducted once)
-     * - However, returnBad is still subtracted in available calculation because
-     *   bad quality items don't count toward usable stock
+     * - Trade return GOOD adds to available stock (via returnGood)
+     * - Trade return BAD does NOT affect stock (no stock change)
      * - Formula: available = stockIn + returnGood - stockOut - returnBad
+     *   (returnBad is tracked for display/reporting but doesn't affect stock)
      *
      * @param string $agentNo Agent number (user name)
      * @param string $itemNo Item number (ITEMNO from icitem)
@@ -55,13 +54,12 @@ class StockService
             } elseif ($orderItem->type === 'INV') {
                 if ($isTradeReturn) {
                     if ($tradeReturnIsGood) {
-                        // Trade return good = Stock IN (returnGood)
+                        // Trade return good = Stock IN (returnGood) - adds to available stock
                         $returnGood += $qty;
                     } else {
-                        // Trade return bad = Stock IN (physically returned)
-                        // Tracked as returnBad for display, but items are returned (stock IN)
-                        // to avoid double deduction (original INV already deducted once)
-                        $returnBad += $qty;
+                        // Trade return bad = No stock change (do nothing)
+                        // Items are physically returned but don't affect available stock
+                        // Don't add to returnBad - it doesn't affect stock calculation
                     }
                 } else {
                     // Normal INV item = Stock OUT
@@ -70,13 +68,12 @@ class StockService
             }
             elseif ($orderItem->type === 'CN') {
                 if ($tradeReturnIsGood) {
-                    // Trade return good = Stock IN (returnGood)
+                    // Trade return good = Stock IN (returnGood) - adds to available stock
                     $returnGood += $qty;
                 } else {
-                    // Trade return bad = Stock IN (physically returned)
-                    // Tracked as returnBad for display, but items are returned (stock IN)
-                    // to avoid double deduction (original INV already deducted once)
-                    $returnBad += $qty;
+                    // Trade return bad = No stock change (do nothing)
+                    // Items are physically returned but don't add to available stock
+                    $returnBad += $qty; // Track for display/reporting only
                 }
             }
         }
@@ -91,18 +88,11 @@ class StockService
                 $qty = (float) $transaction->quantity;
 
                 if ($transaction->transaction_type === 'in') {
-                    if ($transaction->return_type === 'good') {
-                        $returnGood += $qty;
-                    } else {
-                        //$stockIn += $qty;
-                        $returnGood += $qty;
-                    }
+                    // All 'in' transactions = Stock IN
+                    $stockIn += $qty;
                 } elseif ($transaction->transaction_type === 'out') {
-                    if ($transaction->return_type === 'bad') {
-                        $returnBad += $qty;
-                    } else {
-                        //$stockOut += $qty;
-                    }
+                    // All 'out' transactions = Stock OUT
+                    $stockOut += $qty;
                 }
             }
         } catch (\Exception $e) {
@@ -232,13 +222,12 @@ class StockService
                     'in',
                     $referenceType,
                     $referenceId,
-                    null,
                     "DO Order: {$order->reference_no}"
                 );
             } elseif ($orderType === 'INV') {
                 if ($isTradeReturn) {
                     if ($tradeReturnIsGood) {
-                        // Trade return good = Stock IN (return_type = 'good')
+                        // Trade return good = Stock IN
                         $this->recordMovement(
                             $agentNo,
                             $itemNo,
@@ -246,23 +235,11 @@ class StockService
                             'in',
                             $referenceType,
                             $referenceId,
-                            'good',
                             "INV Trade Return Good: {$order->reference_no}"
                         );
                     } else {
-                        // Trade return bad = Stock IN (return_type = 'bad')
-                        // Items are physically returned, so stock IN to avoid double deduction
-                        // (original INV already deducted once)
-                        $this->recordMovement(
-                            $agentNo,
-                            $itemNo,
-                            $quantity,
-                            'in',
-                            $referenceType,
-                            $referenceId,
-                            'bad',
-                            "INV Trade Return Bad: {$order->reference_no}"
-                        );
+                        // Trade return bad = No stock change (do nothing)
+                        // Don't record transaction - it doesn't affect stock
                     }
                 } else {
                     // Normal INV item = Stock OUT
@@ -273,14 +250,13 @@ class StockService
                         'out',
                         $referenceType,
                         $referenceId,
-                        null,
                         "INV Order: {$order->reference_no}"
                     );
                 }
             } elseif ($orderType === 'CN') {
                 // CN = Trade Return
                 if ($tradeReturnIsGood) {
-                    // Trade return good = Stock IN (return_type = 'good')
+                    // Trade return good = Stock IN
                     $this->recordMovement(
                         $agentNo,
                         $itemNo,
@@ -288,23 +264,11 @@ class StockService
                         'in',
                         $referenceType,
                         $referenceId,
-                        'good',
                         "CN Trade Return Good: {$order->reference_no}"
                     );
                 } else {
-                    // Trade return bad = Stock IN (return_type = 'bad')
-                    // Items are physically returned, so stock IN to avoid double deduction
-                    // (original INV already deducted once)
-                    $this->recordMovement(
-                        $agentNo,
-                        $itemNo,
-                        $quantity,
-                        'in',
-                        $referenceType,
-                        $referenceId,
-                        'bad',
-                        "CN Trade Return Bad: {$order->reference_no}"
-                    );
+                    // Trade return bad = No stock change (do nothing)
+                    // Don't record transaction - it doesn't affect stock
                 }
             }
         }
@@ -319,7 +283,6 @@ class StockService
      * @param string $transactionType 'in' or 'out'
      * @param string $referenceType Reference type (e.g., 'order')
      * @param string|int $referenceId Reference ID
-     * @param string|null $returnType 'good' or 'bad' for trade returns
      * @param string|null $notes Additional notes
      * @return ItemTransaction
      */
@@ -330,7 +293,6 @@ class StockService
         string $transactionType,
         string $referenceType,
         $referenceId,
-        ?string $returnType = null,
         ?string $notes = null
     ): ItemTransaction {
         // Ensure quantity is positive (we use transaction_type to indicate direction)
@@ -355,7 +317,6 @@ class StockService
             'quantity' => $quantity, // Store as positive, type indicates direction
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
-            'return_type' => $returnType,
             'notes' => $notes,
             'stock_before' => $stockBefore,
             'stock_after' => $stockAfter,
@@ -390,7 +351,6 @@ class StockService
                 $reverseType,
                 'order_reversal',
                 $order->id,
-                $transaction->return_type,
                 "Reversal of order: {$order->reference_no}"
             );
         }
@@ -445,9 +405,11 @@ class StockService
             } elseif ($orderItem->type === 'INV') {
                 if ($isTradeReturn) {
                     if ($tradeReturnIsGood) {
+                        // Trade return good = adds to available stock
                         $itemTotals[$itemNo]['returnGood'] += $qty;
                     } else {
-                        $itemTotals[$itemNo]['returnBad'] += $qty;
+                        // Trade return bad = no stock change (do nothing)
+                        // Don't add to returnBad - it doesn't affect stock
                     }
                 } else {
                     $itemTotals[$itemNo]['stockOut'] += $qty;
@@ -455,9 +417,11 @@ class StockService
             } elseif ($orderItem->type === 'CN') {
                 // CN = Trade Return
                 if ($tradeReturnIsGood) {
+                    // Trade return good = adds to available stock
                     $itemTotals[$itemNo]['returnGood'] += $qty;
                 } else {
-                    $itemTotals[$itemNo]['returnBad'] += $qty;
+                    // Trade return bad = no stock change (do nothing)
+                    // Don't add to returnBad - it doesn't affect stock
                 }
             }
         }
@@ -486,18 +450,11 @@ class StockService
                 $qty = (float) $transaction->quantity;
 
                 if ($transaction->transaction_type === 'in') {
-                    if ($transaction->return_type === 'good') {
-                        $itemTotals[$itemNo]['returnGood'] += $qty;
-                    } else {
-                        // Opening balance and other stock-in transactions
-                        $itemTotals[$itemNo]['stockIn'] += $qty;
-                    }
+                    // All 'in' transactions = Stock IN
+                    $itemTotals[$itemNo]['stockIn'] += $qty;
                 } elseif ($transaction->transaction_type === 'out') {
-                    if ($transaction->return_type === 'bad') {
-                        $itemTotals[$itemNo]['returnBad'] += $qty;
-                    } else {
-                        $itemTotals[$itemNo]['stockOut'] += $qty;
-                    }
+                    // All 'out' transactions = Stock OUT
+                    $itemTotals[$itemNo]['stockOut'] += $qty;
                 }
             }
         } catch (\Exception $e) {
