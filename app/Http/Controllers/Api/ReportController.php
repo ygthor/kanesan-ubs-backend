@@ -186,40 +186,38 @@ class ReportController extends Controller
             $query->where('customer_id', $customerId);
         }
 
-        $query->where('agent_no', $user->name);
-
         // Filter by agent: if user doesn't have full access, only show their own data
         // Users with full access can filter by any agent_no if provided
         // Users without full access are always restricted to their own agent_no
         // Note: Orders can have agent_no stored as either user->name OR user->username
         // So we need to check both to match all orders created by this user
-        // if ($user && !hasFullAccess()) {
-        //     // Always filter by logged-in user's agent_no (ignore any agent_no in request)
-        //     $userName = $user->name;
-        //     $userUsername = $user->username;
+        if ($user && !hasFullAccess()) {
+            // Always filter by logged-in user's agent_no (ignore any agent_no in request)
+            $userName = $user->name;
+            $userUsername = $user->username;
             
-        //     if ($userName || $userUsername) {
-        //         // Check if agent_no matches either name or username
-        //         $query->where(function($q) use ($userName, $userUsername) {
-        //             if ($userName) {
-        //                 $q->where('agent_no', $userName);
-        //             }
-        //             if ($userUsername) {
-        //                 if ($userName) {
-        //                     $q->orWhere('agent_no', $userUsername);
-        //                 } else {
-                            
-        //                 }
-        //             }
-        //         });
-        //     } else {
-        //         // User has no agent_no, return empty result
-        //         return response()->json([]);
-        //     }
-        // } elseif ($agentNo) {
-        //     // User has full access, allow filtering by provided agent_no
-        //     $query->where('agent_no', $agentNo);
-        // }
+            if ($userName || $userUsername) {
+                // Check if agent_no matches either name or username
+                $query->where(function($q) use ($userName, $userUsername) {
+                    if ($userName) {
+                        $q->where('agent_no', $userName);
+                    }
+                    if ($userUsername) {
+                        if ($userName) {
+                            $q->orWhere('agent_no', $userUsername);
+                        } else {
+                            $q->where('agent_no', $userUsername);
+                        }
+                    }
+                });
+            } else {
+                // User has no agent_no, return empty result
+                return response()->json([]);
+            }
+        } elseif ($agentNo) {
+            // User has full access, allow filtering by provided agent_no
+            $query->where('agent_no', $agentNo);
+        }
 
         if ($customerSearch) {
             $query->where(function($q) use ($customerSearch) {

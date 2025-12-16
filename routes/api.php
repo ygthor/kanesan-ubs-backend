@@ -86,9 +86,6 @@ Route::get('/script_to_run/update_customer_name', function () {
 Route::get('/customer/invoices/print2', [InvoiceController::class, 'printInvoiceReport']);
 Route::get('invoices/{refNo}/print2', [InvoiceController::class, 'printInvoice']);
 
-Route::get('/business-summary', [ReportController::class, 'businessSummary']);
-Route::get('/report/orders', [ReportController::class, 'salesOrders']);
-
 
 
 Route::post('/test/api', function () {
@@ -111,6 +108,10 @@ Route::get('/territories', [\App\Http\Controllers\Api\TerritoryController::class
 
 // Route::middleware([])->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
+
+    // Report routes (require authentication)
+    Route::get('/business-summary', [ReportController::class, 'businessSummary']);
+    Route::get('/report/orders', [ReportController::class, 'salesOrders']);
 
     // Admin Management Routes
     Route::prefix('admin')->group(function () {
