@@ -472,7 +472,8 @@ class OrderController extends Controller
         }
         
         // Load items and customer relationship for detailed view
-        $order->load('items.item', 'customer');
+        // Also load order relationship for items to optimize linked_credit_note_count calculation
+        $order->load('items.item', 'items.order', 'customer');
         
         // If this is an INV order, also load linked CN orders
         $linkedCreditNotes = [];

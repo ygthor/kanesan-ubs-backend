@@ -81,7 +81,7 @@ class OrderItem extends BaseModel
     /**
      * Append unit to array/json output
      */
-    protected $appends = ['unit'];
+    protected $appends = ['unit', 'linked_credit_note_count'];
 
     /**
      * Hide the item relationship from default serialization to avoid recursion
@@ -104,6 +104,39 @@ class OrderItem extends BaseModel
 
         // Lazy load as a final fallback (should rarely happen because item is eager loaded)
         return $this->item ? $this->item->NAME : null;
+    }
+
+    /**
+     * Get the count of linked credit note items that reference this order item.
+     * This counts how many credit note items (from CN orders linked to the invoice)
+     * have the same product_no as this order item.
+     */
+    public function getLinkedCreditNoteCountAttribute()
+    {
+        // Only calculate for items that belong to INV orders
+        $order = $this->order;
+        if (!$order || $order->type !== 'INV') {
+            return 0;
+        }
+
+        // Get all CN orders linked to this invoice
+        $linkedCNOrders = Order::where('credit_invoice_no', $order->reference_no)
+            ->where('type', 'CN')
+            ->get();
+
+        if ($linkedCNOrders->isEmpty()) {
+            return 0;
+        }
+
+        // Count credit note items with the same product_no
+        $count = 0;
+        foreach ($linkedCNOrders as $cnOrder) {
+            $count += OrderItem::where('reference_no', $cnOrder->reference_no)
+                ->where('product_no', $this->product_no)
+                ->count();
+        }
+
+        return $count;
     }
 
     public function calculate()
