@@ -125,7 +125,7 @@
                                 <span style="color: red;"> (RETURN)</span>
                             @endif
                         </td>
-                        <td class="text-right">{{ number_format(abs($item->QTY), 2) }}</td>
+                        <td class="text-right">{{ abs($item->QTY) == floor(abs($item->QTY)) ? number_format(abs($item->QTY), 0) : number_format(abs($item->QTY), 2) }}</td>
                         <td class="text-right">{{ number_format($item->PRICE, 2) }}</td>
                         {{-- CORRECTED: Use AMT_BIL for the line item amount --}}
                         <td class="text-right">{{ number_format($item->AMT_BIL, 2) }}</td>

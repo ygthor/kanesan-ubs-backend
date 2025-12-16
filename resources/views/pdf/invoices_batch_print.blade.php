@@ -107,7 +107,7 @@
                         <tr>
                             <td>{{ $loop->iteration }}</td>
                             <td>{{ $item->DESP }}</td>
-                            <td class="text-right">{{ number_format($item->QTY, 2) }}</td>
+                            <td class="text-right">{{ $item->QTY == floor($item->QTY) ? number_format($item->QTY, 0) : number_format($item->QTY, 2) }}</td>
                             <td class="text-right">{{ number_format($item->PRICE, 2) }}</td>
                             {{-- CORRECTED: Use AMT_BIL for the line item amount --}}
                             <td class="text-right">{{ number_format($item->AMT_BIL, 2) }}</td>
