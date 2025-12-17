@@ -127,24 +127,31 @@ class ReportController extends Controller
         // Database might store in different cases, so we search case-insensitively
         $totalCrCollect = 0;
         $totalCashCollect = 0;
-        $totalBankCollect = 0;
+        //$totalBankCollect = 0;
         $chequeCollect = 0;
+        $pdchequeCollect = 0;
 
         foreach ($collections as $paymentType => $total) {
             $upperType = strtoupper(trim($paymentType));
-            if ($upperType === 'CARD') {
+            if ($upperType === 'CARD' || $upperType === 'E-WALLET' || $upperType === 'ONLINE TRANSFER')
+            {
                 $totalCrCollect = $total;
             } elseif ($upperType === 'CASH') {
                 $totalCashCollect = $total;
-            } elseif ($upperType === 'ONLINE TRANSFER') {
-                $totalBankCollect = $total;
-            } elseif ($upperType === 'CHEQUE') {
+            }
+            // elseif ($upperType === 'ONLINE TRANSFER') {
+            //     $totalBankCollect = $total;
+            // }
+            elseif ($upperType === 'CHEQUE') {
                 $chequeCollect = $total;
+            }
+            elseif ($upperType === 'PD CHEQUE') {
+                $pdchequeCollect = $total;
             }
         }
 
 
-        $totalCollection = $totalCrCollect + $totalCashCollect + $chequeCollect + $totalBankCollect;
+        $totalCollection = $totalCrCollect + $totalCashCollect + $chequeCollect + $pdchequeCollect;
 
         return response()->json([
             'from_date' => $fromDate,
@@ -157,8 +164,9 @@ class ReportController extends Controller
             'total_cr_collect' => $totalCrCollect,
             'total_cash_collect' => $totalCashCollect,
             'cheque_collect' => $chequeCollect,
-            'total_bank_collect' => $totalBankCollect,
+            //'total_bank_collect' => $totalBankCollect,
             'total_collection' => $totalCollection,
+            'pd_cheque_collect' => $pdchequeCollect,
         ]);
     }
 
