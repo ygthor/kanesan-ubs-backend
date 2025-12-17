@@ -50,8 +50,6 @@ class ReportController extends Controller
             }
             $query->whereBetween('order_date', [$fromDate, $toDate]);
         }
-            ->with('customer')
-            ->orderBy('order_date', 'desc');
 
         // Filter by customer_id
         if ($customerId) {
@@ -71,7 +69,7 @@ class ReportController extends Controller
             });
         }
 
-        $orders = $query->get();
+        $orders = $query->with('customer')->orderBy('order_date', 'desc')->get();
 
         // Get agents for filter dropdown
         $agents = $this->getAgents();
@@ -106,8 +104,6 @@ class ReportController extends Controller
             }
             $query->whereBetween('order_date', [$fromDate, $toDate]);
         }
-            ->with('customer')
-            ->orderBy('order_date', 'desc');
 
         // Filter by type if provided
         if ($type) {
@@ -132,7 +128,7 @@ class ReportController extends Controller
             });
         }
 
-        $orders = $query->get();
+        $orders = $query->with('customer')->orderBy('order_date', 'desc')->get();
 
         // Get agents for filter dropdown
         $agents = $this->getAgents();
@@ -216,8 +212,6 @@ class ReportController extends Controller
             }
             $query->whereBetween('receipt_date', [$fromDate, $toDate]);
         }
-            ->with('customer')
-            ->orderBy('receipt_date', 'desc');
 
         // Filter by customer_id
         if ($customerId) {
@@ -245,7 +239,7 @@ class ReportController extends Controller
             });
         }
 
-        $receipts = $query->get();
+        $receipts = $query->with('customer')->orderBy('receipt_date', 'desc')->get();
 
         // Get agents for filter dropdown
         $agents = $this->getAgents();
