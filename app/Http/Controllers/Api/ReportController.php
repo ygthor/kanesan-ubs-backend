@@ -41,31 +41,22 @@ class ReportController extends Controller
 
         // Use Orders table - artrans is deprecated
 
-        // Get user's name for filtering (unless user has full access)
-        $userName = null;
+        // Filter by agent: if user doesn't have full access, only show their own data
+        // Users with full access can filter by any agent_no if provided
+        // Users without full access are always restricted to their own agent_no
+        $agentNoToFilter = null;
         if ($user && !hasFullAccess()) {
-            $userName = $user->name;
+            // Always filter by logged-in user's name (ignore any agent_no in request)
+            $agentNoToFilter = $user->name;
+        } elseif ($agentNo) {
+            // User has full access, allow filtering by provided agent_no
+            $agentNoToFilter = $agentNo;
         }
 
         // Helper function to apply agent_no filter
-        // $applyAgentFilter = function($query) use ($userName) {
-        //     if ($userName) {
-        //         $query->where('agent_no', $userName);
-        //     }
-        // };
-
-        // --- Sales ---
-        // CA Sales: Cash Sales (type='CS')
-        // $caSalesQuery = DB::table('orders')
-        //     ->whereBetween('order_date', [$fromDate, $toDate])
-        //     ->where('type', 'CS');
-        // // Filter by agent_no directly on orders table (if user doesn't have full access)
-        // $applyAgentFilter($caSalesQuery);
-        // $caSales = $caSalesQuery->sum('net_amount');
-
-        $applyAgentFilter = function($query) use ($userName) {
-            if ($userName) {
-                $query->where('orders.agent_no', $userName);
+        $applyAgentFilter = function($query) use ($agentNoToFilter) {
+            if ($agentNoToFilter) {
+                $query->where('orders.agent_no', $agentNoToFilter);
             }
         };
 
@@ -130,8 +121,8 @@ class ReportController extends Controller
             ->whereNull('receipts.deleted_at') // Exclude soft-deleted receipts
             ->select('receipts.payment_type', DB::raw('SUM(receipts.paid_amount) as total'));
 
-        if ($userName) {
-            $collectionsQuery->where('customers.agent_no', $userName);
+        if ($agentNoToFilter) {
+            $collectionsQuery->where('customers.agent_no', $agentNoToFilter);
         }
         if ($customerId) {
             $collectionsQuery->where('receipts.customer_id', $customerId);
