@@ -130,22 +130,49 @@ class Order extends BaseModel
     public function getReferenceNo()
     {
         $type = $this->type;
-        // Use CNI prefix for CN type to prevent conflicts with existing numbering
-        if ($type === 'INV') {
-            $prefix = 'I';
-        } elseif ($type === 'CN') {
-            $prefix = 'CNI';
+        $agentNo = $this->agent_no;
+        
+        // Build prefix based on agent code
+        // Examples: S01 → S1, S02 → S2, S03 → S3
+        if ($agentNo && strlen($agentNo) >= 2) {
+            // Extract first character and numeric part
+            // S01 → S + 1, S02 → S + 2, S03 → S + 3
+            $firstChar = substr($agentNo, 0, 1);
+            $numericPart = (int) substr($agentNo, 1); // Convert "01" to 1, "02" to 2, etc.
+            $agentPrefix = $firstChar . $numericPart;
+            
+            if ($type === 'INV') {
+                // Invoice: S01 → S100001, S02 → S200001
+                $prefix = $agentPrefix;
+            } elseif ($type === 'CN') {
+                // Credit Note: S01 → S1C00001, S03 → S3C00001
+                $prefix = $agentPrefix . 'C';
+            } else {
+                $prefix = $agentPrefix . $type;
+            }
         } else {
-            $prefix = $type;
+            // Fallback to old format if agent_no is not available
+            if ($type === 'INV') {
+                $prefix = 'I';
+            } elseif ($type === 'CN') {
+                $prefix = 'CNI';
+            } else {
+                $prefix = $type;
+            }
         }
         
-        $count = Order::where('type', "=", $type)->count();
+        // Count orders of same type AND same agent_no to get running number per agent
+        $query = Order::where('type', '=', $type);
+        if ($agentNo) {
+            $query->where('agent_no', '=', $agentNo);
+        }
+        $count = $query->count();
 
         $found = false;
-        $running_number = $count;
+        $running_number = $count + 1; // Start from 1, not 0
         while (!$found) {
             $refNo = $prefix . str_pad($running_number, 5, '0', STR_PAD_LEFT);
-            $chk = Order::where('reference_no', "=", $refNo)->first();
+            $chk = Order::where('reference_no', '=', $refNo)->first();
             if ($chk == null) break;
             $running_number++;
         }

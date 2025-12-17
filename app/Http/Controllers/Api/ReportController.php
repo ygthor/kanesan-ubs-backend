@@ -60,9 +60,16 @@ class ReportController extends Controller
             }
         };
 
-        $applyCustFilter = function($query) use ($customerId) {
+        $applyCustFilter = function($query) use ($customerId, $customerSearch) {
             if ($customerId) {
                 $query->where('orders.customer_id', $customerId);
+            }
+            if ($customerSearch) {
+                $query->where(function($q) use ($customerSearch) {
+                    $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                      ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                      ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                });
             }
         };
 
@@ -103,12 +110,13 @@ class ReportController extends Controller
 
         // Returns: Credit Notes (type='CN')
         $returnsQuery = DB::table('orders')
-            ->whereBetween('order_date', [$fromDate, $toDate])
-            ->where('type', 'CN');
+            ->join('customers', 'orders.customer_id', '=', 'customers.id')
+            ->whereBetween('orders.order_date', [$fromDate, $toDate])
+            ->where('orders.type', 'CN');
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($returnsQuery);
         $applyCustFilter($returnsQuery);
-        $returns = $returnsQuery->sum('net_amount');
+        $returns = $returnsQuery->sum('orders.net_amount');
 
         $nettSales = $totalSales - $returns;
 
@@ -126,6 +134,13 @@ class ReportController extends Controller
         }
         if ($customerId) {
             $collectionsQuery->where('receipts.customer_id', $customerId);
+        }
+        if ($customerSearch) {
+            $collectionsQuery->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
         }
 
         $collections = $collectionsQuery->groupBy('receipts.payment_type')->pluck('total', 'payment_type');
