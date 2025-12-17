@@ -12,7 +12,7 @@ class ReportController extends Controller
     public function businessSummary(Request $request)
     {
         $user = auth()->user();
-        
+
         $fromDate = $request->input('from_date');
         $toDate   = $request->input('to_date');
 
@@ -26,7 +26,7 @@ class ReportController extends Controller
         if (!$fromDate || !$toDate) {
             return response()->json(['error' => 'from_date and to_date are required'], 422);
         }
-        
+
         // Ensure dates include full time range for datetime fields
         // fromDate should start at 00:00:00, toDate should end at 23:59:59
         if (strlen($fromDate) == 10) {
@@ -35,7 +35,7 @@ class ReportController extends Controller
         if (strlen($toDate) == 10) {
             $toDate .= ' 23:59:59';
         }
-        
+
         // Use Orders table - artrans is deprecated
 
         // Get user's name for filtering (unless user has full access)
@@ -45,28 +45,56 @@ class ReportController extends Controller
         }
 
         // Helper function to apply agent_no filter
+        // $applyAgentFilter = function($query) use ($userName) {
+        //     if ($userName) {
+        //         $query->where('agent_no', $userName);
+        //     }
+        // };
+
+        // --- Sales ---
+        // CA Sales: Cash Sales (type='CS')
+        // $caSalesQuery = DB::table('orders')
+        //     ->whereBetween('order_date', [$fromDate, $toDate])
+        //     ->where('type', 'CS');
+        // // Filter by agent_no directly on orders table (if user doesn't have full access)
+        // $applyAgentFilter($caSalesQuery);
+        // $caSales = $caSalesQuery->sum('net_amount');
+
         $applyAgentFilter = function($query) use ($userName) {
             if ($userName) {
-                $query->where('agent_no', $userName);
+                $query->where('orders.agent_no', $userName);
             }
         };
 
         // --- Sales ---
-        // CA Sales: Cash Sales (type='CS')
+        // CA Sales: Cash Sales from customers with payment_type 'Cash Sales' or 'Cash'
         $caSalesQuery = DB::table('orders')
-            ->whereBetween('order_date', [$fromDate, $toDate])
-            ->where('type', 'CS');
+            ->join('customers', 'orders.customer_id', '=', 'customers.id')
+            ->whereBetween('orders.order_date', [$fromDate, $toDate])
+            ->where('orders.type', 'INV')
+            ->whereIn('customers.customer_type', ['Cash']);
+
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($caSalesQuery);
-        $caSales = $caSalesQuery->sum('net_amount');
+        $caSales = $caSalesQuery->sum('orders.net_amount');
+
 
         // CR Sales: Credit Sales/Invoices (type='INV')
-        $crSalesQuery = DB::table('orders')
+        /* $crSalesQuery = DB::table('orders')
             ->whereBetween('order_date', [$fromDate, $toDate])
             ->where('type', 'INV');
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($crSalesQuery);
-        $crSales = $crSalesQuery->sum('net_amount');
+        $crSales = $crSalesQuery->sum('net_amount'); */
+        $crSalesQuery = DB::table('orders')
+            ->join('customers', 'orders.customer_id', '=', 'customers.id')
+            ->whereBetween('orders.order_date', [$fromDate, $toDate])
+            ->where('orders.type', 'INV')
+            ->whereIn('customers.customer_type', ['CREDITOR']);
+
+        // Filter by agent_no directly on orders table (if user doesn't have full access)
+        $applyAgentFilter($crSalesQuery);
+        $crSales = $crSalesQuery->sum('orders.net_amount');
 
         $totalSales = $caSales + $crSales;
 
@@ -88,20 +116,20 @@ class ReportController extends Controller
             ->whereBetween('receipts.receipt_date', [$fromDate, $toDate])
             ->whereNull('receipts.deleted_at') // Exclude soft-deleted receipts
             ->select('receipts.payment_type', DB::raw('SUM(receipts.paid_amount) as total'));
-        
+
         if ($userName) {
             $collectionsQuery->where('customers.agent_no', $userName);
         }
-        
+
         $collections = $collectionsQuery->groupBy('receipts.payment_type')->pluck('total', 'payment_type');
-        
+
         // Handle case-insensitive matching (frontend sends: 'CASH', 'Card', 'Online Transfer', 'CHEQUE')
         // Database might store in different cases, so we search case-insensitively
         $totalCrCollect = 0;
         $totalCashCollect = 0;
         $totalBankCollect = 0;
         $chequeCollect = 0;
-        
+
         foreach ($collections as $paymentType => $total) {
             $upperType = strtoupper(trim($paymentType));
             if ($upperType === 'CARD') {
@@ -137,7 +165,7 @@ class ReportController extends Controller
     public function salesOrders(Request $request)
     {
         $user = auth()->user();
-        
+
         $fromDate = $request->input('from_date', date('Y-m-01'));
         $toDate   = $request->input('to_date', date('Y-m-d'));
         $customerId = $request->input('customer_id');
@@ -198,20 +226,20 @@ class ReportController extends Controller
             $linkedCNsQuery = DB::table('orders')
                 ->where('credit_invoice_no', $order->reference_no)
                 ->where('type', 'CN');
-            
+
             // Filter linked CN orders by agent_no if user doesn't have full access
             if ($userName) {
                 $linkedCNsQuery->where('agent_no', $userName);
             }
-            
+
             $linkedCNs = $linkedCNsQuery->get();
-            
+
             // Calculate total from linked CN orders
             $cnTotal = $linkedCNs->sum('net_amount');
-            
+
             // Calculate adjusted net amount (original net_amount - CN total)
             $adjustedNetAmount = max(0, ($order->net_amount ?? 0) - $cnTotal);
-            
+
             // Return order with adjusted amount
             return (object) [
                 'id' => $order->id,
