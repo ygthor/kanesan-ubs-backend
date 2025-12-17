@@ -61,35 +61,35 @@
     </form>
 
     <!-- Summary Tables -->
-    <div class="row mb-4">
+    <div class="row mb-3">
         <!-- Sales Summary Table -->
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-chart-line"></i> Sales</h3>
+                <div class="card-header py-2">
+                    <h5 class="card-title mb-0" style="font-size: 0.9rem;"><i class="fas fa-chart-line"></i> Sales</h5>
                 </div>
-                <div class="card-body p-0">
-                    <table class="table table-bordered mb-0">
+                <div class="card-body p-1">
+                    <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
                         <tbody>
                             <tr>
-                                <td class="font-weight-bold">CA Sales</td>
-                                <td class="text-right">RM {{ number_format($caSalesTotal ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">CA Sales</td>
+                                <td class="text-right py-1">RM {{ number_format($caSalesTotal ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">CR Sales</td>
-                                <td class="text-right">RM {{ number_format($crSalesTotal ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">CR Sales</td>
+                                <td class="text-right py-1">RM {{ number_format($crSalesTotal ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">Total Sales</td>
-                                <td class="text-right">RM {{ number_format($totalSales ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">Total Sales</td>
+                                <td class="text-right py-1">RM {{ number_format($totalSales ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">Return</td>
-                                <td class="text-right">RM {{ number_format($returnsTotal ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">Return</td>
+                                <td class="text-right py-1">RM {{ number_format($returnsTotal ?? 0, 2) }}</td>
                             </tr>
                             <tr class="bg-light">
-                                <td class="font-weight-bold">Nett Sales</td>
-                                <td class="text-right font-weight-bold">RM {{ number_format($nettSales ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">Nett Sales</td>
+                                <td class="text-right font-weight-bold py-1">RM {{ number_format($nettSales ?? 0, 2) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -100,39 +100,39 @@
         <!-- Collection Summary Table -->
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-money-check-alt"></i> Collection</h3>
+                <div class="card-header py-2">
+                    <h5 class="card-title mb-0" style="font-size: 0.9rem;"><i class="fas fa-money-check-alt"></i> Collection</h5>
                 </div>
-                <div class="card-body p-0">
-                    <table class="table table-bordered mb-0">
+                <div class="card-body p-1">
+                    <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
                         <tbody>
                             <tr>
-                                <td class="font-weight-bold">CASH</td>
-                                <td class="text-right">RM {{ number_format($cashCollection ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">CASH</td>
+                                <td class="text-right py-1">RM {{ number_format($cashCollection ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">E-WALLET</td>
-                                <td class="text-right">RM {{ number_format($ewalletCollection ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">E-WALLET</td>
+                                <td class="text-right py-1">RM {{ number_format($ewalletCollection ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">ONLINE TRANSFER</td>
-                                <td class="text-right">RM {{ number_format($onlineTransferCollection ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">ONLINE TRANSFER</td>
+                                <td class="text-right py-1">RM {{ number_format($onlineTransferCollection ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">CARD</td>
-                                <td class="text-right">RM {{ number_format($cardCollection ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">CARD</td>
+                                <td class="text-right py-1">RM {{ number_format($cardCollection ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">CHEQUE</td>
-                                <td class="text-right">RM {{ number_format($chequeCollection ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">CHEQUE</td>
+                                <td class="text-right py-1">RM {{ number_format($chequeCollection ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold">PD CHEQUE</td>
-                                <td class="text-right">RM {{ number_format($pdChequeCollection ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">PD CHEQUE</td>
+                                <td class="text-right py-1">RM {{ number_format($pdChequeCollection ?? 0, 2) }}</td>
                             </tr>
                             <tr class="bg-light">
-                                <td class="font-weight-bold">Total Collection</td>
-                                <td class="text-right font-weight-bold">RM {{ number_format($totalCollection ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">Total Collection</td>
+                                <td class="text-right font-weight-bold py-1">RM {{ number_format($totalCollection ?? 0, 2) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -142,15 +142,15 @@
     </div>
 
     <!-- Account Balance -->
-    <div class="row mb-4">
+    <div class="row mb-3">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-body">
+                <div class="card-body py-2">
                     <div class="row">
                         <div class="col-md-12 text-center">
-                            <h4 class="mb-0">
+                            <h5 class="mb-0" style="font-size: 0.95rem;">
                                 <strong>Account Balance = RM {{ number_format($accountBalance ?? 0, 2) }}</strong>
-                            </h4>
+                            </h5>
                         </div>
                     </div>
                 </div>
