@@ -59,6 +59,16 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // Announcement Management
     Route::resource('announcements', \App\Http\Controllers\Admin\AnnouncementController::class);
+
+    // Report routes (KBS/admin only - checked in controller)
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/sales', [\App\Http\Controllers\Admin\ReportController::class, 'salesReport'])->name('sales');
+        Route::get('/transactions', [\App\Http\Controllers\Admin\ReportController::class, 'transactionReport'])->name('transactions');
+        Route::get('/customers', [\App\Http\Controllers\Admin\ReportController::class, 'customerReport'])->name('customers');
+        Route::get('/receipts', [\App\Http\Controllers\Admin\ReportController::class, 'receiptReport'])->name('receipts');
+        Route::get('/customer-balance', [\App\Http\Controllers\Admin\ReportController::class, 'customerBalanceReport'])->name('customer-balance');
+        Route::get('/customer-balance/{customerId}/detail', [\App\Http\Controllers\Admin\ReportController::class, 'getCustomerBalanceDetail'])->name('customer-balance.detail');
+    });
 });
 
 
