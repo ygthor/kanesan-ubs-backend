@@ -31,22 +31,25 @@ class ReportController extends Controller
     {
         $this->checkAccess();
         
-        $fromDate = $request->input('from_date', date('Y-m-01'));
-        $toDate = $request->input('to_date', date('Y-m-d'));
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
 
-        // Ensure dates include full time range
-        if (strlen($fromDate) == 10) {
-            $fromDate .= ' 00:00:00';
-        }
-        if (strlen($toDate) == 10) {
-            $toDate .= ' 23:59:59';
-        }
+        $query = Order::whereIn('type', ['INV', 'CN']);
 
-        $query = Order::whereIn('type', ['INV', 'CN'])
-            ->whereBetween('order_date', [$fromDate, $toDate])
+        // Apply date filter only if provided
+        if ($fromDate && $toDate) {
+            // Ensure dates include full time range
+            if (strlen($fromDate) == 10) {
+                $fromDate .= ' 00:00:00';
+            }
+            if (strlen($toDate) == 10) {
+                $toDate .= ' 23:59:59';
+            }
+            $query->whereBetween('order_date', [$fromDate, $toDate]);
+        }
             ->with('customer')
             ->orderBy('order_date', 'desc');
 
@@ -83,22 +86,26 @@ class ReportController extends Controller
     {
         $this->checkAccess();
         
-        $fromDate = $request->input('from_date', date('Y-m-01'));
-        $toDate = $request->input('to_date', date('Y-m-d'));
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
         $type = $request->input('type'); // Optional type filter
 
-        // Ensure dates include full time range
-        if (strlen($fromDate) == 10) {
-            $fromDate .= ' 00:00:00';
-        }
-        if (strlen($toDate) == 10) {
-            $toDate .= ' 23:59:59';
-        }
+        $query = Order::query();
 
-        $query = Order::whereBetween('order_date', [$fromDate, $toDate])
+        // Apply date filter only if provided
+        if ($fromDate && $toDate) {
+            // Ensure dates include full time range
+            if (strlen($fromDate) == 10) {
+                $fromDate .= ' 00:00:00';
+            }
+            if (strlen($toDate) == 10) {
+                $toDate .= ' 23:59:59';
+            }
+            $query->whereBetween('order_date', [$fromDate, $toDate]);
+        }
             ->with('customer')
             ->orderBy('order_date', 'desc');
 
@@ -143,6 +150,7 @@ class ReportController extends Controller
         $customerSearch = $request->input('customer_search');
         $customerType = $request->input('customer_type');
         $territoryId = $request->input('territory_id');
+        $agentNo = $request->input('agent_no');
 
         $query = Customer::query();
 
@@ -168,9 +176,17 @@ class ReportController extends Controller
             }
         }
 
+        // Filter by agent_no
+        if ($agentNo) {
+            $query->where('agent_no', $agentNo);
+        }
+
         $customers = $query->orderBy('customer_code', 'asc')->get();
 
-        return view('admin.reports.customer-report', compact('customers', 'customerSearch', 'customerType', 'territoryId'));
+        // Get agents for filter dropdown
+        $agents = $this->getAgents();
+
+        return view('admin.reports.customer-report', compact('customers', 'customerSearch', 'customerType', 'territoryId', 'agentNo', 'agents'));
     }
 
     /**
@@ -180,23 +196,26 @@ class ReportController extends Controller
     {
         $this->checkAccess();
         
-        $fromDate = $request->input('from_date', date('Y-m-01'));
-        $toDate = $request->input('to_date', date('Y-m-d'));
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
         $paymentType = $request->input('payment_type');
 
-        // Ensure dates include full time range
-        if (strlen($fromDate) == 10) {
-            $fromDate .= ' 00:00:00';
-        }
-        if (strlen($toDate) == 10) {
-            $toDate .= ' 23:59:59';
-        }
+        $query = Receipt::whereNull('deleted_at');
 
-        $query = Receipt::whereNull('deleted_at')
-            ->whereBetween('receipt_date', [$fromDate, $toDate])
+        // Apply date filter only if provided
+        if ($fromDate && $toDate) {
+            // Ensure dates include full time range
+            if (strlen($fromDate) == 10) {
+                $fromDate .= ' 00:00:00';
+            }
+            if (strlen($toDate) == 10) {
+                $toDate .= ' 23:59:59';
+            }
+            $query->whereBetween('receipt_date', [$fromDate, $toDate]);
+        }
             ->with('customer')
             ->orderBy('receipt_date', 'desc');
 
@@ -241,11 +260,19 @@ class ReportController extends Controller
     {
         $this->checkAccess();
         
-        $fromDate = $request->input('from_date', date('Y-01-01')); // Default to start of year
-        $toDate = $request->input('to_date', date('Y-m-d'));
+        $fromDate = $request->input('from_date'); // Optional
+        $toDate = $request->input('to_date'); // Optional
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
+
+        // Set default dates if not provided
+        if (!$fromDate) {
+            $fromDate = date('Y-01-01');
+        }
+        if (!$toDate) {
+            $toDate = date('Y-m-d');
+        }
 
         // Ensure dates include full time range
         if (strlen($fromDate) == 10) {
@@ -323,8 +350,16 @@ class ReportController extends Controller
     {
         $this->checkAccess();
         
-        $fromDate = $request->input('from_date', date('Y-01-01'));
-        $toDate = $request->input('to_date', date('Y-m-d'));
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
+
+        // Set default dates if not provided
+        if (!$fromDate) {
+            $fromDate = date('Y-01-01');
+        }
+        if (!$toDate) {
+            $toDate = date('Y-m-d');
+        }
 
         // Ensure dates include full time range
         if (strlen($fromDate) == 10) {
@@ -409,6 +444,29 @@ class ReportController extends Controller
             'total_credit' => $totalCredit,
             'total_debit' => $totalDebit,
             'balance' => $balance,
+        ]);
+    }
+
+    /**
+     * Get order detail with items for modal (web route)
+     */
+    public function getOrderDetail($id)
+    {
+        $this->checkAccess();
+        
+        // Try to find by reference_no first, then by ID
+        $order = Order::where('reference_no', $id)
+            ->orWhere('id', $id)
+            ->with('items.item', 'customer')
+            ->first();
+        
+        if (!$order) {
+            return response()->json(['error' => true, 'message' => 'Order not found.'], 404);
+        }
+        
+        return response()->json([
+            'error' => false,
+            'data' => $order->toArray()
         ]);
     }
 

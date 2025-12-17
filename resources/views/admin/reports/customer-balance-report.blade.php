@@ -19,13 +19,13 @@
             <div class="col-md-3">
                 <div class="form-group">
                     <label>From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ $fromDate ?? date('Y-01-01') }}" required>
+                    <input type="date" name="from_date" class="form-control" value="{{ $fromDate ?? '' }}">
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="form-group">
                     <label>To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ $toDate ?? date('Y-m-d') }}" required>
+                    <input type="date" name="to_date" class="form-control" value="{{ $toDate ?? '' }}">
                 </div>
             </div>
             <div class="col-md-3">
@@ -119,12 +119,12 @@
     </div>
 
     <!-- P&L Detail Modal -->
-    <div class="modal fade" id="plDetailModal" tabindex="-1" role="dialog" aria-labelledby="plDetailModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg" role="document">
+    <div class="modal fade" id="plDetailModal" tabindex="-1" aria-labelledby="plDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="plDetailModalLabel">P&L Detail - <span id="modalCustomerName"></span></h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close" style="border: none; background: none; font-size: 1.5rem; opacity: 0.5; cursor: pointer;">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -165,7 +165,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -175,15 +175,33 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+    // Initialize modal instance
+    const plModalElement = document.getElementById('plDetailModal');
+    const plModal = new bootstrap.Modal(plModalElement);
+    
+    // Handle modal close events
+    plModalElement.addEventListener('hidden.bs.modal', function () {
+        // Reset modal content when closed
+        $('#loadingSpinner').show();
+        $('#plDetailContent').hide();
+        $('#plDetailError').hide();
+        $('#plDetailTableBody').empty();
+    });
+    
+    // Fallback close button handler (in case Bootstrap JS doesn't work)
+    $(plModalElement).find('.close, [data-bs-dismiss="modal"]').on('click', function() {
+        plModal.hide();
+    });
+    
     $('.view-detail').click(function() {
         const customerId = $(this).data('customer-id');
         const customerName = $(this).data('customer-name');
         const fromDate = $(this).data('from-date');
         const toDate = $(this).data('to-date');
         
-        // Show modal
+        // Show modal (Bootstrap 5 syntax)
         $('#modalCustomerName').text(customerName);
-        $('#plDetailModal').modal('show');
+        plModal.show();
         
         // Reset modal content
         $('#loadingSpinner').show();

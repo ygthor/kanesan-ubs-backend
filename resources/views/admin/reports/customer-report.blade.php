@@ -16,13 +16,13 @@
     <!-- Filters -->
     <form method="GET" action="{{ route('admin.reports.customers') }}" class="mb-4">
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="form-group">
                     <label>Customer Search</label>
                     <input type="text" name="customer_search" class="form-control" value="{{ $customerSearch ?? '' }}" placeholder="Code, Name, or Company Name">
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="form-group">
                     <label>Customer Type</label>
                     <select name="customer_type" class="form-control">
@@ -33,7 +33,7 @@
                     </select>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="form-group">
                     <label>Territory</label>
                     <select name="territory_id" class="form-control">
@@ -47,6 +47,19 @@
                 </div>
             </div>
             <div class="col-md-2">
+                <div class="form-group">
+                    <label>Agent</label>
+                    <select name="agent_no" class="form-control">
+                        <option value="">All Agents</option>
+                        @foreach($agents ?? [] as $agent)
+                            <option value="{{ $agent->name }}" {{ ($agentNo ?? '') == $agent->name ? 'selected' : '' }}>
+                                {{ $agent->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
                 <div class="form-group">
                     <label>&nbsp;</label>
                     <div>

@@ -19,13 +19,13 @@
             <div class="col-md-3">
                 <div class="form-group">
                     <label>From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ $fromDate ?? date('Y-m-01') }}" required>
+                    <input type="date" name="from_date" class="form-control" value="{{ $fromDate ?? '' }}">
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="form-group">
                     <label>To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ $toDate ?? date('Y-m-d') }}" required>
+                    <input type="date" name="to_date" class="form-control" value="{{ $toDate ?? '' }}">
                 </div>
             </div>
             <div class="col-md-2">
