@@ -170,7 +170,6 @@
                     <th>Customer Name</th>
                     <th>Agent No</th>
                     <th>Net Amount</th>
-                    <th>Status / Payment Type</th>
                 </tr>
             </thead>
             <tbody>
@@ -231,19 +230,10 @@
                         <td>{{ $item['customer_name'] }}</td>
                         <td>{{ $item['agent_no'] }}</td>
                         <td class="text-right">RM {{ number_format($item['amount'], 2) }}</td>
-                        <td>
-                            @if($item['type'] == 'receipt')
-                                <span class="badge badge-info">{{ $item['payment_type'] }}</span>
-                            @else
-                                <span class="badge badge-{{ $item['status'] == 'completed' ? 'success' : ($item['status'] == 'pending' ? 'warning' : 'secondary') }}">
-                                    {{ ucfirst($item['status']) }}
-                                </span>
-                            @endif
-                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center">No records found for the selected criteria.</td>
+                        <td colspan="7" class="text-center">No records found for the selected criteria.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -257,17 +247,14 @@
                     <tr class="font-weight-bold">
                         <td colspan="6" class="text-right">Total INV:</td>
                         <td class="text-right">RM {{ number_format($totalINV, 2) }}</td>
-                        <td></td>
                     </tr>
                     <tr class="font-weight-bold">
                         <td colspan="6" class="text-right">Total CN:</td>
                         <td class="text-right">RM {{ number_format($totalCN, 2) }}</td>
-                        <td></td>
                     </tr>
                     <tr class="font-weight-bold">
                         <td colspan="6" class="text-right">Total RC:</td>
                         <td class="text-right">RM {{ number_format($totalRC, 2) }}</td>
-                        <td></td>
                     </tr>
                 </tfoot>
             @endif
