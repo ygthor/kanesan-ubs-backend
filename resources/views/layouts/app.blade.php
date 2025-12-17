@@ -1,28 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    
+
     <title>@yield('title', 'Kanesan UBS Backend')</title>
-    
+
     <!-- PICK YOUR THEME -->
     <link href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css" rel="stylesheet">
     <!-- Google Font: Source Sans Pro -->
-    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback"
+        rel="stylesheet">
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
+        rel="stylesheet" />
     <!-- DataTables CSS -->
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet" />
     <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet" />
-    
+
     @stack('styles')
 </head>
 
@@ -33,23 +36,28 @@
             <!-- Left navbar links -->
             <ul class="navbar-nav">
                 <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i
+                            class="fas fa-bars"></i></a>
                 </li>
             </ul>
 
             <!-- Right navbar links -->
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                        data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-user-circle"></i> {{ auth()->user()->name ?? 'Guest' }}
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                         <li><a class="dropdown-item" href="#"><i class="fas fa-user"></i> Profile</a></li>
-                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
                         <li>
                             <form method="POST" action="{{ route('logout') }}" style="display: inline;">
                                 @csrf
-                                <button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                                <button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt"></i>
+                                    Logout</button>
                             </form>
                         </li>
                     </ul>
@@ -69,87 +77,102 @@
             <div class="sidebar">
                 <!-- Sidebar Menu -->
                 <nav class="mt-2">
-                    <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+                    <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
+                        data-accordion="false">
                         <li class="nav-item">
                             <a href="/dashboard" class="nav-link {{ request()->is('dashboard') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-tachometer-alt"></i>
                                 <p>Dashboard</p>
                             </a>
                         </li>
-                        
-                        @if(auth()->check() && (auth()->user()->hasRole('admin') || auth()->user()->username === 'KBS' || auth()->user()->email === 'KBS@kanesan.my'))
-                        <li class="nav-item">
-                            <a href="/inventory/stock-management" class="nav-link {{ request()->is('inventory/stock-management*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-boxes"></i>
-                                <p>Stock Management</p>
-                            </a>
-                        </li>
-                        
-                        <!-- Reports Menu -->
-                        <li class="nav-item {{ request()->is('admin/reports*') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->is('admin/reports*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-chart-bar"></i>
-                                <p>
-                                    Reports
-                                    <i class="fas fa-angle-left right"></i>
-                                </p>
-                            </a>
-                            <ul class="nav nav-treeview">
-                                <li class="nav-item">
-                                    <a href="/admin/reports/sales" class="nav-link {{ request()->is('admin/reports/sales*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Sales Report</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/admin/reports/transactions" class="nav-link {{ request()->is('admin/reports/transactions*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Transaction Report</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/admin/reports/customers" class="nav-link {{ request()->is('admin/reports/customers*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Customer Report</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/admin/reports/receipts" class="nav-link {{ request()->is('admin/reports/receipts*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Receipt Report</p>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="/admin/reports/customer-balance" class="nav-link {{ request()->is('admin/reports/customer-balance*') ? 'active' : '' }}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Customer Balance Report</p>
-                                    </a>
-                                </li>
-                            </ul>
-                        </li>
+
+                        @if (auth()->check() &&
+                                (auth()->user()->hasRole('admin') ||
+                                    auth()->user()->username === 'KBS' ||
+                                    auth()->user()->email === 'KBS@kanesan.my'))
+                            <li class="nav-item">
+                                <a href="/inventory/stock-management"
+                                    class="nav-link {{ request()->is('inventory/stock-management*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-boxes"></i>
+                                    <p>Stock Management</p>
+                                </a>
+                            </li>
                         @endif
-                        
-                        @if(auth()->check() && auth()->user()->hasRole('admin'))
-                        <li class="nav-item">
-                            <a href="/admin/users" class="nav-link {{ request()->is('admin/users*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-users"></i>
-                                <p>User Management</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin/territories" class="nav-link {{ request()->is('admin/territories*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-map-marker-alt"></i>
-                                <p>Territory Management</p>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/admin/announcements" class="nav-link {{ request()->is('admin/announcements*') ? 'active' : '' }}">
-                                <i class="nav-icon fas fa-bullhorn"></i>
-                                <p>Announcement Management</p>
-                            </a>
-                        </li>
+
+                        @if (auth()->check() && auth()->user()->hasRole('admin'))
+                            <li class="nav-item">
+                                <a href="/admin/users"
+                                    class="nav-link {{ request()->is('admin/users*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-users"></i>
+                                    <p>User Management</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="/admin/territories"
+                                    class="nav-link {{ request()->is('admin/territories*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-map-marker-alt"></i>
+                                    <p>Territory Management</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="/admin/announcements"
+                                    class="nav-link {{ request()->is('admin/announcements*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-bullhorn"></i>
+                                    <p>Announcement Management</p>
+                                </a>
+                            </li>
+
+
+                            <!-- Reports Menu -->
+                            <li class="nav-item {{ request()->is('admin/reports*') ? 'menu-open' : '' }}">
+                                <a href="#"
+                                    class="nav-link {{ request()->is('admin/reports*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-chart-bar"></i>
+                                    <p>
+                                        Reports
+                                        <i class="fas fa-angle-left right"></i>
+                                    </p>
+                                </a>
+                                <ul class="nav nav-treeview">
+                                    <li class="nav-item">
+                                        <a href="/admin/reports/sales"
+                                            class="nav-link {{ request()->is('admin/reports/sales*') ? 'active' : '' }}">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>Sales Report</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="/admin/reports/transactions"
+                                            class="nav-link {{ request()->is('admin/reports/transactions*') ? 'active' : '' }}">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>Transaction Report</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="/admin/reports/customers"
+                                            class="nav-link {{ request()->is('admin/reports/customers*') ? 'active' : '' }}">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>Customer Report</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="/admin/reports/receipts"
+                                            class="nav-link {{ request()->is('admin/reports/receipts*') ? 'active' : '' }}">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>Receipt Report</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="/admin/reports/customer-balance"
+                                            class="nav-link {{ request()->is('admin/reports/customer-balance*') ? 'active' : '' }}">
+                                            <i class="far fa-circle nav-icon"></i>
+                                            <p>Customer Balance Report</p>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
                         @endif
-                        
+
                     </ul>
                 </nav>
             </div>
@@ -176,25 +199,25 @@
             <!-- Main content -->
             <div class="content">
                 <div class="container-fluid">
-                    @if(session('success'))
+                    @if (session('success'))
                         <div class="alert alert-success alert-dismissible">
                             <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
                             {{ session('success') }}
                         </div>
                     @endif
 
-                    @if(session('error'))
+                    @if (session('error'))
                         <div class="alert alert-danger alert-dismissible">
                             <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
                             {{ session('error') }}
                         </div>
                     @endif
 
-                    @if($errors->any())
+                    @if ($errors->any())
                         <div class="alert alert-danger alert-dismissible">
                             <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
                             <ul class="mb-0">
-                                @foreach($errors->all() as $error)
+                                @foreach ($errors->all() as $error)
                                     <li>{{ $error }}</li>
                                 @endforeach
                             </ul>
@@ -228,7 +251,8 @@
     <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
     <!-- AdminLTE App -->
     <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
-    
+
     @stack('scripts')
 </body>
+
 </html>
