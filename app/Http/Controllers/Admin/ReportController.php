@@ -71,10 +71,188 @@ class ReportController extends Controller
 
         $orders = $query->with('customer')->orderBy('order_date', 'desc')->get();
 
+        // Fetch receipts with same filters
+        $receiptQuery = Receipt::whereNull('deleted_at');
+        
+        // Apply date filter only if provided
+        if ($fromDate && $toDate) {
+            $receiptCalcFromDate = $fromDate;
+            $receiptCalcToDate = $toDate;
+            if (strlen($receiptCalcFromDate) == 10) {
+                $receiptCalcFromDate .= ' 00:00:00';
+            }
+            if (strlen($receiptCalcToDate) == 10) {
+                $receiptCalcToDate .= ' 23:59:59';
+            }
+            $receiptQuery->whereBetween('receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
+        }
+        
+        // Filter by customer_id
+        if ($customerId) {
+            $receiptQuery->where('customer_id', $customerId);
+        }
+        
+        // Filter by agent_no (through customer)
+        if ($agentNo) {
+            $receiptQuery->whereHas('customer', function($q) use ($agentNo) {
+                $q->where('agent_no', $agentNo);
+            });
+        }
+        
+        // Filter by customer search
+        if ($customerSearch) {
+            $receiptQuery->where(function($q) use ($customerSearch) {
+                $q->where('customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        
+        $receipts = $receiptQuery->with('customer')->orderBy('receipt_date', 'desc')->get();
+
+        // Calculate summary totals
+        // Prepare date variables for calculations
+        $calcFromDate = $fromDate;
+        $calcToDate = $toDate;
+        if ($calcFromDate && $calcToDate) {
+            if (strlen($calcFromDate) == 10) {
+                $calcFromDate .= ' 00:00:00';
+            }
+            if (strlen($calcToDate) == 10) {
+                $calcToDate .= ' 23:59:59';
+            }
+        }
+
+        // CA Sales = INV orders with customer_type 'Cash' or 'Cash Sales'
+        $caSales = Order::whereIn('type', ['INV'])
+            ->join('customers', 'orders.customer_id', '=', 'customers.id')
+            ->where(function($q) {
+                $q->whereIn('customers.customer_type', ['Cash', 'Cash Sales']);
+            });
+        
+        // Apply same filters as main query
+        if ($calcFromDate && $calcToDate) {
+            $caSales->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $caSales->where('orders.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $caSales->where('orders.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $caSales->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $caSalesTotal = $caSales->sum('orders.net_amount') ?? 0;
+
+        // CR Sales = INV orders with customer_type 'CREDITOR' or 'Creditor'
+        $crSales = Order::whereIn('type', ['INV'])
+            ->join('customers', 'orders.customer_id', '=', 'customers.id')
+            ->where(function($q) {
+                $q->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
+            });
+        
+        // Apply same filters as main query
+        if ($calcFromDate && $calcToDate) {
+            $crSales->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $crSales->where('orders.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $crSales->where('orders.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $crSales->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $crSalesTotal = $crSales->sum('orders.net_amount') ?? 0;
+
+        // Return = CN orders (all CN orders are returns)
+        $returns = Order::where('type', 'CN');
+        
+        // Apply same filters as main query
+        if ($calcFromDate && $calcToDate) {
+            $returns->whereBetween('order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $returns->where('customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $returns->where('agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $returns->where(function($q) use ($customerSearch) {
+                $q->where('customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $returnsTotal = $returns->sum('net_amount') ?? 0;
+
+        // Calculate totals
+        $totalSales = $caSalesTotal + $crSalesTotal;
+        $nettSales = $totalSales - $returnsTotal;
+
+        // Calculate receipt collections by payment type
+        $receiptCalcFromDate = $fromDate;
+        $receiptCalcToDate = $toDate;
+        if ($receiptCalcFromDate && $receiptCalcToDate) {
+            if (strlen($receiptCalcFromDate) == 10) {
+                $receiptCalcFromDate .= ' 00:00:00';
+            }
+            if (strlen($receiptCalcToDate) == 10) {
+                $receiptCalcToDate .= ' 23:59:59';
+            }
+        }
+
+        // Helper function to build receipt query with filters
+        $buildReceiptQuery = function() use ($receiptCalcFromDate, $receiptCalcToDate, $customerId, $agentNo, $customerSearch) {
+            $query = Receipt::whereNull('deleted_at');
+            
+            if ($receiptCalcFromDate && $receiptCalcToDate) {
+                $query->whereBetween('receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
+            }
+            if ($customerId) {
+                $query->where('customer_id', $customerId);
+            }
+            if ($agentNo) {
+                $query->whereHas('customer', function($q) use ($agentNo) {
+                    $q->where('agent_no', $agentNo);
+                });
+            }
+            if ($customerSearch) {
+                $query->where(function($q) use ($customerSearch) {
+                    $q->where('customer_code', 'like', "%{$customerSearch}%")
+                      ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+                });
+            }
+            
+            return $query;
+        };
+
+        // Get collections by payment type
+        $cashCollection = $buildReceiptQuery()->where('payment_type', 'CASH')->sum('paid_amount') ?? 0;
+        $ewalletCollection = $buildReceiptQuery()->where('payment_type', 'E-WALLET')->sum('paid_amount') ?? 0;
+        $onlineTransferCollection = $buildReceiptQuery()->where('payment_type', 'ONLINE TRANSFER')->sum('paid_amount') ?? 0;
+        $cardCollection = $buildReceiptQuery()->where('payment_type', 'CARD')->sum('paid_amount') ?? 0;
+        $chequeCollection = $buildReceiptQuery()->where('payment_type', 'CHEQUE')->sum('paid_amount') ?? 0;
+        $pdChequeCollection = $buildReceiptQuery()->where('payment_type', 'PD CHEQUE')->sum('paid_amount') ?? 0;
+        
+        $totalCollection = $cashCollection + $ewalletCollection + $onlineTransferCollection + $cardCollection + $chequeCollection + $pdChequeCollection;
+        
+        // Account Balance = Nett Sales - Total Collection
+        $accountBalance = $nettSales - $totalCollection;
+
         // Get agents for filter dropdown
         $agents = $this->getAgents();
 
-        return view('admin.reports.sales-report', compact('orders', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents'));
+        return view('admin.reports.sales-report', compact('orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents', 'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'totalSales', 'nettSales', 'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollection', 'accountBalance'));
     }
 
     /**
