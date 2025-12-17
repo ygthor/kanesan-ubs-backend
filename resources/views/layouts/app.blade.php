@@ -121,56 +121,6 @@
                                     <p>Announcement Management</p>
                                 </a>
                             </li>
-
-
-                            <!-- Reports Menu -->
-                            <li class="nav-item {{ request()->is('admin/reports*') ? 'menu-open' : '' }}">
-                                <a href="#"
-                                    class="nav-link {{ request()->is('admin/reports*') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-chart-bar"></i>
-                                    <p>
-                                        Reports
-                                        <i class="fas fa-angle-left right"></i>
-                                    </p>
-                                </a>
-                                <ul class="nav nav-treeview">
-                                    <li class="nav-item">
-                                        <a href="/admin/reports/sales"
-                                            class="nav-link {{ request()->is('admin/reports/sales*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Sales Report</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="/admin/reports/transactions"
-                                            class="nav-link {{ request()->is('admin/reports/transactions*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Transaction Report</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="/admin/reports/customers"
-                                            class="nav-link {{ request()->is('admin/reports/customers*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Customer Report</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="/admin/reports/receipts"
-                                            class="nav-link {{ request()->is('admin/reports/receipts*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Receipt Report</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="/admin/reports/customer-balance"
-                                            class="nav-link {{ request()->is('admin/reports/customer-balance*') ? 'active' : '' }}">
-                                            <i class="far fa-circle nav-icon"></i>
-                                            <p>Customer Balance Report</p>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
                         @endif
 
                     </ul>

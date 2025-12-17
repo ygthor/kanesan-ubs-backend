@@ -25,6 +25,49 @@ class ReportController extends Controller
     }
 
     /**
+     * Reports Index - List all available reports
+     */
+    public function index()
+    {
+        $this->checkAccess();
+        
+        $reports = [
+            [
+                'name' => 'Sales Report',
+                'description' => 'Display INV & CN Orders & Receipt with sales summary and collection summary',
+                'route' => route('admin.reports.sales'),
+                'icon' => 'fas fa-chart-line',
+            ],
+            [
+                'name' => 'Transaction Report',
+                'description' => 'Display all orders (INV, DO, CN) with transaction details',
+                'route' => route('admin.reports.transactions'),
+                'icon' => 'fas fa-exchange-alt',
+            ],
+            [
+                'name' => 'Customer Report',
+                'description' => 'Display all customers with their details',
+                'route' => route('admin.reports.customers'),
+                'icon' => 'fas fa-users',
+            ],
+            [
+                'name' => 'Receipt Report',
+                'description' => 'Display all receipts with payment details',
+                'route' => route('admin.reports.receipts'),
+                'icon' => 'fas fa-receipt',
+            ],
+            [
+                'name' => 'Customer Balance Report',
+                'description' => 'Display customer balances (Receipts - INV + CN) with P&L detail view',
+                'route' => route('admin.reports.customer-balance'),
+                'icon' => 'fas fa-balance-scale',
+            ],
+        ];
+        
+        return view('admin.reports.index', compact('reports'));
+    }
+
+    /**
      * Sales Report - Display orders where type='INV' OR type='CN'
      */
     public function salesReport(Request $request)

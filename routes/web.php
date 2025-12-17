@@ -62,6 +62,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // Report routes (KBS/admin only - checked in controller)
     Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\ReportController::class, 'index'])->name('index');
         Route::get('/sales', [\App\Http\Controllers\Admin\ReportController::class, 'salesReport'])->name('sales');
         Route::get('/transactions', [\App\Http\Controllers\Admin\ReportController::class, 'transactionReport'])->name('transactions');
         Route::get('/transactions/{id}/detail', [\App\Http\Controllers\Admin\ReportController::class, 'getOrderDetail'])->name('transactions.detail');
