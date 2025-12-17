@@ -60,148 +60,97 @@
         </div>
     </form>
 
-    <!-- Summary Box -->
+    <!-- Summary Tables -->
     <div class="row mb-4">
-        <div class="col-md-12">
+        <!-- Sales Summary Table -->
+        <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-chart-line"></i> Summary</h3>
+                    <h3 class="card-title"><i class="fas fa-chart-line"></i> Sales</h3>
                 </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-info"><i class="fas fa-money-bill-wave"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">CA Sales</span>
-                                    <span class="info-box-number">RM {{ number_format($caSalesTotal ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-success"><i class="fas fa-file-invoice-dollar"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">CR Sales</span>
-                                    <span class="info-box-number">RM {{ number_format($crSalesTotal ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-primary"><i class="fas fa-calculator"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Total Sales</span>
-                                    <span class="info-box-number">RM {{ number_format($totalSales ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-warning"><i class="fas fa-undo"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Return</span>
-                                    <span class="info-box-number">RM {{ number_format($returnsTotal ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-danger"><i class="fas fa-chart-bar"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Nett Sales</span>
-                                    <span class="info-box-number">RM {{ number_format($nettSales ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <tbody>
+                            <tr>
+                                <td class="font-weight-bold">CA Sales</td>
+                                <td class="text-right">RM {{ number_format($caSalesTotal ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">CR Sales</td>
+                                <td class="text-right">RM {{ number_format($crSalesTotal ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">Total Sales</td>
+                                <td class="text-right">RM {{ number_format($totalSales ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">Return</td>
+                                <td class="text-right">RM {{ number_format($returnsTotal ?? 0, 2) }}</td>
+                            </tr>
+                            <tr class="bg-light">
+                                <td class="font-weight-bold">Nett Sales</td>
+                                <td class="text-right font-weight-bold">RM {{ number_format($nettSales ?? 0, 2) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collection Summary Table -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-money-check-alt"></i> Collection</h3>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <tbody>
+                            <tr>
+                                <td class="font-weight-bold">CASH</td>
+                                <td class="text-right">RM {{ number_format($cashCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">E-WALLET</td>
+                                <td class="text-right">RM {{ number_format($ewalletCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">ONLINE TRANSFER</td>
+                                <td class="text-right">RM {{ number_format($onlineTransferCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">CARD</td>
+                                <td class="text-right">RM {{ number_format($cardCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">CHEQUE</td>
+                                <td class="text-right">RM {{ number_format($chequeCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold">PD CHEQUE</td>
+                                <td class="text-right">RM {{ number_format($pdChequeCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr class="bg-light">
+                                <td class="font-weight-bold">Total Collection</td>
+                                <td class="text-right font-weight-bold">RM {{ number_format($totalCollection ?? 0, 2) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Collection Summary Box -->
+    <!-- Account Balance -->
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-money-check-alt"></i> Collection Summary</h3>
-                </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-success"><i class="fas fa-money-bill"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">CASH</span>
-                                    <span class="info-box-number">RM {{ number_format($cashCollection ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-info"><i class="fas fa-mobile-alt"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">E-WALLET</span>
-                                    <span class="info-box-number">RM {{ number_format($ewalletCollection ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-primary"><i class="fas fa-exchange-alt"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">ONLINE TRANSFER</span>
-                                    <span class="info-box-number">RM {{ number_format($onlineTransferCollection ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-warning"><i class="fas fa-credit-card"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">CARD</span>
-                                    <span class="info-box-number">RM {{ number_format($cardCollection ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-secondary"><i class="fas fa-file-invoice"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">CHEQUE</span>
-                                    <span class="info-box-number">RM {{ number_format($chequeCollection ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-dark"><i class="fas fa-calendar-alt"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">PD CHEQUE</span>
-                                    <span class="info-box-number">RM {{ number_format($pdChequeCollection ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row mt-3">
-                        <div class="col-md-3">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-primary"><i class="fas fa-calculator"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Total Collection</span>
-                                    <span class="info-box-number">RM {{ number_format($totalCollection ?? 0, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-danger"><i class="fas fa-balance-scale"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Account Balance</span>
-                                    <span class="info-box-number">RM {{ number_format($accountBalance ?? 0, 2) }}</span>
-                                </div>
-                            </div>
+                        <div class="col-md-12 text-center">
+                            <h4 class="mb-0">
+                                <strong>Account Balance = RM {{ number_format($accountBalance ?? 0, 2) }}</strong>
+                            </h4>
                         </div>
                     </div>
                 </div>
@@ -300,9 +249,24 @@
             </tbody>
             @if($combinedItems->count() > 0)
                 <tfoot>
+                    @php
+                        $totalINV = $combinedItems->where('order_type', 'INV')->sum('amount');
+                        $totalCN = $combinedItems->where('order_type', 'CN')->sum('amount');
+                        $totalRC = $combinedItems->where('order_type', 'RC')->sum('amount');
+                    @endphp
                     <tr class="font-weight-bold">
-                        <td colspan="6" class="text-right">Total:</td>
-                        <td class="text-right">RM {{ number_format($combinedItems->sum('amount'), 2) }}</td>
+                        <td colspan="6" class="text-right">Total INV:</td>
+                        <td class="text-right">RM {{ number_format($totalINV, 2) }}</td>
+                        <td></td>
+                    </tr>
+                    <tr class="font-weight-bold">
+                        <td colspan="6" class="text-right">Total CN:</td>
+                        <td class="text-right">RM {{ number_format($totalCN, 2) }}</td>
+                        <td></td>
+                    </tr>
+                    <tr class="font-weight-bold">
+                        <td colspan="6" class="text-right">Total RC:</td>
+                        <td class="text-right">RM {{ number_format($totalRC, 2) }}</td>
                         <td></td>
                     </tr>
                 </tfoot>
