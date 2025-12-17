@@ -15,6 +15,9 @@ class ReportController extends Controller
 
         $fromDate = $request->input('from_date');
         $toDate   = $request->input('to_date');
+        $customerId = $request->input('customer_id');
+        $agentNo = $request->input('agent_no');
+        $customerSearch = $request->input('customer_search'); // Search by customer code or name
 
         if (empty($fromDate)) {
             $fromDate = date('Y-01-01');
@@ -66,6 +69,13 @@ class ReportController extends Controller
             }
         };
 
+        $applyCustFilter = function($query) use ($customerId) {
+            if ($customerId) {
+                $query->where('orders.customer_id', $customerId);
+            }
+        };
+
+
         // --- Sales ---
         // CA Sales: Cash Sales from customers with payment_type 'Cash Sales' or 'Cash'
         $caSalesQuery = DB::table('orders')
@@ -76,6 +86,7 @@ class ReportController extends Controller
 
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($caSalesQuery);
+        $applyCustFilter($caSalesQuery);
         $caSales = $caSalesQuery->sum('orders.net_amount');
 
 
@@ -94,6 +105,7 @@ class ReportController extends Controller
 
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($crSalesQuery);
+        $applyCustFilter($crSalesQuery);
         $crSales = $crSalesQuery->sum('orders.net_amount');
 
         $totalSales = $caSales + $crSales;
@@ -104,6 +116,7 @@ class ReportController extends Controller
             ->where('type', 'CN');
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($returnsQuery);
+        $applyCustFilter($returnsQuery);
         $returns = $returnsQuery->sum('net_amount');
 
         $nettSales = $totalSales - $returns;
@@ -119,6 +132,9 @@ class ReportController extends Controller
 
         if ($userName) {
             $collectionsQuery->where('customers.agent_no', $userName);
+        }
+        if ($customerId) {
+            $collectionsQuery->where('receipts.customer_id', $customerId);
         }
 
         $collections = $collectionsQuery->groupBy('receipts.payment_type')->pluck('total', 'payment_type');
