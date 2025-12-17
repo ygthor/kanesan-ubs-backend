@@ -83,7 +83,6 @@
                     <th>Customer Name</th>
                     <th>Agent No</th>
                     <th>Net Amount</th>
-                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -100,15 +99,10 @@
                         <td>{{ $order->customer_name }}</td>
                         <td>{{ $order->agent_no ?? 'N/A' }}</td>
                         <td class="text-right">RM {{ number_format($order->net_amount ?? 0, 2) }}</td>
-                        <td>
-                            <span class="badge badge-{{ $order->status == 'completed' ? 'success' : ($order->status == 'pending' ? 'warning' : 'secondary') }}">
-                                {{ ucfirst($order->status ?? 'N/A') }}
-                            </span>
-                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center">No orders found for the selected criteria.</td>
+                        <td colspan="7" class="text-center">No orders found for the selected criteria.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -117,7 +111,6 @@
                     <tr class="font-weight-bold">
                         <td colspan="6" class="text-right">Total:</td>
                         <td class="text-right">RM {{ number_format($orders->sum('net_amount'), 2) }}</td>
-                        <td></td>
                     </tr>
                 </tfoot>
             @endif
