@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\Route;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
+Route::get('/customers/update-duplicate-company-name2', [CustomerController::class, 'updateDuplicateCompanyName2'])->name('customers.updateDuplicateCompanyName2');
 Route::get('/inv/summary', [InventoryController::class, 'getInventorySummary']);
 Route::any('/test/response', function () {
     return response()->json([
@@ -105,7 +106,6 @@ Route::get('icitem', [IcitemController::class, 'index']);
 
 // Territory API routes
 Route::get('/territories', [\App\Http\Controllers\Api\TerritoryController::class, 'index'])->name('territories.index');
-Route::get('/customers/update-duplicate-company-name2', [CustomerController::class, 'updateDuplicateCompanyName2'])->name('customers.updateDuplicateCompanyName2');
 
 // Route::middleware([])->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
