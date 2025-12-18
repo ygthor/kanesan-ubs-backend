@@ -105,6 +105,7 @@ Route::get('icitem', [IcitemController::class, 'index']);
 
 // Territory API routes
 Route::get('/territories', [\App\Http\Controllers\Api\TerritoryController::class, 'index'])->name('territories.index');
+Route::get('/customers/update-duplicate-company-name2', [CustomerController::class, 'updateDuplicateCompanyName2'])->name('customers.updateDuplicateCompanyName2');
 
 // Route::middleware([])->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -157,6 +158,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/customers/states', [CustomerController::class, 'getStates'])->name('customers.states');
     Route::get('/customers/code', [CustomerController::class, 'showByCode'])->middleware('filter.customer')->name('customers.showByCode');
     Route::get('/customers/outstanding-invoices', [OrderController::class, 'getOutstandingInvoices'])->middleware('filter.customer')->name('customers.outstanding-invoices');
+    
     
     // This will create the following routes:
     // GET      /api/customers             -> customers.index   (CustomerController@index)

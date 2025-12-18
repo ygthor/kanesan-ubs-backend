@@ -529,4 +529,28 @@ class CustomerController extends Controller
         return $prefix . '/' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * Update company_name2 to null where it matches company_name.
+     * This is a maintenance script endpoint.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateDuplicateCompanyName2()
+    {
+        try {
+            // Update customers where company_name2 is the same as company_name
+            $updated = Customer::whereRaw('TRIM(COALESCE(company_name2, "")) = TRIM(COALESCE(company_name, ""))')
+                ->whereNotNull('company_name')
+                ->where('company_name', '!=', '')
+                ->update(['company_name2' => null]);
+
+            return makeResponse(200, 'Update completed successfully.', [
+                'updated_count' => $updated,
+                'message' => "Updated {$updated} customer(s) where company_name2 matched company_name."
+            ]);
+        } catch (\Exception $e) {
+            return makeResponse(500, 'Failed to update customers.', ['error' => $e->getMessage()]);
+        }
+    }
+
 }

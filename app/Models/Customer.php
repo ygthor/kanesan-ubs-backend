@@ -38,6 +38,7 @@ class Customer extends Model
         'address1',         // Street address line 1
         'address2',         // Street address line 2
         'address3',         // Street address line 3
+        'address4',         // Auto-generated: postcode + state
         'postcode',
         'state',
         'territory',
@@ -128,5 +129,50 @@ class Customer extends Model
     public static function fromCode($cpde){
         return self::where('customer_code',$cpde)->first();
 
+    }
+
+    /**
+     * Boot the model.
+     * Auto-generate address4 from postcode and state, and name from company_name2 when creating or updating.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Auto-generate fields before saving (create or update)
+        static::saving(function ($customer) {
+            $customer->generateAddress4();
+            $customer->generateName();
+        });
+    }
+
+    /**
+     * Generate address4 from postcode and state.
+     * Format: "postcode state" (e.g., "12345 Selangor")
+     */
+    public function generateAddress4()
+    {
+        $parts = [];
+        
+        if (!empty($this->postcode)) {
+            $parts[] = trim($this->postcode);
+        }
+        
+        if (!empty($this->state)) {
+            $parts[] = trim($this->state);
+        }
+        
+        $this->address4 = !empty($parts) ? implode(' ', $parts) : null;
+    }
+
+    /**
+     * Generate name from company_name2.
+     * Sets name to company_name2 if company_name2 is provided.
+     */
+    public function generateName()
+    {
+        if (!empty($this->company_name2)) {
+            $this->name = trim($this->company_name2);
+        }
     }
 }
