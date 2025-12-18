@@ -182,7 +182,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="form-group">
                                 <label for="itemSearch">Search by Item Code or Name</label>
                                 <input type="text" class="form-control" id="itemSearch" name="search" 
@@ -190,11 +190,14 @@
                                        placeholder="Enter item code or description...">
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-4">
                             <div class="form-group">
                                 <label>&nbsp;</label>
-                                <div>
-                                    <button type="button" class="btn btn-info btn-block" id="clearFiltersBtn">
+                                <div class="btn-group btn-group-block" style="display: flex; gap: 5px;">
+                                    <button type="button" class="btn btn-primary" id="searchBtn" style="flex: 1;">
+                                        <i class="fas fa-search"></i> Search
+                                    </button>
+                                    <button type="button" class="btn btn-info" id="clearFiltersBtn" style="flex: 1;">
                                         <i class="fas fa-times"></i> Clear
                                     </button>
                                 </div>
@@ -549,50 +552,41 @@ $(document).ready(function() {
     });
     
     // Filter inventory without page refresh
-    var filterTimeout;
     var isFiltering = false;
     
     function filterInventory() {
         if (isFiltering) return;
         
         var agentNo = $('#agentSelect').val();
-        if (!agentNo) {
-            console.log('No agent selected');
-            return;
-        }
+        if (!agentNo) return;
         
         var group = $('#groupFilter').val();
         var search = $('#itemSearch').val();
         
-        console.log('Filtering with:', {agentNo: agentNo, group: group, search: search});
-        
         // If filtering and Transactions tab is not active, switch to it
         if ((group || search) && !$('#transactions').hasClass('active')) {
             $('#transactions-tab').trigger('click');
-            // Wait a bit for tab to switch
             setTimeout(function() {
-                continueFiltering();
+                executeFilter();
             }, 100);
             return;
         }
         
-        continueFiltering();
+        executeFilter();
         
-        function continueFiltering() {
+        function executeFilter() {
             isFiltering = true;
             var tbody = $('#stockSummaryTable tbody');
             var alertInfo = $('#transactionsAlert');
             
             if (tbody.length === 0) {
-                console.error('Table body not found');
                 isFiltering = false;
                 return;
             }
             
-            // Show loading state
             tbody.html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
         
-        $.ajax({
+            $.ajax({
             url: '{{ route("inventory.stock-management") }}',
             method: 'GET',
             data: {
@@ -725,12 +719,11 @@ $(document).ready(function() {
                     tbody.html('<tr><td colspan="9" class="text-center text-muted">Error loading data. Please try again.</td></tr>');
                 }
             },
-            error: function(xhr, status, error) {
+            error: function() {
                 isFiltering = false;
-                console.error('Filter error:', error, xhr);
                 tbody.html('<tr><td colspan="9" class="text-center text-danger">Error loading data. Please try again.</td></tr>');
             }
-        });
+            });
         }
     }
     
@@ -741,38 +734,29 @@ $(document).ready(function() {
         return false;
     });
     
-    // Filter on group change
-    $('#groupFilter').on('change', function() {
-        clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(filterInventory, 300);
+    // Search button click
+    $('#searchBtn').on('click', function() {
+        filterInventory();
     });
     
-    // Filter on search input - SIMPLE DIRECT APPROACH
-    var searchInput = document.getElementById('itemSearch');
-    if (searchInput) {
-        // Use native addEventListener for better reliability
-        searchInput.addEventListener('input', function() {
-            clearTimeout(filterTimeout);
-            filterTimeout = setTimeout(function() {
-                filterInventory();
-            }, 500);
-        });
-        
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' || e.keyCode === 13) {
-                e.preventDefault();
-                clearTimeout(filterTimeout);
-                filterInventory();
-                return false;
-            }
-        });
-    }
+    // Allow Enter key in search field to trigger search
+    $('#itemSearch').on('keypress', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            e.preventDefault();
+            filterInventory();
+            return false;
+        }
+    });
+    
+    // Filter on group change
+    $('#groupFilter').on('change', function() {
+        filterInventory();
+    });
     
     // Clear filters
     $('#clearFiltersBtn').on('click', function() {
         $('#groupFilter').val('').trigger('change');
         $('#itemSearch').val('');
-        clearTimeout(filterTimeout);
         filterInventory();
     });
     
