@@ -131,7 +131,7 @@ class CustomerController extends Controller
         
         $validator = Validator::make($request->all(), [
             'customer_code' => 'sometimes|nullable|string|max:255|unique:customers,customer_code',
-            'customer_type' => 'required|string|max:255|in:Creditor,Cash Sales,Cash',
+            'customer_type' => 'required|string|max:255',
             'company_name' => 'required|string|max:255',
             'company_name2' => 'nullable|string|max:255',
             'address1' => 'required|string|max:255',
@@ -203,6 +203,11 @@ class CustomerController extends Controller
                 // Ensure this list matches the $fillable array in your Customer model
                 // and the fields sent from your Flutter "Detailed Form".
             ]);
+            
+            // Cast customer_type to uppercase before saving
+            if (isset($customerData['customer_type'])) {
+                $customerData['customer_type'] = strtoupper($customerData['customer_type']);
+            }
             
             // Add the generated customer_code
             $customerData['customer_code'] = $customerCode;
@@ -350,7 +355,7 @@ class CustomerController extends Controller
         try {
             // Ensure all fields intended for update are in $request->only([...])
             // and are $fillable in the Customer model.
-            $customer->update($request->only([
+            $updateData = $request->only([
                 'customer_code',
                 'company_name',
                 'company_name2',
@@ -377,7 +382,14 @@ class CustomerController extends Controller
                 'name',
                 'address',
                 'agent_no',
-            ]));
+            ]);
+            
+            // Cast customer_type to uppercase before updating
+            if (isset($updateData['customer_type'])) {
+                $updateData['customer_type'] = strtoupper($updateData['customer_type']);
+            }
+            
+            $customer->update($updateData);
 
             // Handle user assignment using many-to-many relationship
             if ($request->has('assigned_user_id')) {
@@ -461,9 +473,12 @@ class CustomerController extends Controller
     {
         $prefix = null;
         
-        if ($customerType === 'Creditor') {
+        // Normalize customer type to uppercase for comparison
+        $customerTypeUpper = strtoupper($customerType);
+        
+        if ($customerTypeUpper === 'CREDITOR') {
             $prefix = '3000';
-        } elseif ($customerType === 'Cash Sales' || $customerType === 'Cash') {
+        } elseif ($customerTypeUpper === 'CASH SALES' || $customerTypeUpper === 'CASH') {
             $usernameUpper = strtoupper($username);
             if ($usernameUpper === 'S01') {
                 $prefix = '3010';
