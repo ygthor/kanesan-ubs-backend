@@ -121,61 +121,69 @@ class ReportController extends Controller
         $nettSales = $totalSales - $returns;
 
         // --- Collections ---
-        // Single query with GROUP BY for all payment types (more efficient - world standard)
-        // Use INNER JOIN since customer_id is required (foreign key constraint)
-        // IMPORTANT: payment_type comes from receipts table, NOT from customers table
-        $collectionsQuery = DB::table('receipts')
+        // IMPORTANT: CA and CR collections should follow customer_type, not payment_type
+        // - CA collection = all receipts from customers with customer_type = 'Cash'
+        // - CR collection = all receipts from customers with customer_type = 'CREDITOR'
+        // - Cheque collections are tracked separately by payment_type but included in totals
+        
+        // Base query for all collections
+        $collectionsBaseQuery = DB::table('receipts')
             ->join('customers', 'receipts.customer_id', '=', 'customers.id')
             ->whereBetween('receipts.receipt_date', [$fromDate, $toDate])
-            ->whereNull('receipts.deleted_at') // Exclude soft-deleted receipts
-            ->select('receipts.payment_type', DB::raw('SUM(receipts.paid_amount) as total'));
+            ->whereNull('receipts.deleted_at'); // Exclude soft-deleted receipts
 
         if ($agentNoToFilter) {
-            $collectionsQuery->where('customers.agent_no', $agentNoToFilter);
+            $collectionsBaseQuery->where('customers.agent_no', $agentNoToFilter);
         }
         if ($customerId) {
-            $collectionsQuery->where('receipts.customer_id', $customerId);
+            $collectionsBaseQuery->where('receipts.customer_id', $customerId);
         }
         if ($customerSearch) {
-            $collectionsQuery->where(function($q) use ($customerSearch) {
+            $collectionsBaseQuery->where(function($q) use ($customerSearch) {
                 $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
                   ->orWhere('customers.name', 'like', "%{$customerSearch}%")
                   ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
             });
         }
 
-        $collections = $collectionsQuery->groupBy('receipts.payment_type')->pluck('total', 'payment_type');
+        // CA Collection: All receipts from Cash customers (regardless of payment type)
+        // Matches CA Sales logic: customer_type = 'Cash'
+        $caCollectionQuery = clone $collectionsBaseQuery;
+        $caCollectionQuery->whereIn('customers.customer_type', ['Cash']);
+        $totalCashCollect = $caCollectionQuery->sum('receipts.paid_amount') ?? 0;
 
-        // Handle case-insensitive matching (frontend sends: 'CASH', 'Card', 'Online Transfer', 'CHEQUE')
-        // Database might store in different cases, so we search case-insensitively
-        $totalCrCollect = 0;
-        $totalCashCollect = 0;
-        //$totalBankCollect = 0;
+        // CR Collection: All receipts from CREDITOR customers (regardless of payment type)
+        // Matches CR Sales logic: customer_type = 'CREDITOR'
+        $crCollectionQuery = clone $collectionsBaseQuery;
+        $crCollectionQuery->whereIn('customers.customer_type', ['CREDITOR']);
+        $totalCrCollect = $crCollectionQuery->sum('receipts.paid_amount') ?? 0;
+
+        // Cheque collections: Track by payment_type (separate from CA/CR categorization)
+        $chequeQuery = clone $collectionsBaseQuery;
+        $chequeCollections = $chequeQuery
+            ->where(function($q) {
+                $q->whereRaw('UPPER(TRIM(receipts.payment_type)) = ?', ['CHEQUE'])
+                  ->orWhereRaw('UPPER(TRIM(receipts.payment_type)) = ?', ['PD CHEQUE']);
+            })
+            ->select('receipts.payment_type', DB::raw('SUM(receipts.paid_amount) as total'))
+            ->groupBy('receipts.payment_type')
+            ->pluck('total', 'payment_type');
+
         $chequeCollect = 0;
         $pdchequeCollect = 0;
 
-        foreach ($collections as $paymentType => $total) {
+        foreach ($chequeCollections as $paymentType => $total) {
             $upperType = strtoupper(trim($paymentType));
-            // Sum amounts for payment types that map to the same category
-            if ($upperType === 'CARD' || $upperType === 'E-WALLET' || $upperType === 'ONLINE TRANSFER')
-            {
-                $totalCrCollect += $total; // Use += to sum multiple payment types
-            } elseif ($upperType === 'CASH') {
-                $totalCashCollect += $total; // Use += for consistency
-            }
-            // elseif ($upperType === 'ONLINE TRANSFER') {
-            //     $totalBankCollect += $total;
-            // }
-            elseif ($upperType === 'CHEQUE') {
-                $chequeCollect += $total; // Use += for consistency
-            }
-            elseif ($upperType === 'PD CHEQUE') {
-                $pdchequeCollect += $total; // Use += for consistency
+            if ($upperType === 'CHEQUE') {
+                $chequeCollect = $total ?? 0;
+            } elseif ($upperType === 'PD CHEQUE') {
+                $pdchequeCollect = $total ?? 0;
             }
         }
 
-
-        $totalCollection = $totalCrCollect + $totalCashCollect + $chequeCollect + $pdchequeCollect;
+        // Total collection = CA + CR (cheques are already included in CA/CR totals)
+        // Cheques are shown separately for reporting but are part of CA/CR based on customer_type
+        $totalCollection = $totalCrCollect + $totalCashCollect;
 
         return response()->json([
             'from_date' => $fromDate,
