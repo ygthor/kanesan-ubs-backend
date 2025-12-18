@@ -125,7 +125,7 @@ class ReportController extends Controller
         // - CA collection = all receipts from customers with customer_type = 'Cash'
         // - CR collection = all receipts from customers with customer_type = 'CREDITOR'
         // - Cheque collections are tracked separately by payment_type but included in totals
-        
+
         // Base query for all collections
         $collectionsBaseQuery = DB::table('receipts')
             ->join('customers', 'receipts.customer_id', '=', 'customers.id')
@@ -149,7 +149,7 @@ class ReportController extends Controller
         // CA Collection: All receipts from Cash customers (regardless of payment type)
         // Matches CA Sales logic: customer_type = 'Cash'
         $caCollectionQuery = clone $collectionsBaseQuery;
-        $caCollectionQuery->whereIn('customers.customer_type', ['Cash']);
+        $caCollectionQuery->whereIn('customers.customer_type', ['CASH']);
         $totalCashCollect = $caCollectionQuery->sum('receipts.paid_amount') ?? 0;
 
         // CR Collection: All receipts from CREDITOR customers (regardless of payment type)
