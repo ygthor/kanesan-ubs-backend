@@ -82,19 +82,13 @@ class Receipt extends Model
         $prefix = 'R'; // Receipt prefix
         $baseReceiptNo = null;
         
-        // Extract agent prefix from invoice refno if provided
-        // Invoice format: S100001 → extract "S1", S200001 → extract "S2"
+        // Extract receipt number from invoice refno if provided
+        // Invoice format: S400091 → Receipt: RS400091 (just add R prefix)
+        // For multiple payments: RS400091, RS400091-1, RS400091-2, etc.
         if ($primaryInvoiceRefNo) {
-            // Match pattern: letter(s) + number(s) at start
-            if (preg_match('/^([A-Z]+)(\d+)/', $primaryInvoiceRefNo, $matches)) {
-                $agentPrefix = $matches[1] . (int)$matches[2]; // S01 → S1, S02 → S2
-                $prefix = 'R' . $agentPrefix; // RS1, RS2, etc.
-                
-                // Create base receipt number: RS100001 (using invoice number part)
-                // Extract the numeric part from invoice: S100001 → 100001
-                $invoiceNumber = (int)$matches[2];
-                $baseReceiptNo = $prefix . str_pad($invoiceNumber, 5, '0', STR_PAD_LEFT); // RS100001
-            }
+            // Simply add R prefix to the invoice number
+            // S400091 → RS400091
+            $baseReceiptNo = 'R' . $primaryInvoiceRefNo;
         }
         
         // If we have a base receipt number (linked to invoice), check for existing receipts for same invoice
