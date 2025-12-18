@@ -20,7 +20,7 @@ class DebtController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        
+
         $request->validate([
             'search' => 'nullable|string|max:255',
         ]);
@@ -84,21 +84,21 @@ class DebtController extends Controller
         $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) {
             // Get customer data from the first invoice (all invoices have same customer data)
             $firstInvoice = $invoices->first();
-            
+
             // Map the invoices to the 'debtItems' structure
             $debtItems = $invoices->map(function ($invoice) use ($firstInvoice) {
-                
+
                 $orderDate = $invoice->order_date instanceof Carbon ? $invoice->order_date : Carbon::parse($invoice->order_date);
                 // Calculate due date based on payment term
                 $dueDate = $this->calculateDueDate($orderDate, $firstInvoice->payment_term);
 
                 // Calculate total payments made
                 $totalPayments = (float) ($invoice->total_payments ?? 0);
-                
+
                 // Calculate trade return amount from order items
                 $tradeReturnAmount = 0.0;
                 $salesAmount = 0.0;
-                
+
                 if ($invoice->relationLoaded('items')) {
                     foreach ($invoice->items as $item) {
                         $itemAmount = (float) ($item->amount ?? 0.0);
@@ -115,20 +115,22 @@ class DebtController extends Controller
                     // This shouldn't happen as we load items with ->with(['items', 'customer'])
                     $salesAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
                 }
-                
+
                 // Calculate credit note amount from linked CN orders
                 $creditAmount = 0.0;
                 $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
                     ->where('type', 'CN')
                     ->get();
-                
+
                 foreach ($linkedCNs as $cnOrder) {
                     $creditAmount += (float) ($cnOrder->net_amount ?? 0);
                 }
-                
+
+                $totalReturnAmt = $tradeReturnAmount + $creditAmount;
+
                 // Outstanding balance = sales amount - return amount - credit amount - payments
                 $outstandingBalance = max(0, $salesAmount - $tradeReturnAmount - $creditAmount - $totalPayments);
-                
+
                 // Debug logging for partially paid invoices
                 if ($totalPayments > 0 && $outstandingBalance > 0) {
                     \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, creditAmount={$creditAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
@@ -142,9 +144,12 @@ class DebtController extends Controller
                     'dueDate' => $dueDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
                     'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments, returns, and credit notes
                     'salesAmount' => $salesAmount, // Sales amount (excluding trade returns)
-                    'returnAmount' => $tradeReturnAmount, // Trade return amount
-                    'creditAmount' => $creditAmount, // Credit note amount from linked CN orders
-                    'amountPaid' => $totalPayments, // Amount paid from receipts
+                    // 'returnAmount' => $tradeReturnAmount, // Trade return amount
+                    // 'creditAmount' => $creditAmount, // Credit note amount from linked CN orders
+                    // 'amountPaid' => $totalPayments, // Amount paid from receipts
+                    'returnAmount' => $totalReturnAmt,
+                    'creditAmount' => $totalPayments,
+                    'amountPaid' => 0.0,
                     'currency' => 'RM', // Default currency
                 ];
             });
@@ -175,7 +180,7 @@ class DebtController extends Controller
     private function calculateDueDate($orderDate, ?string $paymentTerm): Carbon
     {
         $date = $orderDate->copy();
-        
+
         if (is_null($paymentTerm)) {
             return $date->addDays(30); // Default to 30 days if term is not set
         }
