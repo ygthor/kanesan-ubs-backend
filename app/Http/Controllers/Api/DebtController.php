@@ -116,12 +116,22 @@ class DebtController extends Controller
                     $salesAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
                 }
                 
-                // Outstanding balance = sales amount - return amount - payments
-                $outstandingBalance = max(0, $salesAmount - $tradeReturnAmount - $totalPayments);
+                // Calculate credit note amount from linked CN orders
+                $creditAmount = 0.0;
+                $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
+                    ->where('type', 'CN')
+                    ->get();
+                
+                foreach ($linkedCNs as $cnOrder) {
+                    $creditAmount += (float) ($cnOrder->net_amount ?? 0);
+                }
+                
+                // Outstanding balance = sales amount - return amount - credit amount - payments
+                $outstandingBalance = max(0, $salesAmount - $tradeReturnAmount - $creditAmount - $totalPayments);
                 
                 // Debug logging for partially paid invoices
                 if ($totalPayments > 0 && $outstandingBalance > 0) {
-                    \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
+                    \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, creditAmount={$creditAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
                 }
 
                 return [
@@ -130,10 +140,10 @@ class DebtController extends Controller
                     'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
                     'paymentTerm' => $firstInvoice->payment_term ?? '30 Days', // Fallback value
                     'dueDate' => $dueDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
-                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments and returns
+                    'outstandingAmount' => $outstandingBalance, // Remaining outstanding balance after payments, returns, and credit notes
                     'salesAmount' => $salesAmount, // Sales amount (excluding trade returns)
                     'returnAmount' => $tradeReturnAmount, // Trade return amount
-                    'creditAmount' => 0.0, // Credit notes not tracked here
+                    'creditAmount' => $creditAmount, // Credit note amount from linked CN orders
                     'amountPaid' => $totalPayments, // Amount paid from receipts
                     'currency' => 'RM', // Default currency
                 ];

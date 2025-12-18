@@ -61,8 +61,10 @@ class StockManagementController extends Controller
             }
             
             // Check if user is searching - if so, search ALL items, not just items with transactions
-            $hasSearch = $request->has('search') && $request->input('search');
-            $hasGroupFilter = $request->has('group') && $request->input('group');
+            $searchTerm = trim($request->input('search', ''));
+            $groupFilter = trim($request->input('group', ''));
+            $hasSearch = !empty($searchTerm);
+            $hasGroupFilter = !empty($groupFilter);
             
             if ($hasSearch || $hasGroupFilter) {
                 // When searching or filtering by group, search ALL items in icitem
@@ -70,15 +72,14 @@ class StockManagementController extends Controller
                 
                 // Filter by group if provided
                 if ($hasGroupFilter) {
-                    $itemsQuery->where('GROUP', $request->input('group'));
+                    $itemsQuery->where('GROUP', $groupFilter);
                 }
                 
-                // Filter by search term (item code or name)
+                // Filter by search term (item code or name) - case insensitive
                 if ($hasSearch) {
-                    $searchTerm = $request->input('search');
                     $itemsQuery->where(function($q) use ($searchTerm) {
-                        $q->where('ITEMNO', 'like', '%' . $searchTerm . '%')
-                          ->orWhere('DESP', 'like', '%' . $searchTerm . '%');
+                        $q->whereRaw('LOWER(ITEMNO) LIKE ?', ['%' . strtolower($searchTerm) . '%'])
+                          ->orWhereRaw('LOWER(DESP) LIKE ?', ['%' . strtolower($searchTerm) . '%']);
                     });
                 }
                 
