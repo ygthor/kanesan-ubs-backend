@@ -556,22 +556,41 @@ $(document).ready(function() {
         if (isFiltering) return;
         
         var agentNo = $('#agentSelect').val();
-        if (!agentNo) return;
+        if (!agentNo) {
+            console.log('No agent selected');
+            return;
+        }
         
         var group = $('#groupFilter').val();
         var search = $('#itemSearch').val();
         
+        console.log('Filtering with:', {agentNo: agentNo, group: group, search: search});
+        
         // If filtering and Transactions tab is not active, switch to it
         if ((group || search) && !$('#transactions').hasClass('active')) {
-            $('#transactions-tab').click();
+            $('#transactions-tab').trigger('click');
+            // Wait a bit for tab to switch
+            setTimeout(function() {
+                continueFiltering();
+            }, 100);
+            return;
         }
         
-        isFiltering = true;
-        var tbody = $('#stockSummaryTable tbody');
-        var alertInfo = $('#transactionsAlert');
+        continueFiltering();
         
-        // Show loading state
-        tbody.html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
+        function continueFiltering() {
+            isFiltering = true;
+            var tbody = $('#stockSummaryTable tbody');
+            var alertInfo = $('#transactionsAlert');
+            
+            if (tbody.length === 0) {
+                console.error('Table body not found');
+                isFiltering = false;
+                return;
+            }
+            
+            // Show loading state
+            tbody.html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
         
         $.ajax({
             url: '{{ route("inventory.stock-management") }}',
@@ -706,11 +725,13 @@ $(document).ready(function() {
                     tbody.html('<tr><td colspan="9" class="text-center text-muted">Error loading data. Please try again.</td></tr>');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
                 isFiltering = false;
+                console.error('Filter error:', error, xhr);
                 tbody.html('<tr><td colspan="9" class="text-center text-danger">Error loading data. Please try again.</td></tr>');
             }
         });
+        }
     }
     
     // Prevent form submission on Enter key
@@ -726,31 +747,26 @@ $(document).ready(function() {
         filterTimeout = setTimeout(filterInventory, 300);
     });
     
-    // Filter on search input (with debounce) - use multiple event types to ensure it works
-    $(document).on('input keyup paste', '#itemSearch', function(e) {
-        // Prevent form submission if Enter is pressed
-        if (e.keyCode === 13 || e.which === 13) {
-            e.preventDefault();
+    // Filter on search input - SIMPLE DIRECT APPROACH
+    var searchInput = document.getElementById('itemSearch');
+    if (searchInput) {
+        // Use native addEventListener for better reliability
+        searchInput.addEventListener('input', function() {
             clearTimeout(filterTimeout);
-            filterInventory();
-            return false;
-        }
-        // For other keys, debounce the filter
-        clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(function() {
-            filterInventory();
-        }, 500);
-    });
-    
-    // Also handle keydown for immediate response on Enter
-    $(document).on('keydown', '#itemSearch', function(e) {
-        if (e.keyCode === 13 || e.which === 13) {
-            e.preventDefault();
-            clearTimeout(filterTimeout);
-            filterInventory();
-            return false;
-        }
-    });
+            filterTimeout = setTimeout(function() {
+                filterInventory();
+            }, 500);
+        });
+        
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                e.preventDefault();
+                clearTimeout(filterTimeout);
+                filterInventory();
+                return false;
+            }
+        });
+    }
     
     // Clear filters
     $('#clearFiltersBtn').on('click', function() {
