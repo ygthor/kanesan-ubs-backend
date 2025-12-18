@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Customer; // Using the Customer model
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule; // Required for unique rule updates
 
@@ -530,23 +531,61 @@ class CustomerController extends Controller
     }
 
     /**
-     * Update company_name2 to null where it matches company_name.
+     * Update company_name2 and name fields based on duplicate logic.
      * This is a maintenance script endpoint.
+     * 
+     * Logic:
+     * 1. If company_name2 matches company_name, set company_name2 to null
+     * 2. If name matches company_name, set name to null
+     * 3. If name doesn't match company_name, set company_name2 to name
      *
      * @return \Illuminate\Http\JsonResponse
      */
     public function updateDuplicateCompanyName2()
     {
         try {
-            // Update customers where company_name2 is the same as company_name
-            $updated = Customer::whereRaw('TRIM(COALESCE(company_name2, "")) = TRIM(COALESCE(company_name, ""))')
+            $stats = [
+                'company_name2_cleared' => 0,
+                'name_cleared' => 0,
+                'company_name2_set_from_name' => 0,
+            ];
+
+            // 1. Update customers where company_name2 is the same as company_name (set to null)
+            $updated1 = Customer::whereRaw('TRIM(COALESCE(company_name2, "")) = TRIM(COALESCE(company_name, ""))')
                 ->whereNotNull('company_name')
                 ->where('company_name', '!=', '')
                 ->update(['company_name2' => null]);
+            $stats['company_name2_cleared'] = $updated1;
+
+            // 2. Update customers where name matches company_name (set name to null)
+            $updated2 = Customer::whereRaw('TRIM(COALESCE(name, "")) = TRIM(COALESCE(company_name, ""))')
+                ->whereNotNull('company_name')
+                ->where('company_name', '!=', '')
+                ->update(['name' => null]);
+            $stats['name_cleared'] = $updated2;
+
+            // 3. Update customers where name doesn't match company_name (set company_name2 to name)
+            // Only update if name is not null/empty and doesn't match company_name
+            $updated3 = DB::table('customers')
+                ->whereNotNull('name')
+                ->where('name', '!=', '')
+                ->whereNotNull('company_name')
+                ->where('company_name', '!=', '')
+                ->whereRaw('TRIM(name) != TRIM(company_name)')
+                ->where(function($query) {
+                    // Only update if company_name2 is null or different from name
+                    $query->whereNull('company_name2')
+                          ->orWhereRaw('TRIM(COALESCE(company_name2, "")) != TRIM(name)');
+                })
+                ->update(['company_name2' => DB::raw('name')]);
+            $stats['company_name2_set_from_name'] = $updated3;
+
+            $totalUpdated = $updated1 + $updated2 + $updated3;
 
             return makeResponse(200, 'Update completed successfully.', [
-                'updated_count' => $updated,
-                'message' => "Updated {$updated} customer(s) where company_name2 matched company_name."
+                'total_updated' => $totalUpdated,
+                'details' => $stats,
+                'message' => "Updated {$totalUpdated} customer(s): {$updated1} company_name2 cleared, {$updated2} name cleared, {$updated3} company_name2 set from name."
             ]);
         } catch (\Exception $e) {
             return makeResponse(500, 'Failed to update customers.', ['error' => $e->getMessage()]);
