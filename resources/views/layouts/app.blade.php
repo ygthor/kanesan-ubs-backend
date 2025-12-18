@@ -121,6 +121,13 @@
                                     <p>Announcement Management</p>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a href="/admin/reports"
+                                    class="nav-link {{ request()->is('admin/reports*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-bullhorn"></i>
+                                    <p>Report</p>
+                                </a>
+                            </li>
                         @endif
 
                     </ul>
