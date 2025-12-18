@@ -444,75 +444,86 @@ $(document).ready(function() {
         
         // If switching to Transactions tab, initialize or adjust DataTable
         if (target === '#transactions' && $('#stockSummaryTable').length) {
-            setTimeout(function() {
-                // Ensure table is visible
-                var $table = $('#stockSummaryTable');
-                if (!$table.is(':visible')) {
-                    return;
-                }
-                
-                // Check if table has proper structure (9 columns in header)
-                var headerCols = $table.find('thead th').length;
-                var firstRow = $table.find('tbody tr:first');
-                var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
-                
-                // Handle colspan in first row (empty state)
-                if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
-                    firstRowCols = 0; // Treat colspan rows as empty
-                }
-                
-                // Only initialize if columns match
-                if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0)) {
-                    if (stockSummaryTable === null && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
-                        // Initialize DataTable if not already initialized
-                        @if($selectedAgent && $inventory->count() > 0)
-                        try {
-                            stockSummaryTable = $('#stockSummaryTable').DataTable({
-                                responsive: true,
-                                pageLength: 50,
-                                lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                                order: [[0, 'asc']], // Sort by Item Code by default
-                                columnDefs: [
-                                    {
-                                        targets: [8], // Actions column
-                                        orderable: false,
-                                        searchable: false
+            // Check if there are active filters (from URL params or form values)
+            var urlParams = new URLSearchParams(window.location.search);
+            var hasGroupFilter = urlParams.get('group') || $('#groupFilter').val();
+            var hasSearchFilter = urlParams.get('search') || $('#itemSearch').val();
+            
+            // If filters are active, refresh the data via AJAX to ensure DataTable shows filtered results
+            if (hasGroupFilter || hasSearchFilter) {
+                filterInventory();
+            } else {
+                // No filters, just initialize/adjust DataTable
+                setTimeout(function() {
+                    // Ensure table is visible
+                    var $table = $('#stockSummaryTable');
+                    if (!$table.is(':visible')) {
+                        return;
+                    }
+                    
+                    // Check if table has proper structure (9 columns in header)
+                    var headerCols = $table.find('thead th').length;
+                    var firstRow = $table.find('tbody tr:first');
+                    var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
+                    
+                    // Handle colspan in first row (empty state)
+                    if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
+                        firstRowCols = 0; // Treat colspan rows as empty
+                    }
+                    
+                    // Only initialize if columns match
+                    if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0)) {
+                        if (stockSummaryTable === null && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+                            // Initialize DataTable if not already initialized
+                            @if($selectedAgent && $inventory->count() > 0)
+                            try {
+                                stockSummaryTable = $('#stockSummaryTable').DataTable({
+                                    responsive: true,
+                                    pageLength: 50,
+                                    lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
+                                    order: [[0, 'asc']], // Sort by Item Code by default
+                                    columnDefs: [
+                                        {
+                                            targets: [8], // Actions column
+                                            orderable: false,
+                                            searchable: false
+                                        },
+                                        {
+                                            targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
+                                            orderDataType: 'dom-data-sort-num' // Use custom sorting function
+                                        }
+                                    ],
+                                    language: {
+                                        search: "Search items:",
+                                        lengthMenu: "Show _MENU_ items per page",
+                                        info: "Showing _START_ to _END_ of _TOTAL_ items",
+                                        infoEmpty: "No items to show",
+                                        infoFiltered: "(filtered from _MAX_ total items)",
+                                        zeroRecords: "No matching items found",
+                                        paginate: {
+                                            first: "First",
+                                            last: "Last",
+                                            next: "Next",
+                                            previous: "Previous"
+                                        }
                                     },
-                                    {
-                                        targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
-                                        orderDataType: 'dom-data-sort-num' // Use custom sorting function
-                                    }
-                                ],
-                                language: {
-                                    search: "Search items:",
-                                    lengthMenu: "Show _MENU_ items per page",
-                                    info: "Showing _START_ to _END_ of _TOTAL_ items",
-                                    infoEmpty: "No items to show",
-                                    infoFiltered: "(filtered from _MAX_ total items)",
-                                    zeroRecords: "No matching items found",
-                                    paginate: {
-                                        first: "First",
-                                        last: "Last",
-                                        next: "Next",
-                                        previous: "Previous"
-                                    }
-                                },
-                                dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                            });
-                        } catch (e) {
-                            console.error('Error initializing DataTable:', e);
-                        }
-                        @endif
-                    } else {
-                        // Adjust columns if already initialized
-                        try {
-                            stockSummaryTable.columns.adjust().responsive.recalc();
-                        } catch (e) {
-                            console.error('Error adjusting DataTable columns:', e);
+                                    dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                                });
+                            } catch (e) {
+                                console.error('Error initializing DataTable:', e);
+                            }
+                            @endif
+                        } else {
+                            // Adjust columns if already initialized
+                            try {
+                                stockSummaryTable.columns.adjust().responsive.recalc();
+                            } catch (e) {
+                                console.error('Error adjusting DataTable columns:', e);
+                            }
                         }
                     }
-                }
-            }, 200);
+                }, 200);
+            }
         }
     });
     
@@ -847,58 +858,81 @@ $(document).ready(function() {
     // Initialize DataTable for Transactions tab if it's the active tab on page load
     @if($selectedAgent && $inventory->count() > 0)
     if ($('#transactions').hasClass('active')) {
-        var $table = $('#stockSummaryTable');
+        // Check if there are URL parameters for filters
+        var urlParams = new URLSearchParams(window.location.search);
+        var hasGroupFilter = urlParams.get('group');
+        var hasSearchFilter = urlParams.get('search');
         
-        // Ensure table is visible
-        if ($table.length && $table.is(':visible')) {
-            // Check if table has proper structure (9 columns in header)
-            var headerCols = $table.find('thead th').length;
-            var firstRow = $table.find('tbody tr:first');
-            var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
-            
-            // Handle colspan in first row (empty state)
-            if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
-                firstRowCols = 0; // Treat colspan rows as empty
+        // If URL parameters exist, ensure form fields are synced and refresh data
+        if (hasGroupFilter || hasSearchFilter) {
+            // Form fields should already be populated from server-side, but ensure they're synced
+            if (hasGroupFilter && $('#groupFilter').val() !== hasGroupFilter) {
+                $('#groupFilter').val(hasGroupFilter).trigger('change');
+            }
+            if (hasSearchFilter && $('#itemSearch').val() !== hasSearchFilter) {
+                $('#itemSearch').val(hasSearchFilter);
             }
             
-            // Only initialize if columns match
-            if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
-            try {
-                stockSummaryTable = $('#stockSummaryTable').DataTable({
-                    responsive: true,
-                    pageLength: 50,
-                    lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                    order: [[0, 'asc']], // Sort by Item Code by default
-                    columnDefs: [
-                        {
-                            targets: [8], // Actions column
-                            orderable: false,
-                            searchable: false
+            // Refresh the data to ensure DataTable shows filtered results
+            // Use a small delay to ensure Select2 is initialized
+            setTimeout(function() {
+                filterInventory();
+            }, 300);
+        } else {
+            // No filters, just initialize DataTable with existing data
+            var $table = $('#stockSummaryTable');
+            
+            // Ensure table is visible
+            if ($table.length && $table.is(':visible')) {
+                // Check if table has proper structure (9 columns in header)
+                var headerCols = $table.find('thead th').length;
+                var firstRow = $table.find('tbody tr:first');
+                var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
+                
+                // Handle colspan in first row (empty state)
+                if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
+                    firstRowCols = 0; // Treat colspan rows as empty
+                }
+                
+                // Only initialize if columns match
+                if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+                try {
+                    stockSummaryTable = $('#stockSummaryTable').DataTable({
+                        responsive: true,
+                        pageLength: 50,
+                        lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
+                        order: [[0, 'asc']], // Sort by Item Code by default
+                        columnDefs: [
+                            {
+                                targets: [8], // Actions column
+                                orderable: false,
+                                searchable: false
+                            },
+                            {
+                                targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
+                                orderDataType: 'dom-data-sort-num' // Use custom sorting function
+                            }
+                        ],
+                        language: {
+                            search: "Search items:",
+                            lengthMenu: "Show _MENU_ items per page",
+                            info: "Showing _START_ to _END_ of _TOTAL_ items",
+                            infoEmpty: "No items to show",
+                            infoFiltered: "(filtered from _MAX_ total items)",
+                            zeroRecords: "No matching items found",
+                            paginate: {
+                                first: "First",
+                                last: "Last",
+                                next: "Next",
+                                previous: "Previous"
+                            }
                         },
-                        {
-                            targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
-                            orderDataType: 'dom-data-sort-num' // Use custom sorting function
-                        }
-                    ],
-                    language: {
-                        search: "Search items:",
-                        lengthMenu: "Show _MENU_ items per page",
-                        info: "Showing _START_ to _END_ of _TOTAL_ items",
-                        infoEmpty: "No items to show",
-                        infoFiltered: "(filtered from _MAX_ total items)",
-                        zeroRecords: "No matching items found",
-                        paginate: {
-                            first: "First",
-                            last: "Last",
-                            next: "Next",
-                            previous: "Previous"
-                        }
-                    },
-                    dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                });
-            } catch (e) {
-                console.error('Error initializing DataTable on page load:', e);
-            }
+                        dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                    });
+                } catch (e) {
+                    console.error('Error initializing DataTable on page load:', e);
+                }
+                }
             }
         }
     }
