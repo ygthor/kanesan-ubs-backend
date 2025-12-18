@@ -561,6 +561,11 @@ $(document).ready(function() {
         var group = $('#groupFilter').val();
         var search = $('#itemSearch').val();
         
+        // If filtering and Transactions tab is not active, switch to it
+        if ((group || search) && !$('#transactions').hasClass('active')) {
+            $('#transactions-tab').click();
+        }
+        
         isFiltering = true;
         var tbody = $('#stockSummaryTable tbody');
         var alertInfo = $('#transactionsAlert');
@@ -708,22 +713,50 @@ $(document).ready(function() {
         });
     }
     
+    // Prevent form submission on Enter key
+    $('#searchForm').on('submit', function(e) {
+        e.preventDefault();
+        filterInventory();
+        return false;
+    });
+    
     // Filter on group change
     $('#groupFilter').on('change', function() {
         clearTimeout(filterTimeout);
         filterTimeout = setTimeout(filterInventory, 300);
     });
     
-    // Filter on search input (with debounce)
-    $('#itemSearch').on('input', function() {
+    // Filter on search input (with debounce) - use multiple event types to ensure it works
+    $(document).on('input keyup paste', '#itemSearch', function(e) {
+        // Prevent form submission if Enter is pressed
+        if (e.keyCode === 13 || e.which === 13) {
+            e.preventDefault();
+            clearTimeout(filterTimeout);
+            filterInventory();
+            return false;
+        }
+        // For other keys, debounce the filter
         clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(filterInventory, 500);
+        filterTimeout = setTimeout(function() {
+            filterInventory();
+        }, 500);
+    });
+    
+    // Also handle keydown for immediate response on Enter
+    $(document).on('keydown', '#itemSearch', function(e) {
+        if (e.keyCode === 13 || e.which === 13) {
+            e.preventDefault();
+            clearTimeout(filterTimeout);
+            filterInventory();
+            return false;
+        }
     });
     
     // Clear filters
     $('#clearFiltersBtn').on('click', function() {
         $('#groupFilter').val('').trigger('change');
         $('#itemSearch').val('');
+        clearTimeout(filterTimeout);
         filterInventory();
     });
     
