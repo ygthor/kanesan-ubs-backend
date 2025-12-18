@@ -123,6 +123,7 @@ class ReportController extends Controller
         // --- Collections ---
         // Single query with GROUP BY for all payment types (more efficient - world standard)
         // Use INNER JOIN since customer_id is required (foreign key constraint)
+        // IMPORTANT: payment_type comes from receipts table, NOT from customers table
         $collectionsQuery = DB::table('receipts')
             ->join('customers', 'receipts.customer_id', '=', 'customers.id')
             ->whereBetween('receipts.receipt_date', [$fromDate, $toDate])
@@ -155,20 +156,21 @@ class ReportController extends Controller
 
         foreach ($collections as $paymentType => $total) {
             $upperType = strtoupper(trim($paymentType));
+            // Sum amounts for payment types that map to the same category
             if ($upperType === 'CARD' || $upperType === 'E-WALLET' || $upperType === 'ONLINE TRANSFER')
             {
-                $totalCrCollect = $total;
+                $totalCrCollect += $total; // Use += to sum multiple payment types
             } elseif ($upperType === 'CASH') {
-                $totalCashCollect = $total;
+                $totalCashCollect += $total; // Use += for consistency
             }
             // elseif ($upperType === 'ONLINE TRANSFER') {
-            //     $totalBankCollect = $total;
+            //     $totalBankCollect += $total;
             // }
             elseif ($upperType === 'CHEQUE') {
-                $chequeCollect = $total;
+                $chequeCollect += $total; // Use += for consistency
             }
             elseif ($upperType === 'PD CHEQUE') {
-                $pdchequeCollect = $total;
+                $pdchequeCollect += $total; // Use += for consistency
             }
         }
 
