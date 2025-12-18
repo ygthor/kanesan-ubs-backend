@@ -497,7 +497,7 @@ $(document).ready(function() {
                                         previous: "Previous"
                                     }
                                 },
-                                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                                dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
                             });
                         } catch (e) {
                             console.error('Error initializing DataTable:', e);
@@ -678,7 +678,7 @@ $(document).ready(function() {
                                                 previous: "Previous"
                                             }
                                         },
-                                        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                                        dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
                                     });
                                 } catch (e) {
                                     console.error('Error initializing DataTable after filter:', e);
@@ -894,7 +894,7 @@ $(document).ready(function() {
                             previous: "Previous"
                         }
                     },
-                    dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                    dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
                 });
             } catch (e) {
                 console.error('Error initializing DataTable on page load:', e);

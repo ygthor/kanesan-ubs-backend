@@ -60,63 +60,21 @@ class StockManagementController extends Controller
                 $agentNo = $user->name;
             }
             
-            // Get distinct items from BOTH orders and item_transactions for this agent
-            // This matches how StockService calculates stock
+            // Check if user is searching - if so, search ALL items, not just items with transactions
+            $hasSearch = $request->has('search') && $request->input('search');
+            $hasGroupFilter = $request->has('group') && $request->input('group');
             
-            // Get items from orders (DO and INV types)
-            $itemsFromOrders = DB::table('orders')
-                ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
-                ->join('icitem', function($join) {
-                    $join->on(DB::raw('order_items.product_no COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
-                })
-                ->where('orders.agent_no', $agentNo)
-                ->whereNotNull('order_items.product_no')
-                ->select(
-                    'icitem.ITEMNO',
-                    'icitem.DESP',
-                    'icitem.GROUP',
-                    'icitem.UNIT',
-                    'icitem.PRICE'
-                )
-                ->distinct()
-                ->get()
-                ->pluck('ITEMNO')
-                ->toArray();
-            
-            // Get items from item_transactions
-            $itemsFromTransactions = DB::table('item_transactions')
-                ->join('icitem', function($join) {
-                    $join->on(DB::raw('item_transactions.ITEMNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
-                })
-                ->where('item_transactions.agent_no', $agentNo)
-                ->select(
-                    'icitem.ITEMNO',
-                    'icitem.DESP',
-                    'icitem.GROUP',
-                    'icitem.UNIT',
-                    'icitem.PRICE'
-                )
-                ->distinct()
-                ->get()
-                ->pluck('ITEMNO')
-                ->toArray();
-            
-            // Combine and get unique item numbers
-            $allItemNos = array_unique(array_merge($itemsFromOrders, $itemsFromTransactions));
-            
-            if (empty($allItemNos)) {
-                $inventory = collect([]);
-            } else {
-                // Get item details from icitem for all unique items
-                $itemsQuery = Icitem::whereIn('ITEMNO', $allItemNos);
+            if ($hasSearch || $hasGroupFilter) {
+                // When searching or filtering by group, search ALL items in icitem
+                $itemsQuery = Icitem::query();
                 
                 // Filter by group if provided
-                if ($request->has('group') && $request->input('group')) {
+                if ($hasGroupFilter) {
                     $itemsQuery->where('GROUP', $request->input('group'));
                 }
                 
                 // Filter by search term (item code or name)
-                if ($request->has('search') && $request->input('search')) {
+                if ($hasSearch) {
                     $searchTerm = $request->input('search');
                     $itemsQuery->where(function($q) use ($searchTerm) {
                         $q->where('ITEMNO', 'like', '%' . $searchTerm . '%')
@@ -127,7 +85,6 @@ class StockManagementController extends Controller
                 $items = $itemsQuery->orderBy('GROUP')->orderBy('ITEMNO')->get();
                 
                 // Calculate agent-specific stock for each item using StockService
-                // This will include both orders and item_transactions
                 $inventory = $items->map(function ($item) use ($agentNo, $stockService) {
                     // Calculate stock totals for this agent (includes orders + item_transactions)
                     $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
@@ -147,6 +104,82 @@ class StockManagementController extends Controller
                         'returnBad' => $totals['returnBad'],
                     ];
                 });
+            } else {
+                // If no search/filter, show only items that have transactions for this agent
+                // Get distinct items from BOTH orders and item_transactions for this agent
+                // This matches how StockService calculates stock
+                
+                // Get items from orders (DO and INV types)
+                $itemsFromOrders = DB::table('orders')
+                    ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
+                    ->join('icitem', function($join) {
+                        $join->on(DB::raw('order_items.product_no COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
+                    })
+                    ->where('orders.agent_no', $agentNo)
+                    ->whereNotNull('order_items.product_no')
+                    ->select(
+                        'icitem.ITEMNO',
+                        'icitem.DESP',
+                        'icitem.GROUP',
+                        'icitem.UNIT',
+                        'icitem.PRICE'
+                    )
+                    ->distinct()
+                    ->get()
+                    ->pluck('ITEMNO')
+                    ->toArray();
+                
+                // Get items from item_transactions
+                $itemsFromTransactions = DB::table('item_transactions')
+                    ->join('icitem', function($join) {
+                        $join->on(DB::raw('item_transactions.ITEMNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
+                    })
+                    ->where('item_transactions.agent_no', $agentNo)
+                    ->select(
+                        'icitem.ITEMNO',
+                        'icitem.DESP',
+                        'icitem.GROUP',
+                        'icitem.UNIT',
+                        'icitem.PRICE'
+                    )
+                    ->distinct()
+                    ->get()
+                    ->pluck('ITEMNO')
+                    ->toArray();
+                
+                // Combine and get unique item numbers
+                $allItemNos = array_unique(array_merge($itemsFromOrders, $itemsFromTransactions));
+                
+                if (empty($allItemNos)) {
+                    $inventory = collect([]);
+                } else {
+                    // Get item details from icitem for all unique items
+                    $itemsQuery = Icitem::whereIn('ITEMNO', $allItemNos);
+                    
+                    $items = $itemsQuery->orderBy('GROUP')->orderBy('ITEMNO')->get();
+                    
+                    // Calculate agent-specific stock for each item using StockService
+                    // This will include both orders and item_transactions
+                    $inventory = $items->map(function ($item) use ($agentNo, $stockService) {
+                        // Calculate stock totals for this agent (includes orders + item_transactions)
+                        $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
+                        $currentStock = $totals['available'];
+                        
+                        return [
+                            'ITEMNO' => $item->ITEMNO,
+                            'DESP' => $item->DESP ?? 'N/A',
+                            'current_stock' => $currentStock,
+                            'QTY' => $currentStock,
+                            'UNIT' => $item->UNIT ?? 'N/A',
+                            'PRICE' => $item->PRICE ?? 0,
+                            'GROUP' => $item->GROUP ?? '',
+                            'stockIn' => $totals['stockIn'],
+                            'stockOut' => $totals['stockOut'],
+                            'returnGood' => $totals['returnGood'],
+                            'returnBad' => $totals['returnBad'],
+                        ];
+                    });
+                }
             }
             
             // Get opening balances for this agent
