@@ -445,47 +445,74 @@ $(document).ready(function() {
         // If switching to Transactions tab, initialize or adjust DataTable
         if (target === '#transactions' && $('#stockSummaryTable').length) {
             setTimeout(function() {
-                if (stockSummaryTable === null) {
-                    // Initialize DataTable if not already initialized
-                    @if($selectedAgent && $inventory->count() > 0)
-                    stockSummaryTable = $('#stockSummaryTable').DataTable({
-                        responsive: true,
-                        pageLength: 50,
-                        lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                        order: [[0, 'asc']], // Sort by Item Code by default
-                        columnDefs: [
-                            {
-                                targets: [8], // Actions column
-                                orderable: false,
-                                searchable: false
-                            },
-                            {
-                                targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
-                                orderDataType: 'dom-data-sort-num' // Use custom sorting function
-                            }
-                        ],
-                        language: {
-                            search: "Search items:",
-                            lengthMenu: "Show _MENU_ items per page",
-                            info: "Showing _START_ to _END_ of _TOTAL_ items",
-                            infoEmpty: "No items to show",
-                            infoFiltered: "(filtered from _MAX_ total items)",
-                            zeroRecords: "No matching items found",
-                            paginate: {
-                                first: "First",
-                                last: "Last",
-                                next: "Next",
-                                previous: "Previous"
-                            }
-                        },
-                        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                    });
-                    @endif
-                } else {
-                    // Adjust columns if already initialized
-                    stockSummaryTable.columns.adjust().responsive.recalc();
+                // Ensure table is visible
+                var $table = $('#stockSummaryTable');
+                if (!$table.is(':visible')) {
+                    return;
                 }
-            }, 100);
+                
+                // Check if table has proper structure (9 columns in header)
+                var headerCols = $table.find('thead th').length;
+                var firstRow = $table.find('tbody tr:first');
+                var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
+                
+                // Handle colspan in first row (empty state)
+                if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
+                    firstRowCols = 0; // Treat colspan rows as empty
+                }
+                
+                // Only initialize if columns match
+                if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0)) {
+                    if (stockSummaryTable === null && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+                        // Initialize DataTable if not already initialized
+                        @if($selectedAgent && $inventory->count() > 0)
+                        try {
+                            stockSummaryTable = $('#stockSummaryTable').DataTable({
+                                responsive: true,
+                                pageLength: 50,
+                                lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
+                                order: [[0, 'asc']], // Sort by Item Code by default
+                                columnDefs: [
+                                    {
+                                        targets: [8], // Actions column
+                                        orderable: false,
+                                        searchable: false
+                                    },
+                                    {
+                                        targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
+                                        orderDataType: 'dom-data-sort-num' // Use custom sorting function
+                                    }
+                                ],
+                                language: {
+                                    search: "Search items:",
+                                    lengthMenu: "Show _MENU_ items per page",
+                                    info: "Showing _START_ to _END_ of _TOTAL_ items",
+                                    infoEmpty: "No items to show",
+                                    infoFiltered: "(filtered from _MAX_ total items)",
+                                    zeroRecords: "No matching items found",
+                                    paginate: {
+                                        first: "First",
+                                        last: "Last",
+                                        next: "Next",
+                                        previous: "Previous"
+                                    }
+                                },
+                                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                            });
+                        } catch (e) {
+                            console.error('Error initializing DataTable:', e);
+                        }
+                        @endif
+                    } else {
+                        // Adjust columns if already initialized
+                        try {
+                            stockSummaryTable.columns.adjust().responsive.recalc();
+                        } catch (e) {
+                            console.error('Error adjusting DataTable columns:', e);
+                        }
+                    }
+                }
+            }, 200);
         }
     });
     
@@ -588,47 +615,77 @@ $(document).ready(function() {
                     
                     // Reinitialize DataTable if it exists
                     if (stockSummaryTable) {
-                        stockSummaryTable.destroy();
+                        try {
+                            stockSummaryTable.destroy();
+                        } catch (e) {
+                            console.error('Error destroying DataTable:', e);
+                        }
                         stockSummaryTable = null;
+                        // Clear any DataTables classes that might remain
+                        $('#stockSummaryTable').removeClass('dataTable');
                     }
                     
                     // Reinitialize DataTable after a short delay
                     setTimeout(function() {
-                        if ($('#transactions').hasClass('active') && items.length > 0) {
-                            stockSummaryTable = $('#stockSummaryTable').DataTable({
-                                responsive: true,
-                                pageLength: 50,
-                                lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                                order: [[0, 'asc']],
-                                columnDefs: [
-                                    {
-                                        targets: [8],
-                                        orderable: false,
-                                        searchable: false
-                                    },
-                                    {
-                                        targets: [3, 4, 5, 7],
-                                        orderDataType: 'dom-data-sort-num'
-                                    }
-                                ],
-                                language: {
-                                    search: "Search items:",
-                                    lengthMenu: "Show _MENU_ items per page",
-                                    info: "Showing _START_ to _END_ of _TOTAL_ items",
-                                    infoEmpty: "No items to show",
-                                    infoFiltered: "(filtered from _MAX_ total items)",
-                                    zeroRecords: "No matching items found",
-                                    paginate: {
-                                        first: "First",
-                                        last: "Last",
-                                        next: "Next",
-                                        previous: "Previous"
-                                    }
-                                },
-                                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                            });
+                        if ($('#transactions').hasClass('active')) {
+                            var $table = $('#stockSummaryTable');
+                            
+                            // Ensure table is visible
+                            if (!$table.is(':visible')) {
+                                return;
+                            }
+                            
+                            // Check if table has proper structure (9 columns in header)
+                            var headerCols = $table.find('thead th').length;
+                            var firstRow = $table.find('tbody tr:first');
+                            var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
+                            
+                            // Handle colspan in first row (empty state)
+                            if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
+                                firstRowCols = 0; // Treat colspan rows as empty
+                            }
+                            
+                            // Only initialize if columns match
+                            if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+                                try {
+                                    stockSummaryTable = $('#stockSummaryTable').DataTable({
+                                        responsive: true,
+                                        pageLength: 50,
+                                        lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
+                                        order: [[0, 'asc']],
+                                        columnDefs: [
+                                            {
+                                                targets: [8],
+                                                orderable: false,
+                                                searchable: false
+                                            },
+                                            {
+                                                targets: [3, 4, 5, 7],
+                                                orderDataType: 'dom-data-sort-num'
+                                            }
+                                        ],
+                                        language: {
+                                            search: "Search items:",
+                                            lengthMenu: "Show _MENU_ items per page",
+                                            info: "Showing _START_ to _END_ of _TOTAL_ items",
+                                            infoEmpty: "No items to show",
+                                            infoFiltered: "(filtered from _MAX_ total items)",
+                                            zeroRecords: "No matching items found",
+                                            paginate: {
+                                                first: "First",
+                                                last: "Last",
+                                                next: "Next",
+                                                previous: "Previous"
+                                            }
+                                        },
+                                        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                                    });
+                                } catch (e) {
+                                    console.error('Error initializing DataTable after filter:', e);
+                                }
+                            }
                         }
-                    }, 100);
+                    }, 200);
                 } else {
                     tbody.html('<tr><td colspan="9" class="text-center text-muted">Error loading data. Please try again.</td></tr>');
                 }
@@ -790,38 +847,60 @@ $(document).ready(function() {
     // Initialize DataTable for Transactions tab if it's the active tab on page load
     @if($selectedAgent && $inventory->count() > 0)
     if ($('#transactions').hasClass('active')) {
-        stockSummaryTable = $('#stockSummaryTable').DataTable({
-            responsive: true,
-            pageLength: 50,
-            lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-            order: [[0, 'asc']], // Sort by Item Code by default
-            columnDefs: [
-                {
-                    targets: [8], // Actions column
-                    orderable: false,
-                    searchable: false
-                },
-                {
-                    targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
-                    orderDataType: 'dom-data-sort-num' // Use custom sorting function
-                }
-            ],
-            language: {
-                search: "Search items:",
-                lengthMenu: "Show _MENU_ items per page",
-                info: "Showing _START_ to _END_ of _TOTAL_ items",
-                infoEmpty: "No items to show",
-                infoFiltered: "(filtered from _MAX_ total items)",
-                zeroRecords: "No matching items found",
-                paginate: {
-                    first: "First",
-                    last: "Last",
-                    next: "Next",
-                    previous: "Previous"
-                }
-            },
-            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-        });
+        var $table = $('#stockSummaryTable');
+        
+        // Ensure table is visible
+        if ($table.length && $table.is(':visible')) {
+            // Check if table has proper structure (9 columns in header)
+            var headerCols = $table.find('thead th').length;
+            var firstRow = $table.find('tbody tr:first');
+            var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
+            
+            // Handle colspan in first row (empty state)
+            if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
+                firstRowCols = 0; // Treat colspan rows as empty
+            }
+            
+            // Only initialize if columns match
+            if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+            try {
+                stockSummaryTable = $('#stockSummaryTable').DataTable({
+                    responsive: true,
+                    pageLength: 50,
+                    lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
+                    order: [[0, 'asc']], // Sort by Item Code by default
+                    columnDefs: [
+                        {
+                            targets: [8], // Actions column
+                            orderable: false,
+                            searchable: false
+                        },
+                        {
+                            targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
+                            orderDataType: 'dom-data-sort-num' // Use custom sorting function
+                        }
+                    ],
+                    language: {
+                        search: "Search items:",
+                        lengthMenu: "Show _MENU_ items per page",
+                        info: "Showing _START_ to _END_ of _TOTAL_ items",
+                        infoEmpty: "No items to show",
+                        infoFiltered: "(filtered from _MAX_ total items)",
+                        zeroRecords: "No matching items found",
+                        paginate: {
+                            first: "First",
+                            last: "Last",
+                            next: "Next",
+                            previous: "Previous"
+                        }
+                    },
+                    dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                });
+            } catch (e) {
+                console.error('Error initializing DataTable on page load:', e);
+            }
+            }
+        }
     }
     @endif
 });
