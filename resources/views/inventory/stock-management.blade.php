@@ -555,17 +555,29 @@ $(document).ready(function() {
     var isFiltering = false;
     
     function filterInventory() {
-        if (isFiltering) return;
+        if (isFiltering) {
+            console.log('Already filtering, skipping...');
+            return;
+        }
         
         var agentNo = $('#agentSelect').val();
-        if (!agentNo) return;
+        if (!agentNo) {
+            alert('Please select an agent first.');
+            return;
+        }
         
         var group = $('#groupFilter').val();
         var search = $('#itemSearch').val();
         
-        // If filtering and Transactions tab is not active, switch to it
-        if ((group || search) && !$('#transactions').hasClass('active')) {
-            $('#transactions-tab').trigger('click');
+        // Always ensure Transactions tab is active when filtering
+        if (!$('#transactions').hasClass('active')) {
+            // Manually switch to Transactions tab
+            $('#stockTabs a').removeClass('active');
+            $('.tab-pane').removeClass('show active');
+            $('#transactions-tab').addClass('active');
+            $('#transactions').addClass('show active');
+            
+            // Wait a moment for tab to be visible, then filter
             setTimeout(function() {
                 executeFilter();
             }, 100);
@@ -580,10 +592,12 @@ $(document).ready(function() {
             var alertInfo = $('#transactionsAlert');
             
             if (tbody.length === 0) {
+                console.error('Table body not found');
                 isFiltering = false;
                 return;
             }
             
+            // Show loading state
             tbody.html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
         
             $.ajax({
@@ -601,7 +615,7 @@ $(document).ready(function() {
             success: function(response) {
                 isFiltering = false;
                 
-                if (response.success && response.data) {
+                if (response && response.success && response.data) {
                     var items = response.data;
                     var html = '';
                     
@@ -716,12 +730,18 @@ $(document).ready(function() {
                         }
                     }, 200);
                 } else {
-                    tbody.html('<tr><td colspan="9" class="text-center text-muted">Error loading data. Please try again.</td></tr>');
+                    var errorMsg = response && response.message ? response.message : 'Error loading data. Please try again.';
+                    tbody.html('<tr><td colspan="9" class="text-center text-muted">' + errorMsg + '</td></tr>');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
                 isFiltering = false;
-                tbody.html('<tr><td colspan="9" class="text-center text-danger">Error loading data. Please try again.</td></tr>');
+                console.error('AJAX Error:', status, error, xhr);
+                var errorMsg = 'Error loading data. Please try again.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                tbody.html('<tr><td colspan="9" class="text-center text-danger">' + errorMsg + '</td></tr>');
             }
             });
         }
@@ -734,13 +754,17 @@ $(document).ready(function() {
         return false;
     });
     
-    // Search button click
-    $('#searchBtn').on('click', function() {
+    // Search button click - use document ready and ensure button exists
+    $(document).on('click', '#searchBtn', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Search button clicked');
         filterInventory();
+        return false;
     });
     
     // Allow Enter key in search field to trigger search
-    $('#itemSearch').on('keypress', function(e) {
+    $(document).on('keypress', '#itemSearch', function(e) {
         if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
             filterInventory();
@@ -749,15 +773,17 @@ $(document).ready(function() {
     });
     
     // Filter on group change
-    $('#groupFilter').on('change', function() {
+    $(document).on('change', '#groupFilter', function() {
         filterInventory();
     });
     
     // Clear filters
-    $('#clearFiltersBtn').on('click', function() {
+    $(document).on('click', '#clearFiltersBtn', function(e) {
+        e.preventDefault();
         $('#groupFilter').val('').trigger('change');
         $('#itemSearch').val('');
         filterInventory();
+        return false;
     });
     
     // Custom sorting function for numeric data-sort attribute
