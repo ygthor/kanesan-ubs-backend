@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Receipt extends Model
 {
@@ -59,5 +60,96 @@ class Receipt extends Model
     public function receiptInvoices()
     {
         return $this->hasMany(ReceiptInvoice::class);
+    }
+
+    /**
+     * Generate receipt number in format RS400001 (R prefix + agent prefix + running number)
+     * For multiple payments to same invoice: RS400001, RS400001-1, RS400001-2, etc.
+     * Links to invoice by extracting agent prefix from invoice refno
+     * 
+     * @param string|null $invoiceRefNo Optional invoice refno to extract agent prefix from
+     * @param array|null $invoiceRefNos Optional array of invoice refnos (for multiple invoices, use first one)
+     * @return string
+     */
+    public static function generateReceiptNo($invoiceRefNo = null, $invoiceRefNos = null)
+    {
+        // Use first invoice refno if array provided, otherwise use single refno
+        $primaryInvoiceRefNo = $invoiceRefNo;
+        if (!$primaryInvoiceRefNo && $invoiceRefNos && is_array($invoiceRefNos) && !empty($invoiceRefNos)) {
+            $primaryInvoiceRefNo = $invoiceRefNos[0];
+        }
+        
+        $prefix = 'R'; // Receipt prefix
+        $baseReceiptNo = null;
+        
+        // Extract agent prefix from invoice refno if provided
+        // Invoice format: S100001 → extract "S1", S200001 → extract "S2"
+        if ($primaryInvoiceRefNo) {
+            // Match pattern: letter(s) + number(s) at start
+            if (preg_match('/^([A-Z]+)(\d+)/', $primaryInvoiceRefNo, $matches)) {
+                $agentPrefix = $matches[1] . (int)$matches[2]; // S01 → S1, S02 → S2
+                $prefix = 'R' . $agentPrefix; // RS1, RS2, etc.
+                
+                // Create base receipt number: RS100001 (using invoice number part)
+                // Extract the numeric part from invoice: S100001 → 100001
+                $invoiceNumber = (int)$matches[2];
+                $baseReceiptNo = $prefix . str_pad($invoiceNumber, 5, '0', STR_PAD_LEFT); // RS100001
+            }
+        }
+        
+        // If we have a base receipt number (linked to invoice), check for existing receipts for same invoice
+        if ($baseReceiptNo && $primaryInvoiceRefNo) {
+            // Count how many receipts already exist for this invoice
+            $existingReceiptCount = DB::table('receipt_orders')
+                ->join('receipts', 'receipt_orders.receipt_id', '=', 'receipts.id')
+                ->where('receipt_orders.order_refno', $primaryInvoiceRefNo)
+                ->whereNull('receipts.deleted_at')
+                ->count();
+            
+            if ($existingReceiptCount == 0) {
+                // First receipt for this invoice: use base format RS100001
+                // Check if this exact receipt number already exists (shouldn't happen, but safety check)
+                $chk = self::where('receipt_no', '=', $baseReceiptNo)->first();
+                if ($chk == null) {
+                    return $baseReceiptNo;
+                }
+                // If exists, fall through to suffix format (this shouldn't normally happen)
+            }
+            
+            // Multiple receipts for same invoice: use suffix format RS100001-1, RS100001-2, etc.
+            // existingReceiptCount = 1 means 1 receipt exists, so next one should be -1 (second receipt)
+            // existingReceiptCount = 2 means 2 receipts exist, so next one should be -2 (third receipt)
+            $suffix = $existingReceiptCount; // Start suffix at 1 for second receipt
+            $receiptNoWithSuffix = $baseReceiptNo . '-' . $suffix;
+            
+            // Ensure uniqueness (in case of gaps or deletions)
+            $found = false;
+            while (!$found) {
+                $chk = self::where('receipt_no', '=', $receiptNoWithSuffix)->first();
+                if ($chk == null) {
+                    $found = true;
+                    break;
+                }
+                $suffix++;
+                $receiptNoWithSuffix = $baseReceiptNo . '-' . $suffix;
+            }
+            
+            return $receiptNoWithSuffix;
+        }
+        
+        // No invoice linked - use generic format with running number
+        // Count existing receipts with same prefix to get running number
+        $count = self::where('receipt_no', 'like', $prefix . '%')->count();
+        
+        $found = false;
+        $running_number = $count + 1; // Start from 1
+        while (!$found) {
+            $receiptNo = $prefix . str_pad($running_number, 5, '0', STR_PAD_LEFT);
+            $chk = self::where('receipt_no', '=', $receiptNo)->first();
+            if ($chk == null) break;
+            $running_number++;
+        }
+        
+        return $receiptNo;
     }
 }

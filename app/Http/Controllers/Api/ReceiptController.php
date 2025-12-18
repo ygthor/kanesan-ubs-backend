@@ -89,6 +89,15 @@ class ReceiptController extends Controller
                                  ->orderBy('id', 'desc')
                                  ->paginate($request->input('per_page', 15));
 
+        // Load receipt_orders for each receipt
+        $receipts->getCollection()->transform(function ($receipt) {
+            $receiptOrders = DB::table('receipt_orders')
+                ->where('receipt_id', $receipt->id)
+                ->get();
+            $receipt->setAttribute('receipt_orders', $receiptOrders);
+            return $receipt;
+        });
+
         \Log::info('Receipt query result count:', ['count' => $receipts->count()]);
 
         return makeResponse(200, 'Receipts retrieved successfully.', $receipts);
@@ -100,7 +109,7 @@ class ReceiptController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'receipt_no' => 'required|string|max:255|unique:receipts,receipt_no',
+            'receipt_no' => 'nullable|string|max:255|unique:receipts,receipt_no',
             'customer_id' => 'required|exists:customers,id',
             'customer_name' => 'required|string|max:255',
             'customer_code' => 'required|string|max:255',
@@ -138,6 +147,13 @@ class ReceiptController extends Controller
             $validated = $validator->validated();
             $invoiceRefNos = $request->input('invoice_refnos', []);
             $invoiceAmounts = $request->input('invoice_amounts', []);
+
+            // Auto-generate receipt number if not provided
+            if (empty($validated['receipt_no'])) {
+                // Use first invoice refno if available, otherwise null
+                $primaryInvoiceRefNo = !empty($invoiceRefNos) && is_array($invoiceRefNos) ? $invoiceRefNos[0] : null;
+                $validated['receipt_no'] = Receipt::generateReceiptNo($primaryInvoiceRefNo, $invoiceRefNos);
+            }
 
             // Remove invoice fields from validated data as they're not part of receipts table
             unset($validated['invoice_refnos'], $validated['invoice_amounts']);
