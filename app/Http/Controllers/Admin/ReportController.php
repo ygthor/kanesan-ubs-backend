@@ -439,7 +439,7 @@ class ReportController extends Controller
             $query->where('customer_id', $customerId);
         }
 
-        // Filter by payment type
+        // Filter by payment type (from receipts table, not customer)
         if ($paymentType) {
             $query->where('payment_type', $paymentType);
         }
@@ -460,6 +460,7 @@ class ReportController extends Controller
             });
         }
 
+        // Get receipts with customer relationship - payment_type comes from receipts table
         $receipts = $query->with('customer')->orderBy('receipt_date', 'desc')->get();
 
         // Get agents for filter dropdown

@@ -33,10 +33,12 @@
                     <label>Payment Type</label>
                     <select name="payment_type" class="form-control">
                         <option value="">All Types</option>
-                        <option value="Cash" {{ ($paymentType ?? '') == 'Cash' ? 'selected' : '' }}>Cash</option>
-                        <option value="Card" {{ ($paymentType ?? '') == 'Card' ? 'selected' : '' }}>Card</option>
-                        <option value="Cheque" {{ ($paymentType ?? '') == 'Cheque' ? 'selected' : '' }}>Cheque</option>
-                        <option value="Online Transfer" {{ ($paymentType ?? '') == 'Online Transfer' ? 'selected' : '' }}>Online Transfer</option>
+                        <option value="CASH" {{ ($paymentType ?? '') == 'CASH' ? 'selected' : '' }}>CASH</option>
+                        <option value="CARD" {{ ($paymentType ?? '') == 'CARD' ? 'selected' : '' }}>CARD</option>
+                        <option value="E-WALLET" {{ ($paymentType ?? '') == 'E-WALLET' ? 'selected' : '' }}>E-WALLET</option>
+                        <option value="ONLINE TRANSFER" {{ ($paymentType ?? '') == 'ONLINE TRANSFER' ? 'selected' : '' }}>ONLINE TRANSFER</option>
+                        <option value="CHEQUE" {{ ($paymentType ?? '') == 'CHEQUE' ? 'selected' : '' }}>CHEQUE</option>
+                        <option value="PD CHEQUE" {{ ($paymentType ?? '') == 'PD CHEQUE' ? 'selected' : '' }}>PD CHEQUE</option>
                     </select>
                 </div>
             </div>
