@@ -22,7 +22,7 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        
+
         // Retrieve all filter parameters from the request
         $customerId = $request->input('customer_id');
         $customerCode = $request->input('customer_code');
@@ -38,7 +38,7 @@ class OrderController extends Controller
 
         // Start building the query
         $orders = Order::with('items.item', 'customer');
-        
+
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
             $orders->whereHas('customer', function ($query) use ($user) {
@@ -80,11 +80,11 @@ class OrderController extends Controller
         if (request()->is('api/invoices*')) {
             $orderType = $orderType ?? 'INV';
         }
-        
+
         if ($orderType) {
             // The Flutter app sends a comma-separated string, so we need to split it
             $types = explode(',', $orderType);
-            
+
             // Filter by order types (INV, CN, SO, etc.)
             // Note: 'TR' type is deprecated - use 'CN' (Credit Note) instead
             // Remove 'TR' if present and map to 'CN'
@@ -92,7 +92,7 @@ class OrderController extends Controller
                 return $type === 'TR' ? 'CN' : $type;
             }, $types);
             $types = array_unique($types);
-            
+
             $orders->whereIn('type', $types);
         }
 
@@ -113,11 +113,11 @@ class OrderController extends Controller
         foreach ($ordersCollection as $order) {
             if ($order->type === 'INV') {
                 // Get linked CN orders for this invoice
-                $linkedCNs = Order::where('credit_invoice_no', $order->reference_no)
+                /* $linkedCNs = Order::where('credit_invoice_no', $order->reference_no)
                     ->where('type', 'CN')
                     ->with('items')
                     ->get();
-                
+
                 // Calculate total from linked CN orders
                 $cnTotal = 0.0;
                 foreach ($linkedCNs as $cnOrder) {
@@ -125,10 +125,18 @@ class OrderController extends Controller
                         $cnTotal += ($item->quantity * $item->unit_price);
                     }
                 }
-                
+
                 // Calculate adjusted net amount (original net_amount - CN total)
-                $adjustedNetAmount = ($order->net_amount ?? 0.0) - $cnTotal;
-                
+                $adjustedNetAmount = ($order->net_amount ?? 0.0) - $cnTotal; */
+
+                $adjustedNetAmount = 0.0;
+                foreach ($order->items as $item) {
+                    // Check if item is a free good
+                    if (!$item->isFreeGood) {
+                        $adjustedNetAmount += ($item->quantity * $item->unit_price);
+                    }
+                }
+
                 // Add adjusted_net_amount to the order data
                 $order->setAttribute('adjusted_net_amount', $adjustedNetAmount);
             } else {
@@ -213,7 +221,7 @@ class OrderController extends Controller
                 DB::rollBack();
                 return makeResponse(404, 'Customer not found with ID: ' . $orderData['customer_id']);
             }
-            
+
             $orderData['customer_code'] = $customer->customer_code;
             // Use company_name if available, otherwise use name field
             $orderData['customer_name'] = $customer->company_name ?? $customer->name ?? 'N/A';
@@ -222,7 +230,7 @@ class OrderController extends Controller
             $user = auth()->user();
             if ($user) {
                 $isKBS = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
-                
+
                 if ($isKBS && $request->has('agent_no') && $request->input('agent_no') !== null) {
                     // KBS user: use agent_no from request if provided (can be empty string to clear)
                     $orderData['agent_no'] = $request->input('agent_no');
@@ -244,13 +252,13 @@ class OrderController extends Controller
             if ($id) {
                 // ✅ Update mode - reverse existing stock movements first
                 $order = Order::with('items.item')->findOrFail($id);
-                
+
                 // Reverse existing stock movements before updating
                 $stockService->reverseOrderMovements($order);
-                
+
                 // Delete old items
                 $order->items()->delete();
-                
+
                 $order->fill($orderData)->save();
             } else {
                 // ✅ Create mode
@@ -267,11 +275,11 @@ class OrderController extends Controller
             }
 
             $items = $request->input('items') ?? [];
-            
+
             // Separate regular items from trade return items
             $regularItems = [];
             $tradeReturnItems = [];
-            
+
             foreach ($items as $itemData) {
                 if ($itemData['is_trade_return'] ?? false) {
                     $tradeReturnItems[] = $itemData;
@@ -279,7 +287,7 @@ class OrderController extends Controller
                     $regularItems[] = $itemData;
                 }
             }
-            
+
             // Helper function to get product by product_id or product_no
             $getProduct = function($itemData) {
                 if (isset($itemData['product_id'])) {
@@ -289,7 +297,7 @@ class OrderController extends Controller
                 }
                 return null;
             };
-            
+
             // Prepare items for stock validation (for INV orders - regular items only)
             if ($orderData['type'] === 'INV' && !empty($regularItems)) {
                 $itemsForValidation = [];
@@ -304,7 +312,7 @@ class OrderController extends Controller
                         'is_trade_return' => false,
                     ];
                 }
-                
+
                 // Validate stock availability for INV orders
                 if (!empty($itemsForValidation)) {
                     $stockValidation = $stockService->validateOrderStock($agentNo, $itemsForValidation);
@@ -373,7 +381,7 @@ class OrderController extends Controller
                 $cnOrderData = $orderData;
                 $cnOrderData['type'] = 'CN';
                 $cnOrderData['credit_invoice_no'] = $invOrder->reference_no; // Link to INV order
-                
+
                 $cnOrder = Order::create($cnOrderData);
                 $cnOrder->reference_no = $cnOrder->getReferenceNo();
                 $cnOrder->save();
@@ -432,7 +440,7 @@ class OrderController extends Controller
 
             // Return INV order with items, and include CN order if created
             $invOrder->load('items.item', 'customer');
-            
+
             // Prepare response data - return INV order as main data
             // Frontend can fetch CN order separately using credit_invoice_no if needed
             // For now, just return the INV order (CN order is already created and linked)
@@ -456,25 +464,25 @@ class OrderController extends Controller
     public function show($id)
     {
         $user = auth()->user();
-        
+
         // Try to find by reference_no first (for invoice lookups), then by ID
         $order = Order::where('reference_no', $id)
             ->orWhere('id', $id)
             ->first();
-        
+
         if (!$order) {
             return makeResponse(404, 'Order/Invoice not found.', null);
         }
-        
+
         // Check if user has access to this order's customer
         if (!$this->userHasAccessToCustomer($user, $order->customer)) {
             return makeResponse(403, 'Access denied. You do not have permission to view this order.', null);
         }
-        
+
         // Load items and customer relationship for detailed view
         // Also load order relationship for items to optimize linked_credit_note_count calculation
         $order->load('items.item', 'items.order', 'customer');
-        
+
         // If this is an INV order, also load linked CN orders
         $linkedCreditNotes = [];
         if ($order->type === 'INV') {
@@ -484,12 +492,12 @@ class OrderController extends Controller
                 ->get()
                 ->toArray();
         }
-        
+
         $responseData = $order->toArray();
         if (!empty($linkedCreditNotes)) {
             $responseData['linked_credit_notes'] = $linkedCreditNotes;
         }
-        
+
         return makeResponse(200, 'Order retrieved successfully.', $responseData);
     }
 
@@ -497,12 +505,12 @@ class OrderController extends Controller
     public function deleteOrder($id)
     {
         $user = auth()->user();
-        
+
         try {
             DB::beginTransaction();
 
             $order = Order::with('items.item', 'customer')->findOrFail($id);
-            
+
             // Check if user has access to this order's customer
             if (!$this->userHasAccessToCustomer($user, $order->customer)) {
                 return makeResponse(403, 'Access denied. You do not have permission to delete this order.', null);
@@ -540,18 +548,18 @@ class OrderController extends Controller
         if ($user && hasFullAccess()) {
             return true;
         }
-        
+
         // Check if user is assigned to this customer
         if ($user && $user->customers()->where('customers.id', $customer->id)->exists()) {
             return true;
         }
-        
+
         return false;
     }
 
     /**
      * Get outstanding invoices (orders with type='INV') for a specific customer with calculated balances.
-     * 
+     *
      * This endpoint returns unpaid or partially paid invoices with:
      * - Outstanding balance (net_amount - total_payments)
      * - Total payments made from receipt_order table
@@ -578,7 +586,7 @@ class OrderController extends Controller
 
         // Find customer
         $customer = Customer::where('customer_code', $customerCode)->first();
-        
+
         if (!$customer) {
             \Log::warning("Customer not found: {$customerCode}");
             return makeResponse(404, 'Customer not found', null);
@@ -633,28 +641,28 @@ class OrderController extends Controller
         // Calculate outstanding balance for each invoice and format response
         $formattedInvoices = $invoices->map(function ($invoice) {
             $totalPayments = (float) ($invoice->total_payments ?? 0);
-            
+
             // Get invoice amounts
             $netAmount = (float) ($invoice->net_amount ?? 0);
             $grandAmount = (float) ($invoice->grand_amount ?? 0);
             $grossAmount = (float) ($invoice->gross_amount ?? 0);
             $tax1 = (float) ($invoice->tax1 ?? 0);
-            
+
             // Deduct linked credit notes (CN orders) from invoice amounts
             $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
                 ->where('type', 'CN')
                 ->get();
-            
+
             $cnTotal = 0.0;
             foreach ($linkedCNs as $cnOrder) {
                 $cnTotal += (float) ($cnOrder->net_amount ?? 0);
             }
-            
+
             // Adjust amounts by deducting linked CN totals
             $adjustedNetAmount = max(0, $netAmount - $cnTotal);
             $adjustedGrandAmount = max(0, $grandAmount - $cnTotal);
             $adjustedGrossAmount = max(0, $grossAmount - $cnTotal);
-            
+
             // Outstanding balance = adjusted invoice amount - payments made
             $outstandingBalance = max(0, $adjustedNetAmount - $totalPayments);
 
