@@ -149,7 +149,7 @@ class DebtController extends Controller
                     // 'amountPaid' => $totalPayments, // Amount paid from receipts
                     'returnAmount' => $totalReturnAmt,
                     'creditAmount' => $totalPayments,
-                    'amountPaid' => 0.0,
+                    'amountPaid' => $totalPayments,
                     'currency' => 'RM', // Default currency
                 ];
             });
