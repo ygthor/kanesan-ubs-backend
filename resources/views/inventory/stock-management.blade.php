@@ -634,7 +634,7 @@ $(document).ready(function() {
                             html += '<td>' + (item.UNIT || 'N/A') + '</td>';
                             html += '<td data-sort="' + (item.PRICE || 0) + '">' + parseFloat(item.PRICE || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>';
                             html += '<td>';
-                            html += '<a href="/inventory/stock-management/item/' + encodeURIComponent(item.ITEMNO) + '?agent_no=' + encodeURIComponent(agentNo) + '" class="btn btn-sm btn-info" title="View transactions for this item">';
+                            html += '<a href="/inventory/stock-management/item/' + encodeURIComponent(item.ITEMNO) + '/transactions?agent_no=' + encodeURIComponent(agentNo) + '" class="btn btn-sm btn-info" title="View transactions for this item">';
                             html += '<i class="fas fa-history"></i> View Transactions';
                             html += '</a>';
                             html += '</td>';
