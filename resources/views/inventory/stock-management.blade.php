@@ -447,86 +447,86 @@ $(document).ready(function() {
         
         // If switching to Transactions tab, initialize or adjust DataTable
         if (target === '#transactions' && $('#stockSummaryTable').length) {
-            // Check if there are active filters (from URL params or form values)
-            var urlParams = new URLSearchParams(window.location.search);
-            var hasGroupFilter = urlParams.get('group') || $('#groupFilter').val();
-            var hasSearchFilter = urlParams.get('search') || $('#itemSearch').val();
-            
-            // If filters are active, refresh the data via AJAX to ensure DataTable shows filtered results
-            if (hasGroupFilter || hasSearchFilter) {
-                filterInventory();
-            } else {
-                // No filters, just initialize/adjust DataTable
-                setTimeout(function() {
-                    // Ensure table is visible
-                    var $table = $('#stockSummaryTable');
-                    if (!$table.is(':visible')) {
-                        return;
-                    }
-                    
-                    // Check if table has proper structure (9 columns in header)
-                    var headerCols = $table.find('thead th').length;
-                    var firstRow = $table.find('tbody tr:first');
-                    var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
-                    
-                    // Handle colspan in first row (empty state)
-                    if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
-                        firstRowCols = 0; // Treat colspan rows as empty
-                    }
-                    
-                    // Only initialize if columns match
-                    if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0)) {
-                        if (stockSummaryTable === null && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
-                            // Initialize DataTable if not already initialized
-                            @if($selectedAgent && $inventory->count() > 0)
-                            try {
-                                stockSummaryTable = $('#stockSummaryTable').DataTable({
-                                    responsive: true,
-                                    pageLength: 50,
-                                    lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                                    order: [[0, 'asc']], // Sort by Item Code by default
-                                    columnDefs: [
-                                        {
-                                            targets: [8], // Actions column
-                                            orderable: false,
-                                            searchable: false
-                                        },
-                                        {
-                                            targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
-                                            orderDataType: 'dom-data-sort-num' // Use custom sorting function
-                                        }
-                                    ],
-                                    language: {
-                                        search: "Search items:",
-                                        lengthMenu: "Show _MENU_ items per page",
-                                        info: "Showing _START_ to _END_ of _TOTAL_ items",
-                                        infoEmpty: "No items to show",
-                                        infoFiltered: "(filtered from _MAX_ total items)",
-                                        zeroRecords: "No matching items found",
-                                        paginate: {
-                                            first: "First",
-                                            last: "Last",
-                                            next: "Next",
-                                            previous: "Previous"
-                                        }
+            setTimeout(function() {
+                // Ensure table is visible
+                var $table = $('#stockSummaryTable');
+                if (!$table.is(':visible')) {
+                    return;
+                }
+                
+                // Check if table has proper structure (9 columns in header)
+                var headerCols = $table.find('thead th').length;
+                var firstRow = $table.find('tbody tr:first');
+                var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
+                
+                // Handle colspan in first row (empty state)
+                if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
+                    firstRowCols = 0; // Treat colspan rows as empty
+                }
+                
+                // Only initialize if columns match
+                if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0)) {
+                    if (stockSummaryTable === null && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+                        // Initialize DataTable if not already initialized
+                        @if($selectedAgent && $inventory->count() > 0)
+                        try {
+                            stockSummaryTable = $('#stockSummaryTable').DataTable({
+                                responsive: true,
+                                pageLength: 50,
+                                lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
+                                order: [[0, 'asc']], // Sort by Item Code by default
+                                columnDefs: [
+                                    {
+                                        targets: [8], // Actions column
+                                        orderable: false,
+                                        searchable: false
                                     },
-                                    dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                                });
-                            } catch (e) {
-                                console.error('Error initializing DataTable:', e);
+                                    {
+                                        targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
+                                        orderDataType: 'dom-data-sort-num' // Use custom sorting function
+                                    }
+                                ],
+                                language: {
+                                    search: "Search items:",
+                                    lengthMenu: "Show _MENU_ items per page",
+                                    info: "Showing _START_ to _END_ of _TOTAL_ items",
+                                    infoEmpty: "No items to show",
+                                    infoFiltered: "(filtered from _MAX_ total items)",
+                                    zeroRecords: "No matching items found",
+                                    paginate: {
+                                        first: "First",
+                                        last: "Last",
+                                        next: "Next",
+                                        previous: "Previous"
+                                    }
+                                },
+                                dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                            });
+                            
+                            // Apply any existing filters from URL or form
+                            var urlParams = new URLSearchParams(window.location.search);
+                            var groupFilter = urlParams.get('group') || $('#groupFilter').val();
+                            var searchFilter = urlParams.get('search') || $('#itemSearch').val();
+                            
+                            if (groupFilter || searchFilter) {
+                                setTimeout(function() {
+                                    applyFilters();
+                                }, 100);
                             }
-                            @endif
-                        } else {
-                            // Adjust columns if already initialized
-                            try {
-                                stockSummaryTable.columns.adjust().responsive.recalc();
-                            } catch (e) {
-                                console.error('Error adjusting DataTable columns:', e);
-                            }
+                        } catch (e) {
+                            console.error('Error initializing DataTable:', e);
+                        }
+                        @endif
+                    } else {
+                        // Adjust columns if already initialized
+                        try {
+                            stockSummaryTable.columns.adjust().responsive.recalc();
+                        } catch (e) {
+                            console.error('Error adjusting DataTable columns:', e);
                         }
                     }
-                }, 200);
-            }
+                }
+            }, 200);
         }
     });
     
@@ -551,215 +551,98 @@ $(document).ready(function() {
         $('#agentSelectionForm').submit();
     });
     
-    // Filter inventory without page refresh
-    var isFiltering = false;
+    // Store custom search function reference for cleanup
+    var customSearchFunction = null;
     
-    function filterInventory() {
-        if (isFiltering) {
-            console.log('Already filtering, skipping...');
-            return;
-        }
-        
-        var agentNo = $('#agentSelect').val();
-        if (!agentNo) {
-            alert('Please select an agent first.');
-            return;
-        }
-        
-        var group = $('#groupFilter').val();
-        var search = $('#itemSearch').val();
-        
-        // Always ensure Transactions tab is active when filtering
+    // Enhanced search using DataTables native filtering
+    function applyFilters() {
+        // Ensure Transactions tab is active
         if (!$('#transactions').hasClass('active')) {
-            // Manually switch to Transactions tab
             $('#stockTabs a').removeClass('active');
             $('.tab-pane').removeClass('show active');
             $('#transactions-tab').addClass('active');
             $('#transactions').addClass('show active');
             
-            // Wait a moment for tab to be visible, then filter
+            // Wait for tab to be visible, then apply filters
             setTimeout(function() {
-                executeFilter();
+                applyFilters();
             }, 100);
             return;
         }
         
-        executeFilter();
-        
-        function executeFilter() {
-            isFiltering = true;
-            var tbody = $('#stockSummaryTable tbody');
-            var alertInfo = $('#transactionsAlert');
-            
-            if (tbody.length === 0) {
-                console.error('Table body not found');
-                isFiltering = false;
-                return;
-            }
-            
-            // Show loading state
-            tbody.html('<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
-        
-            $.ajax({
-            url: '{{ route("inventory.stock-management") }}',
-            method: 'GET',
-            data: {
-                agent_no: agentNo,
-                group: group,
-                search: search
-            },
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            },
-            success: function(response) {
-                isFiltering = false;
-                
-                if (response && response.success && response.data) {
-                    var items = response.data;
-                    var html = '';
-                    
-                    if (items.length > 0) {
-                        items.forEach(function(item) {
-                            var stockClass = item.current_stock < 0 ? 'text-danger' : (item.current_stock == 0 ? 'text-warning' : 'text-success');
-                            html += '<tr>';
-                            html += '<td><strong>' + (item.ITEMNO || 'N/A') + '</strong></td>';
-                            html += '<td>' + (item.DESP || 'N/A') + '</td>';
-                            html += '<td>' + (item.GROUP || 'N/A') + '</td>';
-                            html += '<td data-sort="' + (item.current_stock || 0) + '">';
-                            html += '<strong class="' + stockClass + '">' + parseFloat(item.current_stock || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</strong>';
-                            html += '</td>';
-                            html += '<td data-sort="' + (item.stockIn || 0) + '" class="text-success">' + parseFloat(item.stockIn || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>';
-                            html += '<td data-sort="' + (item.stockOut || 0) + '" class="text-danger">' + parseFloat(item.stockOut || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>';
-                            html += '<td>' + (item.UNIT || 'N/A') + '</td>';
-                            html += '<td data-sort="' + (item.PRICE || 0) + '">' + parseFloat(item.PRICE || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>';
-                            html += '<td>';
-                            html += '<a href="/inventory/stock-management/item/' + encodeURIComponent(item.ITEMNO) + '/transactions?agent_no=' + encodeURIComponent(agentNo) + '" class="btn btn-sm btn-info" title="View transactions for this item">';
-                            html += '<i class="fas fa-history"></i> View Transactions';
-                            html += '</a>';
-                            html += '</td>';
-                            html += '</tr>';
-                        });
-                    } else {
-                        html = '<tr><td colspan="9" class="text-center text-muted">';
-                        if (group || search) {
-                            html += 'No items found matching your search criteria.';
-                        } else {
-                            html += 'No items with transactions found for this agent.';
-                        }
-                        html += '</td></tr>';
-                    }
-                    
-                    tbody.html(html);
-                    
-                    // Update alert info
-                    var countText = items.length > 0 ? ' - <strong>' + items.length + '</strong> item(s) found' : '';
-                    alertInfo.html('<i class="fas fa-info-circle"></i> Showing stock for agent: <strong>' + agentNo + '</strong>' + countText);
-                    
-                    // Reinitialize DataTable if it exists
-                    if (stockSummaryTable) {
-                        try {
-                            stockSummaryTable.destroy();
-                        } catch (e) {
-                            console.error('Error destroying DataTable:', e);
-                        }
-                        stockSummaryTable = null;
-                        // Clear any DataTables classes that might remain
-                        $('#stockSummaryTable').removeClass('dataTable');
-                    }
-                    
-                    // Reinitialize DataTable after a short delay
-                    setTimeout(function() {
-                        if ($('#transactions').hasClass('active')) {
-                            var $table = $('#stockSummaryTable');
-                            
-                            // Ensure table is visible
-                            if (!$table.is(':visible')) {
-                                return;
-                            }
-                            
-                            // Check if table has proper structure (9 columns in header)
-                            var headerCols = $table.find('thead th').length;
-                            var firstRow = $table.find('tbody tr:first');
-                            var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
-                            
-                            // Handle colspan in first row (empty state)
-                            if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
-                                firstRowCols = 0; // Treat colspan rows as empty
-                            }
-                            
-                            // Only initialize if columns match
-                            if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
-                                try {
-                                    stockSummaryTable = $('#stockSummaryTable').DataTable({
-                                        responsive: true,
-                                        pageLength: 50,
-                                        lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                                        order: [[0, 'asc']],
-                                        columnDefs: [
-                                            {
-                                                targets: [8],
-                                                orderable: false,
-                                                searchable: false
-                                            },
-                                            {
-                                                targets: [3, 4, 5, 7],
-                                                orderDataType: 'dom-data-sort-num'
-                                            }
-                                        ],
-                                        language: {
-                                            search: "Search items:",
-                                            lengthMenu: "Show _MENU_ items per page",
-                                            info: "Showing _START_ to _END_ of _TOTAL_ items",
-                                            infoEmpty: "No items to show",
-                                            infoFiltered: "(filtered from _MAX_ total items)",
-                                            zeroRecords: "No matching items found",
-                                            paginate: {
-                                                first: "First",
-                                                last: "Last",
-                                                next: "Next",
-                                                previous: "Previous"
-                                            }
-                                        },
-                                        dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                                    });
-                                } catch (e) {
-                                    console.error('Error initializing DataTable after filter:', e);
-                                }
-                            }
-                        }
-                    }, 200);
-                } else {
-                    var errorMsg = response && response.message ? response.message : 'Error loading data. Please try again.';
-                    tbody.html('<tr><td colspan="9" class="text-center text-muted">' + errorMsg + '</td></tr>');
-                }
-            },
-            error: function(xhr, status, error) {
-                isFiltering = false;
-                console.error('AJAX Error:', status, error, xhr);
-                var errorMsg = 'Error loading data. Please try again.';
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMsg = xhr.responseJSON.message;
-                }
-                tbody.html('<tr><td colspan="9" class="text-center text-danger">' + errorMsg + '</td></tr>');
-            }
-            });
+        // Check if DataTable is initialized
+        if (!stockSummaryTable || !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+            // DataTable not initialized yet, wait a bit and try again
+            setTimeout(function() {
+                applyFilters();
+            }, 200);
+            return;
         }
+        
+        var group = $('#groupFilter').val() || '';
+        var search = $('#itemSearch').val() || '';
+        
+        // Remove old custom search function if it exists
+        if (customSearchFunction) {
+            var index = $.fn.dataTable.ext.search.indexOf(customSearchFunction);
+            if (index !== -1) {
+                $.fn.dataTable.ext.search.splice(index, 1);
+            }
+            customSearchFunction = null;
+        }
+        
+        // Apply group filter to column 2 (Group column, index 2)
+        stockSummaryTable.column(2).search(group, false, false);
+        
+        // Apply search filter to columns 0 (Item Code) and 1 (Description)
+        // Use custom search function to search across multiple columns
+        if (search) {
+            customSearchFunction = function(settings, data, dataIndex) {
+                if (settings.nTable.id !== 'stockSummaryTable') {
+                    return true;
+                }
+                
+                var itemCode = (data[0] || '').toLowerCase();
+                var description = (data[1] || '').toLowerCase();
+                var searchTerm = search.toLowerCase();
+                
+                // Check if search term matches item code or description
+                return itemCode.includes(searchTerm) || description.includes(searchTerm);
+            };
+            
+            $.fn.dataTable.ext.search.push(customSearchFunction);
+        }
+        
+        // Draw the table with new filters
+        stockSummaryTable.draw();
+        
+        // Update alert info with filtered count
+        var filteredCount = stockSummaryTable.rows({search: 'applied'}).count();
+        var totalCount = stockSummaryTable.rows().count();
+        var countText = '';
+        if (group || search) {
+            countText = ' - <strong>' + filteredCount + '</strong> item(s) found';
+            if (filteredCount < totalCount) {
+                countText += ' (filtered from ' + totalCount + ' total)';
+            }
+        } else {
+            countText = ' - <strong>' + totalCount + '</strong> item(s) found';
+        }
+        $('#transactionsAlert').html('<i class="fas fa-info-circle"></i> Showing stock for agent: <strong>{{ $selectedAgent }}</strong>' + countText);
     }
     
     // Prevent form submission on Enter key
     $('#searchForm').on('submit', function(e) {
         e.preventDefault();
-        filterInventory();
+        applyFilters();
         return false;
     });
     
-    // Search button click - use document ready and ensure button exists
+    // Search button click
     $(document).on('click', '#searchBtn', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('Search button clicked');
-        filterInventory();
+        applyFilters();
         return false;
     });
     
@@ -767,14 +650,23 @@ $(document).ready(function() {
     $(document).on('keypress', '#itemSearch', function(e) {
         if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
-            filterInventory();
+            applyFilters();
             return false;
         }
     });
     
+    // Real-time search as user types (with debounce)
+    var searchTimeout;
+    $(document).on('input', '#itemSearch', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            applyFilters();
+        }, 300); // Wait 300ms after user stops typing
+    });
+    
     // Filter on group change
     $(document).on('change', '#groupFilter', function() {
-        filterInventory();
+        applyFilters();
     });
     
     // Clear filters
@@ -782,7 +674,26 @@ $(document).ready(function() {
         e.preventDefault();
         $('#groupFilter').val('').trigger('change');
         $('#itemSearch').val('');
-        filterInventory();
+        
+        // Clear DataTable filters
+        if (stockSummaryTable && $.fn.DataTable.isDataTable('#stockSummaryTable')) {
+            stockSummaryTable.column(2).search('');
+            
+            // Remove custom search function if it exists
+            if (customSearchFunction) {
+                var index = $.fn.dataTable.ext.search.indexOf(customSearchFunction);
+                if (index !== -1) {
+                    $.fn.dataTable.ext.search.splice(index, 1);
+                }
+                customSearchFunction = null;
+            }
+            
+            stockSummaryTable.draw();
+            
+            // Update alert info
+            var totalCount = stockSummaryTable.rows().count();
+            $('#transactionsAlert').html('<i class="fas fa-info-circle"></i> Showing stock for agent: <strong>{{ $selectedAgent }}</strong> - <strong>' + totalCount + '</strong> item(s) found');
+        }
         return false;
     });
     
@@ -917,44 +828,23 @@ $(document).ready(function() {
     // Initialize DataTable for Transactions tab if it's the active tab on page load
     @if($selectedAgent && $inventory->count() > 0)
     if ($('#transactions').hasClass('active')) {
-        // Check if there are URL parameters for filters
-        var urlParams = new URLSearchParams(window.location.search);
-        var hasGroupFilter = urlParams.get('group');
-        var hasSearchFilter = urlParams.get('search');
+        // Initialize DataTable with existing data
+        var $table = $('#stockSummaryTable');
         
-        // If URL parameters exist, ensure form fields are synced and refresh data
-        if (hasGroupFilter || hasSearchFilter) {
-            // Form fields should already be populated from server-side, but ensure they're synced
-            if (hasGroupFilter && $('#groupFilter').val() !== hasGroupFilter) {
-                $('#groupFilter').val(hasGroupFilter).trigger('change');
-            }
-            if (hasSearchFilter && $('#itemSearch').val() !== hasSearchFilter) {
-                $('#itemSearch').val(hasSearchFilter);
+        // Ensure table is visible
+        if ($table.length && $table.is(':visible')) {
+            // Check if table has proper structure (9 columns in header)
+            var headerCols = $table.find('thead th').length;
+            var firstRow = $table.find('tbody tr:first');
+            var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
+            
+            // Handle colspan in first row (empty state)
+            if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
+                firstRowCols = 0; // Treat colspan rows as empty
             }
             
-            // Refresh the data to ensure DataTable shows filtered results
-            // Use a small delay to ensure Select2 is initialized
-            setTimeout(function() {
-                filterInventory();
-            }, 300);
-        } else {
-            // No filters, just initialize DataTable with existing data
-            var $table = $('#stockSummaryTable');
-            
-            // Ensure table is visible
-            if ($table.length && $table.is(':visible')) {
-                // Check if table has proper structure (9 columns in header)
-                var headerCols = $table.find('thead th').length;
-                var firstRow = $table.find('tbody tr:first');
-                var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
-                
-                // Handle colspan in first row (empty state)
-                if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
-                    firstRowCols = 0; // Treat colspan rows as empty
-                }
-                
-                // Only initialize if columns match
-                if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
+            // Only initialize if columns match
+            if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
                 try {
                     stockSummaryTable = $('#stockSummaryTable').DataTable({
                         responsive: true,
@@ -988,9 +878,19 @@ $(document).ready(function() {
                         },
                         dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
                     });
+                    
+                    // Apply any existing filters from URL or form after initialization
+                    setTimeout(function() {
+                        var urlParams = new URLSearchParams(window.location.search);
+                        var groupFilter = urlParams.get('group') || $('#groupFilter').val();
+                        var searchFilter = urlParams.get('search') || $('#itemSearch').val();
+                        
+                        if (groupFilter || searchFilter) {
+                            applyFilters();
+                        }
+                    }, 300);
                 } catch (e) {
                     console.error('Error initializing DataTable on page load:', e);
-                }
                 }
             }
         }
