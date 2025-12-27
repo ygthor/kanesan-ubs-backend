@@ -88,11 +88,11 @@ class StockService
                 $qty = (float) $transaction->quantity;
 
                 if ($transaction->transaction_type === 'in') {
-                    // All 'in' transactions = Stock IN
+                    // All 'in' transactions = Stock IN (stored as positive)
                     $stockIn += $qty;
                 } elseif ($transaction->transaction_type === 'out') {
-                    // All 'out' transactions = Stock OUT
-                    $stockOut += $qty;
+                    // All 'out' transactions = Stock OUT (stored as negative, convert to positive for calculation)
+                    $stockOut += abs($qty);
                 }
             }
         } catch (\Exception $e) {
@@ -451,11 +451,11 @@ class StockService
                 $qty = (float) $transaction->quantity;
 
                 if ($transaction->transaction_type === 'in') {
-                    // All 'in' transactions = Stock IN
+                    // All 'in' transactions = Stock IN (stored as positive)
                     $itemTotals[$itemNo]['stockIn'] += $qty;
                 } elseif ($transaction->transaction_type === 'out') {
-                    // All 'out' transactions = Stock OUT
-                    $itemTotals[$itemNo]['stockOut'] += $qty;
+                    // All 'out' transactions = Stock OUT (stored as negative, convert to positive for calculation)
+                    $itemTotals[$itemNo]['stockOut'] += abs($qty);
                 }
             }
         } catch (\Exception $e) {

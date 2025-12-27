@@ -61,13 +61,6 @@
         line-height: 1.4;
     }
     
-    /* Compact DataTables controls */
-    .dataTables_wrapper .dataTables_length,
-    .dataTables_wrapper .dataTables_filter,
-    .dataTables_wrapper .dataTables_info,
-    .dataTables_wrapper .dataTables_paginate {
-        font-size: 0.8rem;
-    }
     
     /* Reduce modal font sizes */
     #addOpeningBalanceModal .modal-body {
@@ -165,7 +158,7 @@
                 <h5 class="card-title mb-0"><i class="fas fa-search"></i> Search & Filter</h5>
             </div>
             <div class="card-body p-1">
-                <form id="searchForm">
+                <form method="GET" action="{{ route('inventory.stock-management') }}" id="searchForm">
                     <input type="hidden" name="agent_no" value="{{ $selectedAgent }}">
                     <div class="row">
                         <div class="col-md-4">
@@ -194,12 +187,12 @@
                             <div class="form-group">
                                 <label>&nbsp;</label>
                                 <div class="btn-group btn-group-block" style="display: flex; gap: 5px;">
-                                    <button type="button" class="btn btn-primary" id="searchBtn" style="flex: 1;">
+                                    <button type="submit" class="btn btn-primary" id="searchBtn" style="flex: 1;">
                                         <i class="fas fa-search"></i> Search
                                     </button>
-                                    <button type="button" class="btn btn-info" id="clearFiltersBtn" style="flex: 1;">
+                                    <a href="{{ route('inventory.stock-management', ['agent_no' => $selectedAgent]) }}" class="btn btn-info" style="flex: 1;">
                                         <i class="fas fa-times"></i> Clear
-                                    </button>
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -213,12 +206,12 @@
             <div class="card-header p-0">
                 <ul class="nav nav-tabs" id="stockTabs" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active" id="opening-balance-tab" data-toggle="tab" data-bs-toggle="tab" href="#opening-balance" role="tab" aria-controls="opening-balance" aria-selected="true">
+                        <a class="nav-link {{ request()->get('tab') != 'transactions' ? 'active' : '' }}" id="opening-balance-tab" data-toggle="tab" data-bs-toggle="tab" href="#opening-balance" role="tab" aria-controls="opening-balance" aria-selected="{{ request()->get('tab') != 'transactions' ? 'true' : 'false' }}">
                             <i class="fas fa-database"></i> Opening Balance
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="transactions-tab" data-toggle="tab" data-bs-toggle="tab" href="#transactions" role="tab" aria-controls="transactions" aria-selected="false">
+                        <a class="nav-link {{ request()->get('tab') == 'transactions' ? 'active' : '' }}" id="transactions-tab" data-toggle="tab" data-bs-toggle="tab" href="#transactions" role="tab" aria-controls="transactions" aria-selected="{{ request()->get('tab') == 'transactions' ? 'true' : 'false' }}">
                             <i class="fas fa-list"></i> Transactions
                         </a>
                     </li>
@@ -227,7 +220,7 @@
             <div class="card-body p-1">
                 <div class="tab-content" id="stockTabsContent">
                     <!-- Opening Balance Tab -->
-                    <div class="tab-pane fade show active" id="opening-balance" role="tabpanel" aria-labelledby="opening-balance-tab">
+                    <div class="tab-pane fade {{ request()->get('tab') != 'transactions' ? 'show active' : '' }}" id="opening-balance" role="tabpanel" aria-labelledby="opening-balance-tab">
                         <div class="table-responsive">
                             <table class="table table-striped table-hover" id="openingBalanceTable">
                                 <thead>
@@ -283,7 +276,14 @@
                                         <tr>
                                             <td colspan="6" class="text-center text-muted py-4">
                                                 <i class="fas fa-inbox fa-2x mb-2"></i>
-                                                <p class="mb-0">No opening balance records found for this agent.</p>
+                                                <p class="mb-0">
+                                                    @if(request('group') || request('search'))
+                                                        No opening balance records found matching your search criteria.
+                                                        <a href="{{ route('inventory.stock-management', ['agent_no' => $selectedAgent]) }}" class="alert-link">Clear filters</a>
+                                                    @else
+                                                        No opening balance records found for this agent.
+                                                    @endif
+                                                </p>
                                             </td>
                                         </tr>
                                     @endforelse
@@ -293,13 +293,7 @@
                     </div>
 
                     <!-- Transactions Tab -->
-                    <div class="tab-pane fade" id="transactions" role="tabpanel" aria-labelledby="transactions-tab">
-                        <div class="alert alert-info mb-3" id="transactionsAlert">
-                            <i class="fas fa-info-circle"></i> Showing stock for agent: <strong>{{ $selectedAgent }}</strong>
-                            @if($inventory->count() > 0)
-                                - <strong>{{ $inventory->count() }}</strong> item(s) found
-                            @endif
-                        </div>
+                    <div class="tab-pane fade {{ request()->get('tab') == 'transactions' ? 'show active' : '' }}" id="transactions" role="tabpanel" aria-labelledby="transactions-tab">
 
                         <div class="table-responsive">
                             <table class="table table-striped table-hover" id="stockSummaryTable">
@@ -337,7 +331,8 @@
                                             <td data-sort="{{ $item['PRICE'] ?? 0 }}">{{ number_format($item['PRICE'] ?? 0, 2) }}</td>
                                             <td>
                                                 <a href="{{ route('inventory.stock-management.item.transactions', $item['ITEMNO']) }}?agent_no={{ urlencode($selectedAgent) }}" 
-                                                   class="btn btn-sm btn-info" 
+                                                target="_blank"   
+                                                class="btn btn-sm btn-info" 
                                                    title="View transactions for this item">
                                                     <i class="fas fa-history"></i> View Transactions
                                                 </a>
@@ -427,8 +422,10 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
-    // Store DataTable instance
-    var stockSummaryTable = null;
+    // Get current tab from URL hash or query parameter
+    var hash = window.location.hash;
+    var tabParam = new URLSearchParams(window.location.search).get('tab');
+    var currentTab = hash || (tabParam === 'transactions' ? '#transactions' : '#opening-balance');
     
     // Initialize Bootstrap tabs - compatible with Bootstrap 5
     $('#stockTabs a[data-bs-toggle="tab"]').on('click', function (e) {
@@ -445,95 +442,56 @@ $(document).ready(function() {
         // Show corresponding pane
         $(target).addClass('show active');
         
-        // If switching to Transactions tab, initialize or adjust DataTable
-        if (target === '#transactions' && $('#stockSummaryTable').length) {
-            setTimeout(function() {
-                // Ensure table is visible
-                var $table = $('#stockSummaryTable');
-                if (!$table.is(':visible')) {
-                    return;
-                }
-                
-                // Check if table has proper structure (9 columns in header)
-                var headerCols = $table.find('thead th').length;
-                var firstRow = $table.find('tbody tr:first');
-                var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
-                
-                // Handle colspan in first row (empty state)
-                if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
-                    firstRowCols = 0; // Treat colspan rows as empty
-                }
-                
-                // Only initialize if columns match
-                if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0)) {
-                    if (stockSummaryTable === null && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
-                        // Initialize DataTable if not already initialized
-                        @if($selectedAgent && $inventory->count() > 0)
-                        try {
-                            stockSummaryTable = $('#stockSummaryTable').DataTable({
-                                responsive: true,
-                                pageLength: 50,
-                                lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                                order: [[0, 'asc']], // Sort by Item Code by default
-                                columnDefs: [
-                                    {
-                                        targets: [8], // Actions column
-                                        orderable: false,
-                                        searchable: false
-                                    },
-                                    {
-                                        targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
-                                        orderDataType: 'dom-data-sort-num' // Use custom sorting function
-                                    }
-                                ],
-                                language: {
-                                    search: "Search items:",
-                                    lengthMenu: "Show _MENU_ items per page",
-                                    info: "Showing _START_ to _END_ of _TOTAL_ items",
-                                    infoEmpty: "No items to show",
-                                    infoFiltered: "(filtered from _MAX_ total items)",
-                                    zeroRecords: "No matching items found",
-                                    paginate: {
-                                        first: "First",
-                                        last: "Last",
-                                        next: "Next",
-                                        previous: "Previous"
-                                    }
-                                },
-                                dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                            });
-                            
-                            // Apply any existing filters from URL or form
-                            var urlParams = new URLSearchParams(window.location.search);
-                            var groupFilter = urlParams.get('group') || $('#groupFilter').val();
-                            var searchFilter = urlParams.get('search') || $('#itemSearch').val();
-                            
-                            if (groupFilter || searchFilter) {
-                                setTimeout(function() {
-                                    applyFilters();
-                                }, 100);
-                            }
-                        } catch (e) {
-                            console.error('Error initializing DataTable:', e);
-                        }
-                        @endif
-                    } else {
-                        // Adjust columns if already initialized
-                        try {
-                            stockSummaryTable.columns.adjust().responsive.recalc();
-                        } catch (e) {
-                            console.error('Error adjusting DataTable columns:', e);
-                        }
-                    }
-                }
-            }, 200);
+        // Update URL hash and query parameter
+        var url = new URL(window.location);
+        url.hash = target;
+        if (target === '#transactions') {
+            url.searchParams.set('tab', 'transactions');
+        } else {
+            url.searchParams.delete('tab');
+        }
+        window.history.pushState({}, '', url);
+    });
+    
+    // Handle initial tab state from URL
+    if (currentTab === '#transactions' || tabParam === 'transactions') {
+        $('#transactions-tab').addClass('active');
+        $('#opening-balance-tab').removeClass('active');
+        $('#transactions').addClass('show active');
+        $('#opening-balance').removeClass('show active');
+        // Ensure hash is set
+        if (!window.location.hash) {
+            var url = new URL(window.location);
+            url.hash = '#transactions';
+            window.history.replaceState({}, '', url);
+        }
+    } else {
+        $('#opening-balance-tab').addClass('active');
+        $('#transactions-tab').removeClass('active');
+        $('#opening-balance').addClass('show active');
+        $('#transactions').removeClass('show active');
+        // Ensure hash is set
+        if (!window.location.hash) {
+            var url = new URL(window.location);
+            url.hash = '#opening-balance';
+            window.history.replaceState({}, '', url);
+        }
+    }
+    
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', function() {
+        var hash = window.location.hash || '#opening-balance';
+        var tabParam = new URLSearchParams(window.location.search).get('tab');
+        if (tabParam === 'transactions' || hash === '#transactions') {
+            $('#transactions-tab').click();
+        } else {
+            $('#opening-balance-tab').click();
         }
     });
     
-    // Initialize Select2
+    // Initialize Select2 - simple and clean
     $('.select2').select2({
         theme: 'bootstrap-5',
-        allowClear: true
     });
     
     // Manual modal trigger for Create Opening Balance button (Bootstrap 5 compatibility)
@@ -551,158 +509,49 @@ $(document).ready(function() {
         $('#agentSelectionForm').submit();
     });
     
-    // Store custom search function reference for cleanup
-    var customSearchFunction = null;
+    // Auto-submit search form when group filter changes (including when cleared)
+    $('#groupFilter').on('change', function() {
+        $('#searchForm').submit();
+    });
     
-    // Enhanced search using DataTables native filtering
-    function applyFilters() {
-        // Ensure Transactions tab is active
-        if (!$('#transactions').hasClass('active')) {
-            $('#stockTabs a').removeClass('active');
-            $('.tab-pane').removeClass('show active');
-            $('#transactions-tab').addClass('active');
-            $('#transactions').addClass('show active');
-            
-            // Wait for tab to be visible, then apply filters
-            setTimeout(function() {
-                applyFilters();
-            }, 100);
-            return;
-        }
-        
-        // Check if DataTable is initialized
-        if (!stockSummaryTable || !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
-            // DataTable not initialized yet, wait a bit and try again
-            setTimeout(function() {
-                applyFilters();
-            }, 200);
-            return;
-        }
-        
-        var group = $('#groupFilter').val() || '';
-        var search = $('#itemSearch').val() || '';
-        
-        // Remove old custom search function if it exists
-        if (customSearchFunction) {
-            var index = $.fn.dataTable.ext.search.indexOf(customSearchFunction);
-            if (index !== -1) {
-                $.fn.dataTable.ext.search.splice(index, 1);
-            }
-            customSearchFunction = null;
-        }
-        
-        // Apply group filter to column 2 (Group column, index 2)
-        stockSummaryTable.column(2).search(group, false, false);
-        
-        // Apply search filter to columns 0 (Item Code) and 1 (Description)
-        // Use custom search function to search across multiple columns
-        if (search) {
-            customSearchFunction = function(settings, data, dataIndex) {
-                if (settings.nTable.id !== 'stockSummaryTable') {
-                    return true;
-                }
-                
-                var itemCode = (data[0] || '').toLowerCase();
-                var description = (data[1] || '').toLowerCase();
-                var searchTerm = search.toLowerCase();
-                
-                // Check if search term matches item code or description
-                return itemCode.includes(searchTerm) || description.includes(searchTerm);
-            };
-            
-            $.fn.dataTable.ext.search.push(customSearchFunction);
-        }
-        
-        // Draw the table with new filters
-        stockSummaryTable.draw();
-        
-        // Update alert info with filtered count
-        var filteredCount = stockSummaryTable.rows({search: 'applied'}).count();
-        var totalCount = stockSummaryTable.rows().count();
-        var countText = '';
-        if (group || search) {
-            countText = ' - <strong>' + filteredCount + '</strong> item(s) found';
-            if (filteredCount < totalCount) {
-                countText += ' (filtered from ' + totalCount + ' total)';
-            }
-        } else {
-            countText = ' - <strong>' + totalCount + '</strong> item(s) found';
-        }
-        $('#transactionsAlert').html('<i class="fas fa-info-circle"></i> Showing stock for agent: <strong>{{ $selectedAgent }}</strong>' + countText);
-    }
-    
-    // Prevent form submission on Enter key
+    // Handle search form submission - preserve tab hash in URL
     $('#searchForm').on('submit', function(e) {
         e.preventDefault();
-        applyFilters();
-        return false;
-    });
-    
-    // Search button click
-    $(document).on('click', '#searchBtn', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        applyFilters();
-        return false;
-    });
-    
-    // Allow Enter key in search field to trigger search
-    $(document).on('keypress', '#itemSearch', function(e) {
-        if (e.key === 'Enter' || e.keyCode === 13) {
-            e.preventDefault();
-            applyFilters();
-            return false;
-        }
-    });
-    
-    // Real-time search as user types (with debounce)
-    var searchTimeout;
-    $(document).on('input', '#itemSearch', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(function() {
-            applyFilters();
-        }, 300); // Wait 300ms after user stops typing
-    });
-    
-    // Filter on group change
-    $(document).on('change', '#groupFilter', function() {
-        applyFilters();
-    });
-    
-    // Clear filters
-    $(document).on('click', '#clearFiltersBtn', function(e) {
-        e.preventDefault();
-        $('#groupFilter').val('').trigger('change');
-        $('#itemSearch').val('');
+        var url = new URL($(this).attr('action'), window.location.origin);
+        var formData = $(this).serializeArray();
         
-        // Clear DataTable filters
-        if (stockSummaryTable && $.fn.DataTable.isDataTable('#stockSummaryTable')) {
-            stockSummaryTable.column(2).search('');
-            
-            // Remove custom search function if it exists
-            if (customSearchFunction) {
-                var index = $.fn.dataTable.ext.search.indexOf(customSearchFunction);
-                if (index !== -1) {
-                    $.fn.dataTable.ext.search.splice(index, 1);
-                }
-                customSearchFunction = null;
+        // Always preserve agent_no
+        var agentNo = $('#searchForm input[name="agent_no"]').val();
+        if (agentNo) {
+            url.searchParams.set('agent_no', agentNo);
+        }
+        
+        // Add or remove form data to/from URL
+        formData.forEach(function(item) {
+            // Skip agent_no as it's handled above
+            if (item.name === 'agent_no') {
+                return;
             }
             
-            stockSummaryTable.draw();
-            
-            // Update alert info
-            var totalCount = stockSummaryTable.rows().count();
-            $('#transactionsAlert').html('<i class="fas fa-info-circle"></i> Showing stock for agent: <strong>{{ $selectedAgent }}</strong> - <strong>' + totalCount + '</strong> item(s) found');
+            if (item.value && item.value.trim() !== '') {
+                url.searchParams.set(item.name, item.value);
+            } else {
+                // Remove parameter if value is empty
+                url.searchParams.delete(item.name);
+            }
+        });
+        
+        // Preserve current tab hash
+        var currentHash = window.location.hash || '#opening-balance';
+        if (currentHash === '#transactions') {
+            url.searchParams.set('tab', 'transactions');
         }
+        url.hash = currentHash;
+        
+        // Navigate to new URL
+        window.location.href = url.toString();
         return false;
     });
-    
-    // Custom sorting function for numeric data-sort attribute
-    $.fn.dataTable.ext.order['dom-data-sort-num'] = function(settings, col) {
-        return this.api().column(col, {order: 'index'}).nodes().map(function(td, i) {
-            return $(td).attr('data-sort') * 1;
-        });
-    };
     
     // Load items when group is selected in modal
     $('#modalGroupSelect').on('change', function() {
@@ -825,77 +674,6 @@ $(document).ready(function() {
         });
     }
     
-    // Initialize DataTable for Transactions tab if it's the active tab on page load
-    @if($selectedAgent && $inventory->count() > 0)
-    if ($('#transactions').hasClass('active')) {
-        // Initialize DataTable with existing data
-        var $table = $('#stockSummaryTable');
-        
-        // Ensure table is visible
-        if ($table.length && $table.is(':visible')) {
-            // Check if table has proper structure (9 columns in header)
-            var headerCols = $table.find('thead th').length;
-            var firstRow = $table.find('tbody tr:first');
-            var firstRowCols = firstRow.length > 0 ? firstRow.find('td').length : 0;
-            
-            // Handle colspan in first row (empty state)
-            if (firstRowCols === 1 && firstRow.find('td[colspan]').length > 0) {
-                firstRowCols = 0; // Treat colspan rows as empty
-            }
-            
-            // Only initialize if columns match
-            if (headerCols === 9 && (firstRowCols === 9 || firstRowCols === 0) && !$.fn.DataTable.isDataTable('#stockSummaryTable')) {
-                try {
-                    stockSummaryTable = $('#stockSummaryTable').DataTable({
-                        responsive: true,
-                        pageLength: 50,
-                        lengthMenu: [[25, 50, 100, 200, -1], [25, 50, 100, 200, "All"]],
-                        order: [[0, 'asc']], // Sort by Item Code by default
-                        columnDefs: [
-                            {
-                                targets: [8], // Actions column
-                                orderable: false,
-                                searchable: false
-                            },
-                            {
-                                targets: [3, 4, 5, 7], // Current Stock, Stock In, Stock Out, and Price columns
-                                orderDataType: 'dom-data-sort-num' // Use custom sorting function
-                            }
-                        ],
-                        language: {
-                            search: "Search items:",
-                            lengthMenu: "Show _MENU_ items per page",
-                            info: "Showing _START_ to _END_ of _TOTAL_ items",
-                            infoEmpty: "No items to show",
-                            infoFiltered: "(filtered from _MAX_ total items)",
-                            zeroRecords: "No matching items found",
-                            paginate: {
-                                first: "First",
-                                last: "Last",
-                                next: "Next",
-                                previous: "Previous"
-                            }
-                        },
-                        dom: '<"row"<"col-sm-12 col-md-6"l>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-                    });
-                    
-                    // Apply any existing filters from URL or form after initialization
-                    setTimeout(function() {
-                        var urlParams = new URLSearchParams(window.location.search);
-                        var groupFilter = urlParams.get('group') || $('#groupFilter').val();
-                        var searchFilter = urlParams.get('search') || $('#itemSearch').val();
-                        
-                        if (groupFilter || searchFilter) {
-                            applyFilters();
-                        }
-                    }, 300);
-                } catch (e) {
-                    console.error('Error initializing DataTable on page load:', e);
-                }
-            }
-        }
-    }
-    @endif
 });
 
 // Inline editing for opening balance quantity - triggered by Edit button

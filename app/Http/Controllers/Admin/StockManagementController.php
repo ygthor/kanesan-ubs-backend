@@ -183,12 +183,32 @@ class StockManagementController extends Controller
                 }
             }
             
-            // Get opening balances for this agent
-            $openingBalances = ItemTransaction::where('agent_no', $agentNo)
-                ->where('reference_type', 'opening balance')
-                ->where('transaction_type', 'in')
+            // Get opening balances for this agent with filters
+            $itemTransactionTable = (new ItemTransaction())->getTable();
+            $openingBalancesQuery = ItemTransaction::where($itemTransactionTable . '.agent_no', $agentNo)
+                ->where($itemTransactionTable . '.reference_type', 'opening balance')
+                ->where($itemTransactionTable . '.transaction_type', 'in')
+                ->join('icitem', function($join) use ($itemTransactionTable) {
+                    $join->on(DB::raw($itemTransactionTable . '.ITEMNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
+                });
+            
+            // Apply group filter if provided
+            if ($hasGroupFilter) {
+                $openingBalancesQuery->where('icitem.GROUP', $groupFilter);
+            }
+            
+            // Apply search filter if provided
+            if ($hasSearch) {
+                $openingBalancesQuery->where(function($q) use ($searchTerm) {
+                    $q->whereRaw('LOWER(icitem.ITEMNO) LIKE ?', ['%' . strtolower($searchTerm) . '%'])
+                      ->orWhereRaw('LOWER(icitem.DESP) LIKE ?', ['%' . strtolower($searchTerm) . '%']);
+                });
+            }
+            
+            $openingBalances = $openingBalancesQuery
+                ->select($itemTransactionTable . '.*')
                 ->with('item')
-                ->orderBy('CREATED_ON', 'desc')
+                ->orderBy($itemTransactionTable . '.CREATED_ON', 'desc')
                 ->get();
         }
         
@@ -342,11 +362,21 @@ class StockManagementController extends Controller
      */
     public function store(Request $request)
     {
+        // Validate quantity based on transaction type
+        $quantityRules = 'required|numeric';
+        if ($request->transaction_type === 'adjustment') {
+            // Adjustment can be positive or negative
+            $quantityRules .= '|not_in:0';
+        } else {
+            // Other types must be positive
+            $quantityRules .= '|min:0.01';
+        }
+        
         $request->validate([
             'agent_no' => 'required|string',
             'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
             'transaction_type' => 'required|string|in:in,out,adjustment,invoice_sale,invoice_return',
-            'quantity' => 'required|numeric|min:0.01',
+            'quantity' => $quantityRules,
             'notes' => 'nullable|string',
             'reference_type' => 'nullable|string',
         ]);
@@ -366,7 +396,7 @@ class StockManagementController extends Controller
             $agentNo = $request->agent_no;
             $itemno = $request->ITEMNO;
             $transactionType = $request->transaction_type;
-            $quantity = $request->quantity;
+            $quantity = (float)$request->quantity;
             $referenceType = $request->reference_type;
             
             // Determine reference type
@@ -381,9 +411,12 @@ class StockManagementController extends Controller
             }
             
             // For stock out and invoice sale, check if sufficient stock is available
+            // IMPORTANT: Store negative values for "out" transactions so calculateCurrentStock() works correctly
+            // calculateCurrentStock uses sum('quantity'), so negative values are needed for subtraction
             if (in_array($transactionType, ['out', 'invoice_sale'])) {
+                $absQuantity = abs($quantity);
                 $currentStock = $this->calculateCurrentStock($itemno);
-                if ($currentStock < $quantity) {
+                if ($currentStock < $absQuantity) {
                     return redirect()->route('inventory.stock-management.create', [
                         'agent_no' => $request->agent_no,
                         'group' => $request->group,
@@ -392,9 +425,11 @@ class StockManagementController extends Controller
                         ->with('error', 'Insufficient stock. Available: ' . number_format($currentStock, 2))
                         ->withInput();
                 }
-                $quantity = -abs($quantity); // Make negative for stock out
+                // Store as negative - needed for calculateCurrentStock sum() to work correctly
+                $quantity = -$absQuantity;
             } elseif (in_array($transactionType, ['in', 'invoice_return'])) {
-                $quantity = abs($quantity); // Ensure positive for stock in
+                // Store as positive
+                $quantity = abs($quantity);
             }
             // For adjustment, quantity can be positive or negative as provided
             
@@ -1203,6 +1238,66 @@ class StockManagementController extends Controller
         $itemSummary = collect($itemSummary)->sortBy('item_no')->values();
 
         return view('inventory.item-movements', compact('movements', 'itemSummary', 'groups', 'agents', 'filters'));
+    }
+    
+    /**
+     * Get stock by agent and item for web requests (AJAX)
+     * Returns JSON response for use in blade templates
+     */
+    public function getStockByAgentWeb(Request $request, $itemno)
+    {
+        $user = auth()->user();
+        
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            return response()->json([
+                'error' => 1,
+                'status' => 403,
+                'message' => 'Unauthorized access.',
+                'data' => []
+            ], 403);
+        }
+        
+        $agentNo = $request->input('agent_no');
+        
+        if (!$agentNo) {
+            return response()->json([
+                'error' => 1,
+                'status' => 400,
+                'message' => 'Agent number is required.',
+                'data' => []
+            ], 400);
+        }
+        
+        // Normalize agent_no: if it's a username, convert to user's name
+        $user = User::where('username', $agentNo)->first();
+        if ($user && $user->name) {
+            $agentNo = $user->name;
+        }
+        
+        $stockService = new StockService();
+        
+        // Get stock for specific item
+        $totals = $stockService->calculateStockTotals($agentNo, $itemno);
+        
+        // Get item details from icitem
+        $item = Icitem::find($itemno);
+        
+        return response()->json([
+            'error' => 0,
+            'status' => 200,
+            'message' => 'Stock retrieved successfully.',
+            'data' => [
+                'ITEMNO' => $itemno,
+                'DESP' => $item->DESP ?? 'Unknown Product',
+                'agent_no' => $agentNo,
+                'stockIn' => $totals['stockIn'],
+                'stockOut' => $totals['stockOut'],
+                'returnGood' => $totals['returnGood'],
+                'returnBad' => $totals['returnBad'],
+                'available' => $totals['available'],
+            ]
+        ]);
     }
 }
 

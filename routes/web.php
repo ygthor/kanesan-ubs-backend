@@ -27,6 +27,7 @@ Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(func
     Route::get('/stock-management/create', [\App\Http\Controllers\Admin\StockManagementController::class, 'create'])->name('stock-management.create');
     Route::post('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'store'])->name('stock-management.store');
     Route::get('/stock-management/item/{itemno}/transactions', [\App\Http\Controllers\Admin\StockManagementController::class, 'showItemTransactions'])->name('stock-management.item.transactions');
+    Route::get('/stock-management/stock-by-agent/{itemno}', [\App\Http\Controllers\Admin\StockManagementController::class, 'getStockByAgentWeb'])->name('stock-management.stock-by-agent');
     Route::post('/stock-management/opening-balance', [\App\Http\Controllers\Admin\StockManagementController::class, 'storeOpeningBalance'])->name('stock-management.opening-balance.store');
     Route::put('/stock-management/opening-balance/{id}', [\App\Http\Controllers\Admin\StockManagementController::class, 'updateOpeningBalance'])->name('stock-management.opening-balance.update');
     Route::delete('/stock-management/opening-balance/{id}', [\App\Http\Controllers\Admin\StockManagementController::class, 'deleteOpeningBalance'])->name('stock-management.opening-balance.delete');
