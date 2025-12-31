@@ -206,8 +206,11 @@ class OrderController extends Controller
                 'discount'
             ]);
 
-            // Always use current time for order_date
-            $orderData['order_date'] = now();
+            // Only set order_date when creating new orders, not when updating
+            // Preserve original order_date when updating
+            if (!$id) {
+                $orderData['order_date'] = now();
+            }
             $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
             // If called from /api/invoices route, default to 'INV', otherwise use request or default to INV
             if (request()->is('api/invoices*')) {
