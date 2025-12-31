@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoiceItemController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AnnouncementController;
+use App\Http\Controllers\Api\TimeTestController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,9 @@ Route::any('/test/response', function () {
         ]
     ]);
 })->name('test.response');
+
+// Time test endpoint - check server, PHP, and MySQL timezone
+Route::get('/test/time', [TimeTestController::class, 'index'])->name('test.time');
 
 Route::post('/sync/local', [SyncController::class, 'syncLocalData']); // Recommended array syntax
 Route::post('/auth/token', [AuthController::class, 'get_token'])->name('auth.token'); // Recommended array syntax

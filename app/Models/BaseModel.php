@@ -25,18 +25,14 @@ class BaseModel extends Model
     }
 
     /**
-     * Override date serialization to return datetime in app timezone (UTC+8)
-     * This ensures dates are serialized in Asia/Kuala_Lumpur timezone instead of UTC
+     * Override date serialization to return datetime in simple format (Y-m-d H:i:s)
+     * Laravel's default serializeDate returns ISO 8601 format with timezone (e.g., 2025-12-30T03:25:14.000000Z)
+     * This override formats dates as simple string (e.g., 2025-12-30 03:25:14) which the mobile app expects
+     * Dates are already in app timezone (Asia/Kuala_Lumpur) from Laravel's datetime cast
      */
     protected function serializeDate(\DateTimeInterface $date)
     {
-        if ($date instanceof Carbon) {
-            // Convert to app timezone (UTC+8) and format as datetime
-            return $date->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s');
-        }
-        // Fallback for other DateTimeInterface implementations
-        return Carbon::instance($date)
-            ->setTimezone(config('app.timezone'))
-            ->format('Y-m-d H:i:s');
+        // Just format the date - no timezone conversion needed since it's already in app timezone
+        return $date->format('Y-m-d H:i:s');
     }
 }
