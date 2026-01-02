@@ -220,13 +220,14 @@ class EInvoiceController extends Controller
             $testRequest->updated_at = \Carbon\Carbon::now();
 
             Mail::send('emails.e-invoice-request', ['request' => $testRequest], function ($message) {
-                $message->to('luckboy5566@gmail.com')
-                    ->subject('Test E-Invoice Request Email');
+                $message->to(
+                    config('app.admin_email')
+                )->subject('Test E-Invoice Request Email');
             });
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Test email sent successfully to luckboy5566@gmail.com'
+                'message' => 'Test email sent successfully to '.config('app.admin_email')
             ]);
         } catch (\Exception $e) {
             return response()->json([
