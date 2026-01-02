@@ -182,31 +182,31 @@
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Company / Individual Name</label>
-                            <input type="text" class="form-control" name="company_individual_name" value="{{ old('company_individual_name', $prefillData['company_individual_name'] ?? '') }}">
+                            <input type="text" class="form-control" name="company_individual_name" value="{{ old('company_individual_name', $prefillData['company_individual_name'] ?? '') }}" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Business Registration Number (Old)</label>
-                            <input type="text" class="form-control" name="business_registration_number_old" value="{{ old('business_registration_number_old') }}">
+                            <input type="text" class="form-control" name="business_registration_number_old" value="{{ old('business_registration_number_old') }}" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Business Registration Number (New)</label>
-                            <input type="text" class="form-control" name="business_registration_number_new" value="{{ old('business_registration_number_new') }}">
+                            <input type="text" class="form-control" name="business_registration_number_new" value="{{ old('business_registration_number_new') }}" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">TIN Number</label>
-                            <input type="text" class="form-control" name="tin_number" value="{{ old('tin_number') }}">
+                            <input type="text" class="form-control" name="tin_number" value="{{ old('tin_number') }}" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">MSIC Code</label>
-                            <input type="text" class="form-control" name="msic_code" value="{{ old('msic_code') }}">
+                            <input type="text" class="form-control" name="msic_code" value="{{ old('msic_code') }}" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Sales & Service Tax (SST)</label>
-                            <input type="text" class="form-control" name="sales_service_tax_sst" value="{{ old('sales_service_tax_sst') }}">
+                            <input type="text" class="form-control" name="sales_service_tax_sst" value="{{ old('sales_service_tax_sst') }}" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Address</label>
-                            <textarea class="form-control" name="address" rows="3">{{ old('address', $prefillData['address'] ?? '') }}</textarea>
+                            <textarea class="form-control" name="address" rows="3" @if(isset($existingRequest) && $existingRequest) readonly @endif>{{ old('address', $prefillData['address'] ?? '') }}</textarea>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Person In Charge</label>
@@ -214,32 +214,34 @@
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Contact <span class="required">*</span></label>
-                            <input type="text" class="form-control" name="contact" value="{{ old('contact', $prefillData['contact'] ?? '') }}" required>
+                            <input type="text" class="form-control" name="contact" value="{{ old('contact', $prefillData['contact'] ?? '') }}" @if(isset($existingRequest) && $existingRequest) readonly @else required @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Email Address <span class="required">*</span></label>
-                            <input type="email" class="form-control" name="email_address" value="{{ old('email_address', $prefillData['email_address'] ?? '') }}" required>
+                            <input type="email" class="form-control" name="email_address" value="{{ old('email_address', $prefillData['email_address'] ?? '') }}" @if(isset($existingRequest) && $existingRequest) readonly @else required @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">IC Number <span class="required">*</span></label>
-                            <input type="text" class="form-control" name="ic_number" value="{{ old('ic_number') }}" id="ic_number">
+                            <input type="text" class="form-control" name="ic_number" value="{{ old('ic_number') }}" id="ic_number" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <div class="mb-1">
                             <label class="form-label">Passport Number <span class="required">*</span></label>
-                            <input type="text" class="form-control" name="passport_number" value="{{ old('passport_number') }}" id="passport_number">
+                            <input type="text" class="form-control" name="passport_number" value="{{ old('passport_number') }}" id="passport_number" @if(isset($existingRequest) && $existingRequest) readonly @endif>
                         </div>
                         <small class="text-muted d-block mb-1">* At least one of IC Number or Passport Number is required</small>
                     </div>
                 </div>
 
-                <div class="text-center mb-4">
-                    <button type="submit" class="btn btn-submit btn-lg" id="submitBtn">
-                        <span id="submitText"><i class="fas fa-paper-plane"></i> Submit Request</span>
-                        <span id="submitLoading" style="display: none;">
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...
-                        </span>
-                    </button>
-                </div>
+                @if(!isset($existingRequest) || !$existingRequest)
+                    <div class="text-center mb-4">
+                        <button type="submit" class="btn btn-submit btn-lg" id="submitBtn">
+                            <span id="submitText"><i class="fas fa-paper-plane"></i> Submit Request</span>
+                            <span id="submitLoading" style="display: none;">
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...
+                            </span>
+                        </button>
+                    </div>
+                @endif
             </form>
         </div>
     </div>
