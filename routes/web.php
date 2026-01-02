@@ -75,6 +75,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // Invoices Management (KBS/admin only - checked in controller)
     Route::get('invoices', [\App\Http\Controllers\Admin\InvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('invoices/{id}', [\App\Http\Controllers\Admin\InvoiceController::class, 'show'])->name('invoices.show');
 
     // Report routes (KBS/admin only - checked in controller)
     Route::prefix('reports')->name('reports.')->group(function () {

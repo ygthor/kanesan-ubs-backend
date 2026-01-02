@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Kanesan UBS Backend')</title>
+    <title>@yield('title', 'Kanesan Backend')</title>
 
     <!-- PICK YOUR THEME -->
     <link href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css" rel="stylesheet">
@@ -69,8 +69,8 @@
         <aside class="main-sidebar sidebar-dark-primary elevation-4">
             <!-- Brand Logo -->
             <a href="/dashboard" class="brand-link">
-                <i class="fas fa-cogs brand-image img-circle elevation-3" style="opacity: .8"></i>
-                <span class="brand-text font-weight-light">Kanesan UBS</span>
+                <img src="{{ asset('app_logo.png') }}" alt="Kanesan Logo" class="brand-image img-circle elevation-3" style="opacity: .8; max-width: 40px; max-height: 40px;">
+                <span class="brand-text font-weight-light">Kanesan</span>
             </a>
 
             <!-- Sidebar -->
@@ -97,6 +97,7 @@
                                     <p>Stock Management</p>
                                 </a>
                             </li>
+                           
                         @endif
 
                         @if (auth()->check() && auth()->user()->hasRole('admin'))
@@ -124,8 +125,15 @@
                             <li class="nav-item">
                                 <a href="/admin/reports"
                                     class="nav-link {{ request()->is('admin/reports*') ? 'active' : '' }}">
-                                    <i class="nav-icon fas fa-bullhorn"></i>
+                                    <i class="nav-icon fas fa-file"></i>
                                     <p>Report</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('admin.invoices.index') }}"
+                                    class="nav-link {{ request()->is('admin/invoices*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                                    <p>Invoices</p>
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -196,7 +204,7 @@
         <!-- Footer -->
         <footer class="main-footer">
             <div class="float-right d-none d-sm-inline">
-                Kanesan UBS Backend
+                Kanesan Backend
             </div>
             <strong>Copyright &copy; {{ date('Y') }} <a href="#">Kanesan</a>.</strong> All rights reserved.
         </footer>

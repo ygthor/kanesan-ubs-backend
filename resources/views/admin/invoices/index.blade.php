@@ -54,6 +54,20 @@
             </div>
         </div>
         <div class="row">
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label>Reference No</label>
+                    <input type="text" name="reference_no" class="form-control" value="{{ $referenceNo ?? '' }}" placeholder="Search by reference number">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label>Agent No</label>
+                    <input type="text" name="agent_no" class="form-control" value="{{ $agentNo ?? '' }}" placeholder="Search by agent number">
+                </div>
+            </div>
+        </div>
+        <div class="row">
             <div class="col-md-12">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-search"></i> Filter
@@ -95,67 +109,30 @@
                         <td>{{ $order->agent_no ?? 'N/A' }}</td>
                         <td class="text-right">RM {{ number_format($order->net_amount ?? 0, 2) }}</td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-link p-0 text-info" data-bs-toggle="modal" data-bs-target="#orderModal{{ $order->id }}">
+                            <a href="{{ route('admin.invoices.show', $order->id) }}" class="btn btn-sm btn-link p-0 text-info">
                                 View
-                            </button>
+                            </a>
                             @if($order->type == 'INV' || $order->type == 'CN')
                                 <span class="mx-1">|</span>
-                                <a href="{{ route('e-invoice.form', ['invoice_no' => $order->reference_no, 'customer_code' => $order->customer_code, 'type' => $order->type, 'id' => $order->id]) }}" 
-                                   class="btn btn-sm btn-link p-0 text-primary" target="_blank">
-                                    E-Invoice
-                                </a>
+                                @php
+                                    $eInvoiceRequest = \App\Models\EInvoiceRequest::where('invoice_no', $order->reference_no)
+                                        ->where('customer_code', $order->customer_code)
+                                        ->first();
+                                @endphp
+                                @if($eInvoiceRequest)
+                                    <a href="{{ route('admin.e-invoice-requests.edit', $eInvoiceRequest->id) }}" 
+                                       target="_blank" class="btn btn-sm btn-link p-0 text-warning" title="View E-Invoice Request Details">
+                                        E-Invoice (Requested)
+                                    </a>
+                                @else
+                                    <a href="{{ route('e-invoice.form', ['invoice_no' => $order->reference_no, 'customer_code' => $order->customer_code, 'type' => $order->type, 'id' => $order->id]) }}" 
+                                       class="btn btn-sm btn-link p-0 text-primary" target="_blank">
+                                        E-Invoice
+                                    </a>
+                                @endif
                             @endif
                         </td>
                     </tr>
-
-                    <!-- Order Detail Modal -->
-                    <div class="modal fade" id="orderModal{{ $order->id }}" tabindex="-1">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Order Details - {{ $order->reference_no }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="row mb-3">
-                                        <div class="col-md-6">
-                                            <strong>Reference No:</strong> {{ $order->reference_no }}<br>
-                                            <strong>Type:</strong> {{ $order->type }}<br>
-                                            <strong>Date:</strong> {{ \Carbon\Carbon::parse($order->order_date)->format('d/m/Y H:i') }}<br>
-                                            <strong>Status:</strong> {{ $order->status ?? 'N/A' }}
-                                        </div>
-                                        <div class="col-md-6">
-                                            <strong>Customer Code:</strong> {{ $order->customer_code }}<br>
-                                            <strong>Customer Name:</strong> {{ $order->customer_name }}<br>
-                                            <strong>Agent No:</strong> {{ $order->agent_no ?? 'N/A' }}
-                                        </div>
-                                    </div>
-                                    <hr>
-                                    <div class="row mb-3">
-                                        <div class="col-md-6">
-                                            <strong>Gross Amount:</strong> RM {{ number_format($order->gross_amount ?? 0, 2) }}<br>
-                                            <strong>Discount:</strong> RM {{ number_format($order->discount ?? 0, 2) }}<br>
-                                            <strong>Tax:</strong> RM {{ number_format($order->tax1 ?? 0, 2) }}
-                                        </div>
-                                        <div class="col-md-6">
-                                            <strong>Grand Amount:</strong> RM {{ number_format($order->grand_amount ?? 0, 2) }}<br>
-                                            <strong>Net Amount:</strong> <span class="font-weight-bold">RM {{ number_format($order->net_amount ?? 0, 2) }}</span>
-                                        </div>
-                                    </div>
-                                    @if($order->remarks)
-                                        <hr>
-                                        <div class="mb-3">
-                                            <strong>Remarks:</strong><br>
-                                            {{ $order->remarks }}
-                                        </div>
-                                    @endif
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 @empty
                     <tr>
                         <td colspan="8" class="text-center">No invoices found.</td>
