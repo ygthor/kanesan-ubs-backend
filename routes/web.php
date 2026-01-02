@@ -21,6 +21,13 @@ Route::post('/logout', [\App\Http\Controllers\Auth\AuthController::class, 'logou
 // Dashboard route (requires authentication)
 Route::get('/dashboard', [\App\Http\Controllers\Auth\AuthController::class, 'dashboard'])->name('dashboard')->middleware('auth');
 
+// E-Invoice Request Form (public route, no authentication required)
+Route::get('/e-invoice', [\App\Http\Controllers\EInvoiceController::class, 'showForm'])->name('e-invoice.form');
+Route::post('/e-invoice', [\App\Http\Controllers\EInvoiceController::class, 'submitForm'])->name('e-invoice.submit');
+
+// Test email route (for testing purposes)
+Route::get('/test/e-invoice-email', [\App\Http\Controllers\EInvoiceController::class, 'testEmail'])->name('test.e-invoice-email');
+
 // Stock Management routes (requires authentication and admin/KBS access - checked in controller)
 Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'index'])->name('stock-management');
@@ -60,6 +67,14 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // Announcement Management
     Route::resource('announcements', \App\Http\Controllers\Admin\AnnouncementController::class);
+
+    // E-Invoice Request Management (KBS/admin only - checked in controller)
+    Route::get('e-invoice-requests', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'index'])->name('e-invoice-requests.index');
+    Route::get('e-invoice-requests/{id}/edit', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'edit'])->name('e-invoice-requests.edit');
+    Route::put('e-invoice-requests/{id}', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'update'])->name('e-invoice-requests.update');
+
+    // Invoices Management (KBS/admin only - checked in controller)
+    Route::get('invoices', [\App\Http\Controllers\Admin\InvoiceController::class, 'index'])->name('invoices.index');
 
     // Report routes (KBS/admin only - checked in controller)
     Route::prefix('reports')->name('reports.')->group(function () {

@@ -1,0 +1,27 @@
+CREATE TABLE IF NOT EXISTS `e_invoice_requests` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `invoice_no` VARCHAR(255) NULL DEFAULT NULL,
+  `customer_code` VARCHAR(255) NULL DEFAULT NULL,
+  `order_id` VARCHAR(255) NULL DEFAULT NULL,
+  `company_individual_name` VARCHAR(255) NULL DEFAULT NULL,
+  `business_registration_number_old` VARCHAR(255) NULL DEFAULT NULL,
+  `business_registration_number_new` VARCHAR(255) NULL DEFAULT NULL,
+  `tin_number` VARCHAR(255) NULL DEFAULT NULL,
+  `msic_code` VARCHAR(255) NULL DEFAULT NULL,
+  `sales_service_tax_sst` VARCHAR(255) NULL DEFAULT NULL,
+  `address` TEXT NULL DEFAULT NULL,
+  `person_in_charge` VARCHAR(255) NULL DEFAULT NULL,
+  `contact` VARCHAR(255) NULL DEFAULT NULL,
+  `email_address` VARCHAR(255) NULL DEFAULT NULL,
+  `ic_number` VARCHAR(255) NULL DEFAULT NULL,
+  `passport_number` VARCHAR(255) NULL DEFAULT NULL,
+  `ip_address` VARCHAR(255) NULL DEFAULT NULL,
+  `user_agent` TEXT NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `idx_invoice_no` (`invoice_no`),
+  INDEX `idx_customer_code` (`customer_code`),
+  INDEX `idx_order_id` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

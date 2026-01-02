@@ -128,6 +128,13 @@
                                     <p>Report</p>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a href="/admin/e-invoice-requests"
+                                    class="nav-link {{ request()->is('admin/e-invoice-requests*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-file-invoice"></i>
+                                    <p>E-Invoice Requests</p>
+                                </a>
+                            </li>
                         @endif
 
                     </ul>

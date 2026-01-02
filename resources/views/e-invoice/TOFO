@@ -1,0 +1,6 @@
+COMUEN = business_registration_no
+LHDNMID = lhdm_no
+E_MAIL = email
+MSICCODE = msic_code
+IDNUM = id_number
+IDTYPE = id_type
