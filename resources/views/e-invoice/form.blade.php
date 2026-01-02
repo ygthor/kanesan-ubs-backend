@@ -74,6 +74,25 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
+
+            @if(isset($existingRequest) && $existingRequest)
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <strong><i class="fas fa-exclamation-triangle"></i> E-Invoice Already Requested</strong><br>
+                    An e-invoice request for invoice <strong>{{ $existingRequest->invoice_no ?? 'N/A' }}</strong> 
+                    has already been submitted on {{ $existingRequest->created_at ? $existingRequest->created_at->format('d/m/Y H:i:s') : 'N/A' }}.
+                    @if($existingRequest->email_address)
+                        <br>Submitted by: <strong>{{ $existingRequest->email_address }}</strong>
+                    @endif
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                     <ul class="mb-0">
@@ -85,7 +104,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('e-invoice.submit') }}">
+            <form method="POST" action="{{ route('e-invoice.submit') }}" id="eInvoiceForm">
                 @csrf
 
                 <!-- Section 1: Fixed Platform Information -->
@@ -215,7 +234,10 @@
 
                 <div class="text-center mb-4">
                     <button type="submit" class="btn btn-submit btn-lg" id="submitBtn">
-                        <i class="fas fa-paper-plane"></i> Submit Request
+                        <span id="submitText"><i class="fas fa-paper-plane"></i> Submit Request</span>
+                        <span id="submitLoading" style="display: none;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...
+                        </span>
                     </button>
                 </div>
             </form>
@@ -225,8 +247,16 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Validate that at least one of IC Number or Passport Number is filled
-        document.getElementById('submitBtn').addEventListener('click', function(e) {
+        let isSubmitting = false;
+        
+        document.getElementById('eInvoiceForm').addEventListener('submit', function(e) {
+            // Prevent double submit
+            if (isSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Validate that at least one of IC Number or Passport Number is filled
             const icNumber = document.getElementById('ic_number').value.trim();
             const passportNumber = document.getElementById('passport_number').value.trim();
             
@@ -235,6 +265,16 @@
                 alert('Please fill in either IC Number or Passport Number');
                 return false;
             }
+            
+            // Show loading and disable button
+            isSubmitting = true;
+            const submitBtn = document.getElementById('submitBtn');
+            const submitText = document.getElementById('submitText');
+            const submitLoading = document.getElementById('submitLoading');
+            
+            submitBtn.disabled = true;
+            submitText.style.display = 'none';
+            submitLoading.style.display = 'inline';
         });
     </script>
 </body>

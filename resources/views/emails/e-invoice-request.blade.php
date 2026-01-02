@@ -53,16 +53,20 @@
             <img src="{{ url('app_logo.png') }}" alt="Logo" style="max-height: 100px;">
         </div>
         
-        <div class="header">
-            <h2>E-Invoice Request</h2>
-        </div>
-        
         <div class="content">
             <p>Dear admin,</p>
             
             <p>Here is the e-invoice request for invoice no <strong>{{ $request->invoice_no ?? 'N/A' }}</strong>.</p>
             
             <table>
+                <thead>
+                    <tr>
+                        <th colspan="2" style="background-color: #007bff; color: white; padding: 15px; text-align: center; font-size: 18px;">
+                            E-Invoice Request
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
                 <tr>
                     <td>Invoice No</td>
                     <td>{{ $request->invoice_no ?? 'N/A' }}</td>
@@ -123,6 +127,7 @@
                     <td>Request Date</td>
                     <td>{{ $request->created_at ? $request->created_at->format('Y-m-d H:i:s') : 'N/A' }}</td>
                 </tr>
+                </tbody>
             </table>
         </div>
         

@@ -27,158 +27,174 @@
         @csrf
         @method('PUT')
 
-        <div class="row">
-            <div class="col-md-6">
-                <div class="form-group mb-3">
-                    <label>Invoice No</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="invoice_no" value="{{ old('invoice_no', $request->invoice_no) }}" id="invoice_no">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('invoice_no')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Customer Code</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="customer_code" value="{{ old('customer_code', $request->customer_code) }}" id="customer_code">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('customer_code')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Company / Individual Name</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="company_individual_name" value="{{ old('company_individual_name', $request->company_individual_name) }}" id="company_individual_name">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('company_individual_name')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Business Registration Number (Old)</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="business_registration_number_old" value="{{ old('business_registration_number_old', $request->business_registration_number_old) }}" id="business_registration_number_old">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('business_registration_number_old')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Business Registration Number (New)</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="business_registration_number_new" value="{{ old('business_registration_number_new', $request->business_registration_number_new) }}" id="business_registration_number_new">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('business_registration_number_new')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>TIN Number</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="tin_number" value="{{ old('tin_number', $request->tin_number) }}" id="tin_number">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('tin_number')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>MSIC Code</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="msic_code" value="{{ old('msic_code', $request->msic_code) }}" id="msic_code">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('msic_code')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Sales & Service Tax (SST)</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="sales_service_tax_sst" value="{{ old('sales_service_tax_sst', $request->sales_service_tax_sst) }}" id="sales_service_tax_sst">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('sales_service_tax_sst')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="form-group mb-3">
-                    <label>Address</label>
-                    <div class="d-flex">
-                        <textarea class="form-control" name="address" rows="3" id="address" style="flex: 1;">{{ old('address', $request->address) }}</textarea>
-                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="copyToClipboard('address')" title="Copy to clipboard" style="height: fit-content; align-self: flex-start;">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Person In Charge</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="person_in_charge" value="{{ old('person_in_charge', $request->person_in_charge) }}" id="person_in_charge">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('person_in_charge')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Contact</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="contact" value="{{ old('contact', $request->contact) }}" id="contact">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('contact')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Email Address</label>
-                    <div class="input-group">
-                        <input type="email" class="form-control" name="email_address" value="{{ old('email_address', $request->email_address) }}" id="email_address">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('email_address')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>IC Number</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="ic_number" value="{{ old('ic_number', $request->ic_number) }}" id="ic_number">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('ic_number')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Passport Number</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="passport_number" value="{{ old('passport_number', $request->passport_number) }}" id="passport_number">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('passport_number')" title="Copy to clipboard">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group mb-3">
-                    <label>Request Date</label>
-                    <input type="text" class="form-control" value="{{ $request->created_at->format('Y-m-d H:i:s') }}" readonly>
-                </div>
-            </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <tbody>
+                    <tr>
+                        <td style="width: 30%; font-weight: 600; background-color: #f8f9fa;">Invoice No</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="invoice_no" value="{{ old('invoice_no', $request->invoice_no) }}" id="invoice_no">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('invoice_no')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Customer Code</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="customer_code" value="{{ old('customer_code', $request->customer_code) }}" id="customer_code">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('customer_code')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Company / Individual Name</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="company_individual_name" value="{{ old('company_individual_name', $request->company_individual_name) }}" id="company_individual_name">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('company_individual_name')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Business Registration Number (Old)</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="business_registration_number_old" value="{{ old('business_registration_number_old', $request->business_registration_number_old) }}" id="business_registration_number_old">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('business_registration_number_old')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Business Registration Number (New)</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="business_registration_number_new" value="{{ old('business_registration_number_new', $request->business_registration_number_new) }}" id="business_registration_number_new">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('business_registration_number_new')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">TIN Number</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="tin_number" value="{{ old('tin_number', $request->tin_number) }}" id="tin_number">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('tin_number')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">MSIC Code</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="msic_code" value="{{ old('msic_code', $request->msic_code) }}" id="msic_code">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('msic_code')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Sales & Service Tax (SST)</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="sales_service_tax_sst" value="{{ old('sales_service_tax_sst', $request->sales_service_tax_sst) }}" id="sales_service_tax_sst">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('sales_service_tax_sst')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Address</td>
+                        <td>
+                            <div class="input-group">
+                                <textarea class="form-control form-control-sm" name="address" rows="2" id="address">{{ old('address', $request->address) }}</textarea>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('address')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Person In Charge</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="person_in_charge" value="{{ old('person_in_charge', $request->person_in_charge) }}" id="person_in_charge">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('person_in_charge')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Contact</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="contact" value="{{ old('contact', $request->contact) }}" id="contact">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('contact')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Email Address</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="email" class="form-control form-control-sm" name="email_address" value="{{ old('email_address', $request->email_address) }}" id="email_address">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('email_address')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">IC Number</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="ic_number" value="{{ old('ic_number', $request->ic_number) }}" id="ic_number">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('ic_number')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Passport Number</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm" name="passport_number" value="{{ old('passport_number', $request->passport_number) }}" id="passport_number">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('passport_number')" title="Copy to clipboard">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: 600; background-color: #f8f9fa;">Request Date</td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm" value="{{ $request->created_at->format('Y-m-d H:i:s') }}" readonly style="background-color: #e9ecef;">
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
-        <div class="form-group mt-4">
+        <div class="mt-4">
             <button type="submit" class="btn btn-primary">
                 <i class="fas fa-save"></i> Update Request
             </button>
@@ -231,7 +247,11 @@
     function showCopyFeedback(fieldId) {
         const field = document.getElementById(fieldId);
         const inputGroup = field.closest('.input-group');
+        if (!inputGroup) return;
+        
         const button = inputGroup.querySelector('button');
+        if (!button) return;
+        
         const originalHTML = button.innerHTML;
         button.innerHTML = '<i class="fas fa-check"></i>';
         button.classList.add('btn-success');
