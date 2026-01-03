@@ -19,20 +19,42 @@ class EInvoiceController extends Controller
     public function showForm(Request $request)
     {
         $invoiceNo = $request->query('invoice_no');
+        $receiptNo = $request->query('receipt_no');
         $customerCode = $request->query('customer_code');
         $type = $request->query('type');
         $id = $request->query('id');
 
-        // Prevent brute force - require at least invoice_no or customer_code
-        if (!$invoiceNo && !$customerCode && !$id) {
-            abort(403, 'Access denied. This page requires invoice or customer information.');
+        // Prevent brute force - require at least invoice_no, receipt_no, customer_code, or id
+        if (!$invoiceNo && !$receiptNo && !$customerCode && !$id) {
+            abort(403, 'Access denied. This page requires invoice, receipt, or customer information.');
         }
 
-        // Pre-fill data from invoice/customer if available
+        // Pre-fill data from invoice/receipt/customer if available
         $prefillData = [];
         $existingRequest = null;
         
-        if ($invoiceNo || $customerCode || $id) {
+        // Handle receipt requests (type=RC)
+        if ($receiptNo && $type == 'RC') {
+            // For receipts, use receipt_no as invoice_no in the form
+            $prefillData['invoice_no'] = $receiptNo;
+            if ($customerCode) {
+                $prefillData['customer_code'] = $customerCode;
+                $customer = Customer::where('customer_code', $customerCode)->first();
+                if ($customer) {
+                    $prefillData['company_individual_name'] = $customer->company_name ?? $customer->name;
+                    $prefillData['address'] = $customer->address ?? ($customer->address1 . "\n" . ($customer->address2 ?? '') . "\n" . ($customer->address3 ?? '') . "\n" . ($customer->postcode ?? '') . " " . ($customer->state ?? ''));
+                    $prefillData['person_in_charge'] = $customer->agent_no;
+                    $prefillData['contact'] = $customer->telephone1 ?? $customer->phone;
+                    $prefillData['email_address'] = $customer->email;
+                }
+                
+                // Check if e-invoice request already exists for this receipt
+                $existingRequest = EInvoiceRequest::where('invoice_no', $receiptNo)
+                    ->where('customer_code', $customerCode)
+                    ->first();
+            }
+        } elseif ($invoiceNo || $customerCode || $id) {
+            // Handle invoice/order requests (type=INV or CN)
             // Try to find order/invoice
             $order = null;
             if ($id) {
@@ -99,14 +121,19 @@ class EInvoiceController extends Controller
      */
     public function submitForm(Request $request)
     {
+        // Handle receipt_no parameter (for receipts, type=RC)
+        // If receipt_no is provided, use it as invoice_no in the database
+        $invoiceNo = $request->input('receipt_no') ?: $request->input('invoice_no');
+        
         // Prevent duplicate submissions - check if already submitted
-        $submissionKey = 'e_invoice_submitted_' . md5($request->invoice_no . $request->customer_code . $request->ip());
+        $submissionKey = 'e_invoice_submitted_' . md5($invoiceNo . $request->customer_code . $request->ip());
         
         // Check if submission key exists and hasn't expired
         if (session()->has($submissionKey)) {
             $expiresKey = $submissionKey . '_expires';
             if (session()->has($expiresKey) && now()->lt(session($expiresKey))) {
-                return redirect()->route('e-invoice.form', $request->only(['invoice_no', 'customer_code', 'type', 'id']))
+                $redirectParams = $request->only(['invoice_no', 'receipt_no', 'customer_code', 'type', 'id']);
+                return redirect()->route('e-invoice.form', $redirectParams)
                     ->with('error', 'You have already submitted this request. Please wait before submitting again.');
             } else {
                 // Expired, remove old session data
@@ -117,6 +144,7 @@ class EInvoiceController extends Controller
 
         $validator = Validator::make($request->all(), [
             'invoice_no' => 'nullable|string|max:255',
+            'receipt_no' => 'nullable|string|max:255',
             'customer_code' => 'nullable|string|max:255',
             'company_individual_name' => 'nullable|string|max:255',
             'business_registration_number_old' => 'nullable|string|max:255',
@@ -136,28 +164,29 @@ class EInvoiceController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        // Find order if invoice_no is provided
+        // Find order if invoice_no is provided (not for receipts)
         $order = null;
-        if ($request->invoice_no) {
-            $order = Order::where('reference_no', $request->invoice_no)->first();
+        if ($invoiceNo && !$request->input('receipt_no')) {
+            $order = Order::where('reference_no', $invoiceNo)->first();
         }
 
-        // Check if this invoice/customer combination already has a request (prevent duplicate submissions)
-        if ($request->invoice_no && $request->customer_code && $request->email_address) {
-            $existingRequest = EInvoiceRequest::where('invoice_no', $request->invoice_no)
+        // Check if this invoice/receipt/customer combination already has a request (prevent duplicate submissions)
+        if ($invoiceNo && $request->customer_code && $request->email_address) {
+            $existingRequest = EInvoiceRequest::where('invoice_no', $invoiceNo)
                 ->where('customer_code', $request->customer_code)
                 ->where('email_address', $request->email_address)
                 ->first();
 
             if ($existingRequest) {
-                return redirect()->route('e-invoice.form', $request->only(['invoice_no', 'customer_code', 'type', 'id']))
-                    ->with('error', 'An e-invoice request for this invoice and customer has already been submitted.');
+                $redirectParams = $request->only(['invoice_no', 'receipt_no', 'customer_code', 'type', 'id']);
+                return redirect()->route('e-invoice.form', $redirectParams)
+                    ->with('error', 'An e-invoice request for this invoice/receipt and customer has already been submitted.');
             }
         }
 
         // Create e-invoice request
         $eInvoiceRequest = EInvoiceRequest::create([
-            'invoice_no' => $request->invoice_no,
+            'invoice_no' => $invoiceNo,
             'customer_code' => $request->customer_code,
             'order_id' => $order ? $order->id : null,
             'company_individual_name' => $request->company_individual_name,
@@ -190,7 +219,8 @@ class EInvoiceController extends Controller
         session()->put($submissionKey, true);
         session()->put($submissionKey . '_expires', now()->addHour());
 
-        return redirect()->route('e-invoice.form', $request->only(['invoice_no', 'customer_code', 'type', 'id']))
+        $redirectParams = $request->only(['invoice_no', 'receipt_no', 'customer_code', 'type', 'id']);
+        return redirect()->route('e-invoice.form', $redirectParams)
             ->with('success', 'E-Invoice request submitted successfully. We will process your request shortly.');
     }
 
