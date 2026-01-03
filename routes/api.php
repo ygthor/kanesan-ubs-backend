@@ -187,6 +187,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Invoices are now handled through /api/orders with type='INV' filter
     // Keeping these routes for backward compatibility, but they redirect to orders
     // Invoice items are just order items, use OrderItemController  
+    Route::post('/invoices/create-with-items', [OrderController::class, 'createInvoiceWithItems'])->name('invoices.create-with-items');
     Route::apiResource('invoices-items', OrderItemController::class)->only(['index', 'store', 'update', 'show', 'destroy']);
 
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index')->middleware('filter.customer');

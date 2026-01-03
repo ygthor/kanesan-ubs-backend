@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Customer; // To fetch customer details if needed
 use App\Models\Product;  // To fetch product details if needed
+use App\Models\Icitem;
 use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -454,6 +455,285 @@ class OrderController extends Controller
             DB::rollBack();
             \Log::error('Order save failed: ' . $e->getMessage());
             return makeResponse(500, 'Failed to save order.', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Create invoice (INV order) with items in a single transaction.
+     * This is a new endpoint that creates the invoice and all items at once,
+     * optimized for the order form page.
+     *
+     * @bodyParam branch_id integer required The branch ID. Example: 1
+     * @bodyParam customer_id integer required The customer ID. Example: 1
+     * @bodyParam remarks string nullable Any remarks for the order.
+     * @bodyParam discount float nullable Order-level discount. Example: 10.00
+     * @bodyParam tax1_percentage float nullable Tax percentage. Example: 6.00
+     * @bodyParam agent_no string nullable Agent number (KBS users can set, others default to username).
+     * @bodyParam order_date string nullable Order date (YYYY-MM-DD HH:MM:SS). Defaults to now.
+     * @bodyParam items array required Array of invoice items.
+     * @bodyParam items.*.product_no string required The product number. Example: "AK1K"
+     * @bodyParam items.*.quantity float required The quantity. Example: 2
+     * @bodyParam items.*.unit_price float required The unit price. Example: 10.00
+     * @bodyParam items.*.discount float nullable Item-level discount. Example: 1.00
+     * @bodyParam items.*.is_free_good boolean nullable Is this a free good? Example: false
+     * @bodyParam items.*.item_group string nullable Item group.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function createInvoiceWithItems(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_id' => 'required|exists:customers,id',
+            'items' => 'required|array|min:1',
+            'items.*.product_no' => 'required|string',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
+            'items.*.is_free_good' => 'nullable|boolean',
+            'items.*.item_group' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
+        }
+
+        DB::beginTransaction();
+        try {
+            $orderData = $request->only([
+                'branch_id',
+                'customer_id',
+                'remarks',
+                'tax1_percentage',
+                'discount'
+            ]);
+
+            $orderData['order_date'] = $request->input('order_date') ?: now();
+            $orderData['branch_id'] = $orderData['branch_id'] ?? 0;
+            $orderData['type'] = 'INV'; // Always INV for invoices
+
+            $customer = Customer::find($orderData['customer_id']);
+            if (!$customer) {
+                DB::rollBack();
+                return makeResponse(404, 'Customer not found with ID: ' . $orderData['customer_id']);
+            }
+
+            $orderData['customer_code'] = $customer->customer_code;
+            $orderData['customer_name'] = $customer->company_name ?? $customer->name ?? 'N/A';
+
+            // Handle agent_no: KBS users can set/update it, others default to their name
+            $user = auth()->user();
+            if ($user) {
+                $isKBS = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
+
+                if ($isKBS && $request->has('agent_no') && $request->input('agent_no') !== null) {
+                    $orderData['agent_no'] = $request->input('agent_no');
+                } else {
+                    // Non-KBS or KBS without agent_no: default to user's name
+                    $orderData['agent_no'] = $user->name ?? $user->username ?? null;
+                }
+            }
+
+            $orderData['status'] = 'pending';
+
+            // Create the invoice order
+            $order = Order::create($orderData);
+            $order->reference_no = $order->getReferenceNo();
+            $order->save();
+
+            // Get agent_no for stock validation
+            $agentNo = $order->agent_no;
+            if (!$agentNo) {
+                DB::rollBack();
+                return makeResponse(422, 'Agent number is required for stock management.', null);
+            }
+
+            // Initialize stock service
+            $stockService = new StockService();
+
+            // Get items from request
+            $items = $request->input('items', []);
+
+            // Helper function to get product by product_no from icitem table (following existing pattern)
+            $getIcitem = function($itemData) {
+                $productNo = $itemData['product_no'] ?? null;
+                if (!$productNo) {
+                    return null;
+                }
+                // Try exact match first using ITEMNO (primary key)
+                $icitem = Icitem::find($productNo);
+                // If not found, try case-insensitive match
+                if (!$icitem) {
+                    $icitem = Icitem::whereRaw('LOWER(ITEMNO) = LOWER(?)', [$productNo])->first();
+                }
+                return $icitem;
+            };
+
+            // Separate regular items from trade return items (following store method pattern)
+            $regularItems = [];
+            $tradeReturnItems = [];
+
+            foreach ($items as $itemData) {
+                if ($itemData['is_trade_return'] ?? false) {
+                    $tradeReturnItems[] = $itemData;
+                } else {
+                    $regularItems[] = $itemData;
+                }
+            }
+
+            // Validate stock availability (only for regular items in INV orders)
+            if (!empty($regularItems)) {
+                $itemsForValidation = [];
+                foreach ($regularItems as $itemData) {
+                    $icitem = $getIcitem($itemData);
+                    if (!$icitem) {
+                        continue;
+                    }
+                    $itemsForValidation[] = [
+                        'product_no' => $icitem->ITEMNO,
+                        'quantity' => $itemData['quantity'] ?? 0,
+                        'is_trade_return' => false,
+                    ];
+                }
+
+                if (!empty($itemsForValidation)) {
+                    $stockValidation = $stockService->validateOrderStock($agentNo, $itemsForValidation);
+                    if (!$stockValidation['valid']) {
+                        DB::rollBack();
+                        return makeResponse(422, 'Stock validation failed.', ['errors' => $stockValidation['errors']]);
+                    }
+                }
+            }
+
+            // Add regular items to INV order (trade returns go to CN order)
+            $referenceNo = $order->reference_no;
+            $itemCount = 1;
+
+            foreach ($regularItems as $itemData) {
+                $icitem = $getIcitem($itemData);
+                if (!$icitem) {
+                    DB::rollBack();
+                    $productNo = $itemData['product_no'] ?? 'unknown';
+                    return makeResponse(400, 'Invalid product_no: ' . $productNo);
+                }
+
+                $isFreeGood = $itemData['is_free_good'] ?? false;
+                $unitPrice = $isFreeGood ? 0 : ($itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0);
+                $quantity = $itemData['quantity'];
+                $discount = $itemData['discount'] ?? 0;
+                $unique_key = "$referenceNo|$itemCount";
+
+                $orderItem = $order->items()->create([
+                    'unique_key' => $unique_key,
+                    'reference_no' => $referenceNo,
+                    'order_id' => $order->id,
+                    'item_count' => $itemCount,
+                    'product_no' => $icitem->ITEMNO,
+                    'product_name' => $icitem->DESP ?? 'Unknown Product',
+                    'description' => $icitem->DESP ?? 'Unknown Product',
+                    'sku_code' => $icitem->ITEMNO, // Use ITEMNO as SKU
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'discount' => $discount,
+                    'is_free_good' => $isFreeGood,
+                    'is_trade_return' => false, // Regular items are not trade returns
+                    'trade_return_is_good' => true,
+                    'item_group' => $itemData['item_group'] ?? null,
+                ]);
+                $orderItem->calculate();
+                $orderItem->save();
+                $itemCount++;
+            }
+
+            // Calculate INV order totals
+            $order->calculate();
+            $order->save();
+
+            // Reload order with items for stock movement recording
+            $order->load('items');
+
+            // Record stock movements for the INV order
+            $stockService->recordOrderMovements($order);
+
+            // Create CN order for trade return items if any exist
+            $cnOrder = null;
+            if (!empty($tradeReturnItems)) {
+                // Create CN order
+                $cnOrderData = $orderData;
+                $cnOrderData['type'] = 'CN';
+                $cnOrderData['credit_invoice_no'] = $order->reference_no; // Link to INV order
+
+                $cnOrder = Order::create($cnOrderData);
+                $cnOrder->reference_no = $cnOrder->getReferenceNo();
+                $cnOrder->save();
+
+                // Add trade return items to CN order
+                $cnReferenceNo = $cnOrder->reference_no;
+                $cnItemCount = 1;
+
+                foreach ($tradeReturnItems as $itemData) {
+                    $icitem = $getIcitem($itemData);
+                    if (!$icitem) {
+                        DB::rollBack();
+                        $productNo = $itemData['product_no'] ?? 'unknown';
+                        return makeResponse(400, 'Invalid product_no: ' . $productNo);
+                    }
+
+                    $isFreeGood = $itemData['is_free_good'] ?? false;
+                    $unitPrice = $isFreeGood ? 0 : ($itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0);
+                    $quantity = $itemData['quantity'];
+                    $discount = $itemData['discount'] ?? 0;
+                    $unique_key = "$cnReferenceNo|$cnItemCount";
+
+                    $orderItem = $cnOrder->items()->create([
+                        'unique_key' => $unique_key,
+                        'reference_no' => $cnReferenceNo,
+                        'order_id' => $cnOrder->id,
+                        'item_count' => $cnItemCount,
+                        'product_no' => $icitem->ITEMNO,
+                        'product_name' => $icitem->DESP ?? 'Unknown Product',
+                        'description' => $icitem->DESP ?? 'Unknown Product',
+                        'sku_code' => $icitem->ITEMNO, // Use ITEMNO as SKU
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'discount' => $discount,
+                        'is_free_good' => $isFreeGood,
+                        'is_trade_return' => false, // CN items are not marked as trade return anymore
+                        'trade_return_is_good' => $itemData['trade_return_is_good'] ?? true,
+                        'item_group' => $itemData['item_group'] ?? null,
+                    ]);
+                    $orderItem->calculate();
+                    $orderItem->save();
+                    $cnItemCount++;
+                }
+
+                $cnOrder->calculate();
+                $cnOrder->save();
+
+                // Reload CN order with items for stock movement recording
+                $cnOrder->load('items');
+
+                // Record stock movements for the CN order
+                $stockService->recordOrderMovements($cnOrder);
+            }
+
+            DB::commit();
+
+            // Return order with items and customer (following saveOrder pattern)
+            $order->load('items.item', 'customer');
+
+            // If only trade returns exist (INV has 0 items but CN was created), return CN order instead
+            if (empty($regularItems) && !empty($tradeReturnItems) && $cnOrder) {
+                $cnOrder->load('items.item', 'customer');
+                return makeResponse(201, 'Credit note created successfully with items.', $cnOrder);
+            }
+
+            // Return INV order (frontend will call _fetchOrder() to get linked_credit_notes)
+            return makeResponse(201, 'Invoice created successfully with items.', $order);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Invoice creation with items failed: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to create invoice.', ['error' => $e->getMessage()]);
         }
     }
 
