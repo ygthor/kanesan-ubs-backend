@@ -118,6 +118,14 @@ class ReportController extends Controller
         $applyCustFilter($returnsQuery);
         $returns = $returnsQuery->sum('orders.net_amount');
 
+        $caReturnQuery = clone $returnsQuery;
+        $caReturnQuery->whereIn('customers.customer_type', ['CASH']);
+        $totalCashReturn = $caReturnQuery->sum('orders.net_amount') ?? 0;
+
+        $crReturnQuery = clone $returnsQuery;
+        $crReturnQuery->whereIn('customers.customer_type', ['CREDITOR']);
+        $totalCrReturn = $crReturnQuery->sum('orders.net_amount') ?? 0;
+
         $nettSales = $totalSales - $returns;
 
         // --- Collections ---
@@ -180,6 +188,9 @@ class ReportController extends Controller
                 $pdchequeCollect = $total ?? 0;
             }
         }
+
+        $totalCrCollect = $totalCrCollect - $totalCrReturn;
+        $totalCashCollect = $totalCashCollect - $totalCashReturn;
 
         // Total collection = CA + CR (cheques are already included in CA/CR totals)
         // Cheques are shown separately for reporting but are part of CA/CR based on customer_type
