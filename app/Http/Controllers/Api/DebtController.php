@@ -29,30 +29,34 @@ class DebtController extends Controller
 
         // Fetch invoice-type orders with outstanding balances
         $invoicesQuery = Order::select([
-                'orders.*',
-                'customers.customer_code',
-                'customers.id as customer_id',
-                'customers.name as customer_name',
-                'customers.company_name',
-                'customers.payment_type',
-                'customers.payment_term',
-                DB::raw('COALESCE((
+            'orders.*',
+            'customers.customer_code',
+            'customers.id as customer_id',
+            'customers.name as customer_name',
+            'customers.company_name',
+            'customers.payment_type',
+            'customers.payment_term',
+            DB::raw('COALESCE((
                     SELECT SUM(receipt_orders.amount_applied)
                     FROM receipt_orders
                     INNER JOIN receipts ON receipt_orders.receipt_id = receipts.id
                     WHERE receipt_orders.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
                     AND receipts.deleted_at IS NULL
                 ), 0) as total_payments')
-            ])
+        ])
             ->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
             ->where('orders.type', 'INV')
-            ->whereRaw('COALESCE((
-                SELECT SUM(receipt_orders.amount_applied)
-                FROM receipt_orders
-                INNER JOIN receipts ON receipt_orders.receipt_id = receipts.id
-                WHERE receipt_orders.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
-                AND receipts.deleted_at IS NULL
-            ), 0) < (COALESCE(orders.net_amount, orders.grand_amount, 0) - 0.01)');
+            ->whereRaw('(
+                COALESCE((
+                    SELECT SUM(receipt_orders.amount_applied)
+                    FROM receipt_orders
+                    INNER JOIN receipts ON receipt_orders.receipt_id = receipts.id
+                    WHERE receipt_orders.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
+                    AND receipts.deleted_at IS NULL
+                ), 0) < (COALESCE(orders.net_amount, orders.grand_amount, 0) - 0.01)
+                OR
+                orders.net_amount = "0"
+            )');
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -63,8 +67,8 @@ class DebtController extends Controller
         if ($searchTerm) {
             $invoicesQuery->where(function ($query) use ($searchTerm) {
                 $query->where('customers.customer_code', 'like', '%' . $searchTerm . '%')
-                      ->orWhere('customers.company_name', 'like', '%' . $searchTerm . '%')
-                      ->orWhere('customers.name', 'like', '%' . $searchTerm . '%');
+                    ->orWhere('customers.company_name', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('customers.name', 'like', '%' . $searchTerm . '%');
             });
         }
 
@@ -102,20 +106,9 @@ class DebtController extends Controller
                 if ($invoice->relationLoaded('items')) {
                     foreach ($invoice->items as $item) {
                         $itemAmount = (float) ($item->amount ?? 0.0);
-                        if ($item->is_trade_return) {
-                            // Trade return items count as return amount (negative)
-                            $tradeReturnAmount += abs($itemAmount);
-                        } else {
-                            // Non-trade return items count as sales amount
-                            $salesAmount += $itemAmount;
-                        }
+                        $salesAmount += $itemAmount;
                     }
-                } else {
-                    // Fallback: if items not loaded, use net/grand amount as sales amount
-                    // This shouldn't happen as we load items with ->with(['items', 'customer'])
-                    $salesAmount = (float) ($invoice->net_amount ?? $invoice->grand_amount ?? 0);
-                }
-
+                } 
                 // Calculate credit note amount from linked CN orders
                 $creditAmount = 0.0;
                 $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
@@ -129,7 +122,17 @@ class DebtController extends Controller
                 $totalReturnAmt = $tradeReturnAmount + $creditAmount;
 
                 // Outstanding balance = sales amount - return amount - credit amount - payments
-                $outstandingBalance = max(0, $salesAmount - $tradeReturnAmount - $creditAmount - $totalPayments);
+                // $outstandingBalance = max(0, $salesAmount - $tradeReturnAmount - $creditAmount - $totalPayments);
+                $outstandingBalance = $salesAmount - $tradeReturnAmount - $creditAmount - $totalPayments;
+
+                // need to exclude credit note only invoice, cn is with zero salesamount
+                if($salesAmount == 0 && $outstandingBalance <= 0 ){
+                    // IT IS CN
+                }else{
+                    if($outstandingBalance <= 0){
+                        return null;
+                    };
+                }
 
                 // Debug logging for partially paid invoices
                 if ($totalPayments > 0 && $outstandingBalance > 0) {
@@ -152,7 +155,7 @@ class DebtController extends Controller
                     'amountPaid' => $totalPayments,
                     'currency' => 'RM', // Default currency
                 ];
-            });
+            })->filter()->values();
 
             // Calculate total outstanding amount from remaining balances (not original NET_BIL)
             $totalOutstanding = $debtItems->sum('outstandingAmount');
@@ -166,7 +169,40 @@ class DebtController extends Controller
             ];
         });
 
-        return makeResponse(200, 'Customer debts retrieved successfully.', $formattedData->values()->toArray());
+        $formattedData = json_decode(json_encode(
+            $formattedData->values()
+        ), true);
+
+        
+        // GET ALL ORDER WITH ZERO REGULAR ITEM
+        foreach ($formattedData as &$customer) {
+            $date_group = [];
+            foreach ($customer['debtItems'] as $debtItem) {
+                $salesAmount = $debtItem['salesAmount'];
+                $outstandingBalance = $debtItem['outstandingAmount'];
+                if($salesAmount == 0 && $outstandingBalance <= 0 ){
+                    // IT IS CN
+                }else{ // IF IS NOT CN
+                    $date_group[$debtItem['salesDate']] = $debtItem['salesDate'];
+                }
+            }
+
+            foreach ($customer['debtItems'] as $k => $debtItem) {
+                $CN_ONLY = $debtItem['salesAmount'] == 0 && $debtItem['returnAmount'] > 0;
+                if ($CN_ONLY) {
+                    $customer['debtItems'][$k]['is_cn_only'] = true;
+                    if (!isset($date_group[$debtItem['salesDate']])) {
+                        unset($customer['debtItems'][$k]);
+                    }
+                    // THIS IS THE KEY FIX: Re-index the array to make it a proper list
+                    $customer['debtItems'] = array_values($customer['debtItems']);
+                }
+                
+            }
+        }
+        // dd($formattedData);
+
+        return makeResponse(200, 'Customer debts retrieved successfully.', $formattedData);
     }
 
     /**
