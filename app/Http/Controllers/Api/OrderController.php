@@ -722,11 +722,12 @@ class OrderController extends Controller
             // Return order with items and customer (following saveOrder pattern)
             $order->load('items.item', 'customer');
 
+            // NO NEED THIS
             // If only trade returns exist (INV has 0 items but CN was created), return CN order instead
-            if (empty($regularItems) && !empty($tradeReturnItems) && $cnOrder) {
-                $cnOrder->load('items.item', 'customer');
-                return makeResponse(201, 'Credit note created successfully with items.', $cnOrder);
-            }
+            // if (empty($regularItems) && !empty($tradeReturnItems) && $cnOrder) {
+            //     $cnOrder->load('items.item', 'customer');
+            //     return makeResponse(201, 'Credit note created successfully with items.', $cnOrder);
+            // }
 
             // Return INV order (frontend will call _fetchOrder() to get linked_credit_notes)
             return makeResponse(201, 'Invoice created successfully with items.', $order);
