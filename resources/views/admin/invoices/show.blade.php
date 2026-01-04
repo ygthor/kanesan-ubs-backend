@@ -61,10 +61,6 @@
                                     <td>{{ \Carbon\Carbon::parse($order->order_date)->format('d/m/Y H:i:s') }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="font-weight: 600; background-color: #f8f9fa;">Status</td>
-                                    <td>{{ $order->status ?? 'N/A' }}</td>
-                                </tr>
-                                <tr>
                                     <td style="font-weight: 600; background-color: #f8f9fa;">Agent No</td>
                                     <td>{{ $order->agent_no ?? 'N/A' }}</td>
                                 </tr>
