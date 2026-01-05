@@ -41,12 +41,12 @@ class InvoiceController extends Controller
         // Apply date filter
         if ($fromDate && $toDate) {
             if (strlen($fromDate) == 10) {
-                $fromDate .= ' 00:00:00';
+                $fromDatetime = $fromDate . ' 00:00:00';
             }
             if (strlen($toDate) == 10) {
-                $toDate .= ' 23:59:59';
+                $toDatetime = $toDate . ' 23:59:59';
             }
-            $query->whereBetween('order_date', [$fromDate, $toDate]);
+            $query->whereBetween('order_date', [$fromDatetime, $toDatetime]);
         }
 
         // Filter by type
