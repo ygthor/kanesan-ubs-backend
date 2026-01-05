@@ -66,6 +66,10 @@ class StockManagementController extends Controller
             $hasSearch = !empty($searchTerm);
             $hasGroupFilter = !empty($groupFilter);
 
+            // Pre-fetch all stock data for this agent in ONE batch call (2 queries total)
+            // This avoids N+1 query problem when looping through items
+            $stockSummaryKeyed = $stockService->getAgentStockSummaryKeyed($agentNo);
+            
             if ($hasSearch || $hasGroupFilter) {
                 // When searching or filtering by group, search ALL items in icitem
                 $itemsQuery = Icitem::query();
@@ -85,10 +89,10 @@ class StockManagementController extends Controller
 
                 $items = $itemsQuery->orderBy('GROUP')->orderBy('ITEMNO')->get();
 
-                // Calculate agent-specific stock for each item using StockService
-                $inventory = $items->map(function ($item) use ($agentNo, $stockService) {
-                    // Calculate stock totals for this agent (includes orders + item_transactions)
-                    $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
+                // Map items with stock data from pre-fetched summary (no additional queries)
+                $inventory = $items->map(function ($item) use ($stockService, $stockSummaryKeyed) {
+                    // Get stock totals from pre-fetched keyed summary
+                    $totals = $stockService->getStockFromKeyedSummary($stockSummaryKeyed, $item->ITEMNO);
                     $currentStock = $totals['available'];
 
                     return [
@@ -107,63 +111,22 @@ class StockManagementController extends Controller
                 });
             } else {
                 // If no search/filter, show only items that have transactions for this agent
-                // Get distinct items from BOTH orders and item_transactions for this agent
-                // This matches how StockService calculates stock
-
-                // Get items from orders (DO and INV types)
-                $itemsFromOrders = DB::table('orders')
-                    ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
-                    ->join('icitem', function ($join) {
-                        $join->on(DB::raw('order_items.product_no COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
-                    })
-                    ->where('orders.agent_no', $agentNo)
-                    ->whereNotNull('order_items.product_no')
-                    ->select(
-                        'icitem.ITEMNO',
-                        'icitem.DESP',
-                        'icitem.GROUP',
-                        'icitem.UNIT',
-                        'icitem.PRICE'
-                    )
-                    ->distinct()
-                    ->get()
-                    ->pluck('ITEMNO')
-                    ->toArray();
-
-                // Get items from item_transactions
-                $itemsFromTransactions = DB::table('item_transactions')
-                    ->join('icitem', function ($join) {
-                        $join->on(DB::raw('item_transactions.ITEMNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
-                    })
-                    ->where('item_transactions.agent_no', $agentNo)
-                    ->select(
-                        'icitem.ITEMNO',
-                        'icitem.DESP',
-                        'icitem.GROUP',
-                        'icitem.UNIT',
-                        'icitem.PRICE'
-                    )
-                    ->distinct()
-                    ->get()
-                    ->pluck('ITEMNO')
-                    ->toArray();
-
-                // Combine and get unique item numbers
-                $allItemNos = array_unique(array_merge($itemsFromOrders, $itemsFromTransactions));
+                // Use the pre-fetched stock summary which already has all items with transactions
+                $allItemNos = array_keys($stockSummaryKeyed);
 
                 if (empty($allItemNos)) {
                     $inventory = collect([]);
                 } else {
-                    // Get item details from icitem for all unique items
-                    $itemsQuery = Icitem::whereIn('ITEMNO', $allItemNos);
+                    // Get item details from icitem for all items with transactions
+                    $items = Icitem::whereIn('ITEMNO', $allItemNos)
+                        ->orderBy('GROUP')
+                        ->orderBy('ITEMNO')
+                        ->get();
 
-                    $items = $itemsQuery->orderBy('GROUP')->orderBy('ITEMNO')->get();
-
-                    // Calculate agent-specific stock for each item using StockService
-                    // This will include both orders and item_transactions
-                    $inventory = $items->map(function ($item) use ($agentNo, $stockService) {
-                        // Calculate stock totals for this agent (includes orders + item_transactions)
-                        $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
+                    // Map items with stock data from pre-fetched summary (no additional queries)
+                    $inventory = $items->map(function ($item) use ($stockService, $stockSummaryKeyed) {
+                        // Get stock totals from pre-fetched keyed summary
+                        $totals = $stockService->getStockFromKeyedSummary($stockSummaryKeyed, $item->ITEMNO);
                         $currentStock = $totals['available'];
 
                         return [

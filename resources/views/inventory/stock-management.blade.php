@@ -299,15 +299,15 @@
                             <table class="table table-striped table-hover" id="stockSummaryTable">
                                 <thead>
                                     <tr>
-                                        <th>Item Code</th>
-                                        <th>Description</th>
-                                        <th>Group</th>
-                                        <th>Current Stock</th>
-                                        <th>Stock In</th>
-                                        <th>Stock Out</th>
-                                        <th>Unit</th>
-                                        <th>Price</th>
-                                        <th>Actions</th>
+                                        <th class="text-center">Item Code</th>
+                                        <th class="text-center">Description</th>
+                                        <th class="text-center">Group</th>
+                                        <th class="text-center">Current Stock</th>
+                                        <th class="text-center">Stock In</th>
+                                        <th class="text-center">Stock Out</th>
+                                        <th class="text-center">Unit</th>
+                                        <th class="text-center">Price</th>
+                                        <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -316,15 +316,15 @@
                                             <td><strong>{{ $item['ITEMNO'] }}</strong></td>
                                             <td>{{ $item['DESP'] ?? 'N/A' }}</td>
                                             <td>{{ $item['GROUP'] ?? 'N/A' }}</td>
-                                            <td data-sort="{{ $item['current_stock'] }}">
-                                                <strong class="{{ $item['current_stock'] < 0 ? 'text-danger' : ($item['current_stock'] == 0 ? 'text-warning' : 'text-success') }}">
+                                            <td data-sort="{{ $item['current_stock'] }}" align="right">
+                                                <strong>
                                                     {{ number_format($item['current_stock'], 2) }}
                                                 </strong>
                                             </td>
-                                            <td data-sort="{{ $item['stockIn'] ?? 0 }}" class="text-success">
+                                            <td align="right" data-sort="{{ $item['stockIn'] ?? 0 }}" class="text-success">
                                                 {{ number_format($item['stockIn'] ?? 0, 2) }}
                                             </td>
-                                            <td data-sort="{{ $item['stockOut'] ?? 0 }}" class="text-danger">
+                                            <td align="right" data-sort="{{ $item['stockOut'] ?? 0 }}" class="text-danger">
                                                 {{ number_format($item['stockOut'] ?? 0, 2) }}
                                             </td>
                                             <td>{{ $item['UNIT'] ?? 'N/A' }}</td>

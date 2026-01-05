@@ -693,6 +693,52 @@ class StockService
         return $summary;
     }
 
+    /**
+     * Get stock summary for all items for an agent, keyed by ITEMNO
+     * 
+     * This is useful for batch lookups when you have a list of items
+     * and need to get stock for each without multiple database queries.
+     *
+     * @param string $agentNo Agent number
+     * @return array Associative array keyed by ITEMNO with stock totals
+     */
+    public function getAgentStockSummaryKeyed(string $agentNo): array
+    {
+        $summary = $this->getAgentStockSummary($agentNo);
+        
+        $keyed = [];
+        foreach ($summary as $item) {
+            $keyed[$item['ITEMNO']] = $item;
+        }
+        
+        return $keyed;
+    }
+
+    /**
+     * Get stock totals for a specific item from a pre-fetched keyed summary
+     * Returns default empty totals if item not found
+     *
+     * @param array $keyedSummary Pre-fetched keyed summary from getAgentStockSummaryKeyed
+     * @param string $itemNo Item number
+     * @return array Stock totals
+     */
+    public function getStockFromKeyedSummary(array $keyedSummary, string $itemNo): array
+    {
+        if (isset($keyedSummary[$itemNo])) {
+            return $keyedSummary[$itemNo];
+        }
+
+        // Return empty totals for items with no transactions
+        return [
+            'ITEMNO' => $itemNo,
+            'stockIn' => 0,
+            'stockOut' => 0,
+            'returnGood' => 0,
+            'returnBad' => 0,
+            'available' => 0,
+        ];
+    }
+
     /*
     
     private function calculateCurrentStock($itemno, $agentNo)
