@@ -653,7 +653,7 @@ class InvoiceController extends Controller
     ) {
         try {
             // Get current stock
-            $stockBefore = $this->calculateCurrentStock($itemno);
+            $stockBefore = $this->calculateCurrentStock($itemno, null);
             
             // Calculate new stock
             // invoice_sale = stock out (negative), invoice_return = stock in (positive)
@@ -705,10 +705,17 @@ class InvoiceController extends Controller
      * @param string $itemno
      * @return float
      */
-    private function calculateCurrentStock($itemno)
+    private function calculateCurrentStock($itemno, $agentNo)
     {
-        $total = ItemTransaction::where('ITEMNO', $itemno)->sum('quantity');
-        
+        if (!$agentNo || empty($agentNo)) {
+            throw new \InvalidArgumentException('agentNo is required for stock calculations. Stock is by agent.');
+        }
+
+        $query = ItemTransaction::where('ITEMNO', $itemno)
+            ->where('agent_no', $agentNo);
+
+        $total = $query->sum('quantity');
+
         if ($total === null) {
             $item = Icitem::find($itemno);
             return $item ? (float)($item->QTY ?? 0) : 0;

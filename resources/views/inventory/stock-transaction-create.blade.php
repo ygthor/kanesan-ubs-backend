@@ -122,6 +122,7 @@
         <form method="POST" action="{{ route('inventory.stock-management.store') }}" id="stockTransactionForm">
             @csrf
             <input type="hidden" name="agent_no" value="{{ $selectedAgent }}">
+            <input type="hidden" name="group" id="hiddenGroup" value="{{ request('group') }}">
 
             <div class="card mb-3">
                 <div class="card-header">
@@ -253,6 +254,19 @@
                 theme: 'bootstrap-5'
             });
 
+            // Auto-select agent if agent_no parameter is provided in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const agentParam = urlParams.get('agent_no');
+            if (agentParam && $('#agentSelect option[value="' + agentParam + '"]').length > 0) {
+                $('#agentSelect').val(agentParam).trigger('change');
+            }
+
+            // Auto-select group if group parameter is provided in URL
+            const groupParam = urlParams.get('group');
+            if (groupParam && $('#groupSelect option[value="' + groupParam + '"]').length > 0) {
+                $('#groupSelect').val(groupParam).trigger('change');
+            }
+
             // Update transaction form when type changes (radio buttons)
             $('input[name="transaction_type"]').on('change', function() {
                 // Update active state for button group
@@ -383,6 +397,9 @@
             const groupName = $(this).val();
             const itemSelect = $('#transactionItemCode');
             const itemHelpText = $('#itemHelpText');
+            
+            // Update hidden group field for form submission
+            $('#hiddenGroup').val(groupName);
 
             if (!groupName) {
                 itemSelect.empty().append('<option value="">Select Group first</option>');
@@ -462,12 +479,8 @@
             });
         });
 
-        // Initialize items if group is already selected on page load
-        @if (request('group'))
-            $(document).ready(function() {
-                $('#groupSelect').trigger('change');
-            });
-        @endif
+        // Note: Group auto-selection and item loading is handled in the document.ready function
+        // when groupParam is detected from URL parameters
 
         function updateTransactionForm() {
             const type = $('input[name="transaction_type"]:checked').val();

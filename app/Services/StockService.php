@@ -30,7 +30,7 @@ class StockService
         $returnGood = 0;
         $returnBad = 0;
 
-        // Calculate from orders - optimized query with direct join using reference_no
+        // 1. Calculate from orders - optimized query with direct join using reference_no
         $orderItems = DB::table('orders')
             ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
             ->where('orders.agent_no', $agentNo)
@@ -65,8 +65,7 @@ class StockService
                     // Normal INV item = Stock OUT
                     $stockOut += $qty;
                 }
-            }
-            elseif ($orderItem->type === 'CN') {
+            } elseif ($orderItem->type === 'CN') {
                 if ($tradeReturnIsGood) {
                     // Trade return good = Stock IN (returnGood) - adds to available stock
                     $returnGood += $qty;
@@ -78,27 +77,31 @@ class StockService
             }
         }
 
-        // Also calculate from item_transactions (if table exists and has data)
-        try {
-            $transactions = ItemTransaction::where('agent_no', $agentNo)
-                ->where('ITEMNO', $itemNo)
-                ->get();
+        // 2. Calculate from item_transactions - ONLY standalone transactions (no reference_type)
+        // IMPORTANT: Exclude transactions with reference_type to avoid double counting orders
+        // Standalone transactions include: opening balance, manual adjustments, etc.
+        $transactions = ItemTransaction::where('agent_no', $agentNo)
+            ->where('ITEMNO', $itemNo)
+            ->whereNull('reference_type') // Only standalone transactions
+            ->get();
 
-            foreach ($transactions as $transaction) {
-                $qty = (float) $transaction->quantity;
+        foreach ($transactions as $transaction) {
+            $qty = (float) $transaction->quantity;
 
-                if ($transaction->transaction_type === 'in') {
-                    // All 'in' transactions = Stock IN (stored as positive)
+            if ($transaction->transaction_type === 'in') {
+                // All 'in' transactions = Stock IN (stored as positive)
+                $stockIn += $qty;
+            } elseif ($transaction->transaction_type === 'out') {
+                // All 'out' transactions = Stock OUT (convert to positive for calculation)
+                $stockOut += abs($qty);
+            } elseif ($transaction->transaction_type === 'adjustment') {
+                // Adjustments can be positive or negative
+                if ($qty >= 0) {
                     $stockIn += $qty;
-                } elseif ($transaction->transaction_type === 'out') {
-                    // All 'out' transactions = Stock OUT (stored as negative, convert to positive for calculation)
+                } else {
                     $stockOut += abs($qty);
                 }
             }
-        } catch (\Exception $e) {
-            // If item_transactions table doesn't exist, just skip it
-            // We'll rely on orders only
-            Log::debug("item_transactions table not available or error: " . $e->getMessage());
         }
 
         // Available stock = stockIn + returnGood - stockOut
@@ -112,6 +115,204 @@ class StockService
             'returnBad' => $returnBad,
             'available' => max(0, $available), // Never go negative in display
         ];
+    }
+
+    /**
+     * Get stock movements (transaction details) for an agent and item
+     * 
+     * Combines data from:
+     * 1. item_transactions table (standalone only - no reference_type)
+     * 2. orders table (DO, INV, CN)
+     * 
+     * @param string $agentNo Agent number (user name)
+     * @param string $itemNo Item number (ITEMNO from icitem)
+     * @param array $filters Optional filters: ['transaction_type', 'date_from', 'date_to']
+     * @return \Illuminate\Support\Collection Collection of movement records
+     */
+    public function getStockMovements(string $agentNo, string $itemNo, array $filters = []): \Illuminate\Support\Collection
+    {
+        $allTransactions = collect([]);
+
+        // 1. Get transactions from item_transactions table (standalone only)
+        $itemTransactionsQuery = ItemTransaction::where('ITEMNO', $itemNo)
+            ->where('agent_no', $agentNo)
+            ->whereNull('reference_type'); // Only standalone transactions
+
+        // Filter by transaction type if provided
+        if (!empty($filters['transaction_type'])) {
+            $itemTransactionsQuery->where('transaction_type', $filters['transaction_type']);
+        }
+
+        // Filter by date range if provided
+        if (!empty($filters['date_from'])) {
+            $itemTransactionsQuery->whereDate('CREATED_ON', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $itemTransactionsQuery->whereDate('CREATED_ON', '<=', $filters['date_to']);
+        }
+
+        $itemTransactions = $itemTransactionsQuery->get();
+
+        // Transform item_transactions to a common format
+        // Note: stock_before/stock_after set to null - will be recalculated in preprocessing
+        foreach ($itemTransactions as $trans) {
+            $allTransactions->push([
+                'date' => $trans->CREATED_ON->toDateTimeString(),
+                'type' => $trans->transaction_type,
+                'quantity' => $trans->quantity,
+                'stock_before' => null, // Will be recalculated
+                'stock_after' => null,  // Will be recalculated
+                'reference_type' => $trans->reference_type,
+                'reference_id' => $trans->reference_id,
+                'notes' => $trans->notes,
+                'source' => 'item_transaction',
+                'id' => $trans->id,
+            ]);
+        }
+
+        // 2. Get transactions from orders (DO, INV, CN types)
+        $ordersQuery = DB::table('orders')
+            ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
+            ->where('orders.agent_no', $agentNo)
+            ->where('order_items.product_no', $itemNo)
+            ->select(
+                'orders.id',
+                'orders.reference_no',
+                'orders.type',
+                'orders.order_date',
+                'order_items.quantity',
+                'order_items.is_trade_return',
+                'order_items.trade_return_is_good'
+            );
+
+        // Filter by date range if provided
+        if (!empty($filters['date_from'])) {
+            $ordersQuery->whereDate('orders.order_date', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $ordersQuery->whereDate('orders.order_date', '<=', $filters['date_to']);
+        }
+
+        $orders = $ordersQuery->get();
+
+        // Transform orders to transaction format
+        foreach ($orders as $order) {
+            $transactionType = null;
+            $quantity = (float) $order->quantity;
+            $tradeReturnIsGood = (bool) ($order->trade_return_is_good ?? true);
+
+            if ($order->type === 'DO') {
+                $transactionType = 'in';
+            } elseif ($order->type === 'INV') {
+                $transactionType = 'out';
+            } elseif ($order->type === 'CN' && $tradeReturnIsGood) {
+                $transactionType = 'in'; // CN with good return = stock in
+            }
+
+            if ($transactionType === null) {
+                continue;
+            }
+
+            // Skip if transaction type filter doesn't match
+            if (!empty($filters['transaction_type']) && $transactionType !== $filters['transaction_type']) {
+                continue;
+            }
+
+            $notes = '-';
+            if ($order->type === 'DO') {
+                $notes = 'DO';
+            } elseif ($order->type === 'INV') {
+                $notes = 'Invoice';
+            } elseif ($order->type === 'CN') {
+                $notes = 'CN';
+            }
+
+            $allTransactions->push([
+                'date' => $order->order_date,
+                'type' => $transactionType,
+                'quantity' => $transactionType === 'out' ? -abs($quantity) : abs($quantity),
+                'stock_before' => null,
+                'stock_after' => null,
+                'reference_type' => 'order',
+                'reference_id' => $order->reference_no,
+                'notes' => $notes,
+                'source' => 'order',
+                'id' => 'order_' . $order->id,
+            ]);
+        }
+
+        // Preprocess: Calculate stock_before and stock_after for each transaction
+        // Sort by date ASCENDING (oldest first) to calculate running totals
+        $sortedAsc = $allTransactions->sortBy([
+            ['date', 'asc'],
+            ['reference_id', 'asc'],
+        ])->values();
+
+        // Calculate running stock totals
+        $runningStock = 0;
+        $processedTransactions = collect([]);
+
+        foreach ($sortedAsc as $trans) {
+            $type = $trans['type'];
+            $quantity = abs($trans['quantity']);
+
+            $stockBefore = $runningStock;
+
+            // Calculate stock change
+            if ($type === 'in' || $type === 'adjustment') {
+                $runningStock += $quantity;
+            } else {
+                // 'out' type
+                $runningStock -= $quantity;
+            }
+
+            $stockAfter = $runningStock;
+
+            // Update transaction with calculated values
+            $trans['stock_before'] = $stockBefore;
+            $trans['stock_after'] = $stockAfter;
+            $processedTransactions->push($trans);
+        }
+
+        // Sort all transactions by date (descending) for display
+        return $processedTransactions->sortByDesc('date')->values();
+    }
+
+    /**
+     * Get paginated stock movements for an agent and item
+     * 
+     * @param string $agentNo Agent number (user name)
+     * @param string $itemNo Item number (ITEMNO from icitem)
+     * @param array $filters Optional filters: ['transaction_type', 'date_from', 'date_to']
+     * @param int $page Current page number
+     * @param int $perPage Items per page
+     * @param string $url Base URL for pagination
+     * @param array $queryParams Query parameters for pagination links
+     * @return \Illuminate\Pagination\LengthAwarePaginator
+     */
+    public function getStockMovementsPaginated(
+        string $agentNo,
+        string $itemNo,
+        array $filters = [],
+        int $page = 1,
+        int $perPage = 50,
+        string $url = '',
+        array $queryParams = []
+    ): \Illuminate\Pagination\LengthAwarePaginator {
+        $allTransactions = $this->getStockMovements($agentNo, $itemNo, $filters);
+
+        $total = $allTransactions->count();
+        $items = $allTransactions->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            ['path' => $url, 'query' => $queryParams]
+        );
     }
 
     /**
@@ -427,9 +628,12 @@ class StockService
             }
         }
 
-        // Also include item_transactions (opening balance, manual adjustments, etc.)
+        // Also include item_transactions - ONLY standalone transactions (no reference_type)
+        // IMPORTANT: Exclude transactions with reference_type to avoid double counting orders
+        // Standalone transactions include: opening balance, manual adjustments, etc.
         try {
             $transactions = ItemTransaction::where('agent_no', $agentNo)
+                ->whereNull('reference_type') // Only standalone transactions
                 ->get();
 
             foreach ($transactions as $transaction) {
@@ -454,8 +658,15 @@ class StockService
                     // All 'in' transactions = Stock IN (stored as positive)
                     $itemTotals[$itemNo]['stockIn'] += $qty;
                 } elseif ($transaction->transaction_type === 'out') {
-                    // All 'out' transactions = Stock OUT (stored as negative, convert to positive for calculation)
+                    // All 'out' transactions = Stock OUT (convert to positive for calculation)
                     $itemTotals[$itemNo]['stockOut'] += abs($qty);
+                } elseif ($transaction->transaction_type === 'adjustment') {
+                    // Adjustments can be positive or negative
+                    if ($qty >= 0) {
+                        $itemTotals[$itemNo]['stockIn'] += $qty;
+                    } else {
+                        $itemTotals[$itemNo]['stockOut'] += abs($qty);
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -481,4 +692,53 @@ class StockService
 
         return $summary;
     }
+
+    /*
+    
+    private function calculateCurrentStock($itemno, $agentNo)
+    {
+        if (!$agentNo || empty($agentNo)) {
+            throw new \InvalidArgumentException('agentNo is required for stock calculations. Stock is by agent.');
+        }
+
+        $non_accepted_reference_type = [
+            'invoice',
+            'order',
+            'test'
+        ];
+        $item_trans_in = ItemTransaction::where('ITEMNO', $itemno)
+            ->whereNotIn('reference_type', $non_accepted_reference_type)
+            ->where('transaction_type', 'in')
+            ->where('agent_no', $agentNo)
+            ->sum('quantity');
+
+        $item_trans_out = ItemTransaction::where('ITEMNO', $itemno)
+            ->whereNotIn('reference_type', $non_accepted_reference_type)
+            ->where('transaction_type', 'out')
+            ->where('agent_no', $agentNo)
+            ->sum('quantity');
+
+        $total_trans = $item_trans_in - $item_trans_out;
+
+
+        $order_summary = DB::Table('order_items AS oi')
+        ->selectRaw('
+            SUM(IF(o.type = "DO", oi.quantity, 0)) AS do_stock_in,
+            SUM(IF(o.type = "CN" AND oi.trade_return_is_good = 1, oi.quantity, 0)) AS cn_stock_in,
+            SUM(IF(o.type = "INV", oi.quantity, 0)) AS inv_stock_out
+        ')
+        ->leftJoin('orders AS o','o.reference_no','=','oi.reference_no')
+        ->where('oi.product_no', $itemno)
+        ->where('o.agent_no', $agentNo)
+        ->first();
+
+        $do_stock_in = $order_summary->do_stock_in ?? 0;
+        $cn_stock_in = $order_summary->cn_stock_in ?? 0;
+        $inv_stock_out = $order_summary->inv_stock_out ?? 0;
+
+        $stock = $total_trans + $do_stock_in
+
+        
+    }
+    */
 }

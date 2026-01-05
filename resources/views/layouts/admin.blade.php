@@ -95,9 +95,9 @@
             });
             
             // Auto-hide alerts after 5 seconds (except persistent alerts)
-            setTimeout(function() {
-                $('.alert').not('.alert-persistent').fadeOut('slow');
-            }, 5000);
+            // setTimeout(function() {
+            //     $('.alert').not('.alert-persistent').fadeOut('slow');
+            // }, 5000);
         });
     </script>
 @endpush

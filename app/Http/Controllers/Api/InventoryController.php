@@ -72,13 +72,23 @@ class InventoryController extends Controller
     {
         // itemno is now a product code from products table
         $product = Product::where('code', $itemno)->where('is_active', true)->first();
-        
+
         if (!$product) {
             return makeResponse(404, 'Product not found.', null);
         }
 
-        // Calculate current stock from transactions
-        $currentStock = $this->calculateCurrentStock($itemno);
+        // Get agent_no from request or current user (required for agent-specific stock)
+        $agentNo = $request->input('agent_no');
+        if (!$agentNo && auth()->user()) {
+            $agentNo = auth()->user()->name ?? auth()->user()->username;
+        }
+
+        if (!$agentNo || empty($agentNo)) {
+            return makeResponse(400, 'Agent number is required for stock calculations.', null);
+        }
+
+        // Calculate current stock from transactions (agent-specific)
+        $currentStock = $this->calculateCurrentStock($itemno, $agentNo);
 
         return makeResponse(200, 'Stock retrieved successfully.', [
             'ITEMNO' => $product->code, // For backward compatibility
@@ -171,14 +181,18 @@ class InventoryController extends Controller
             'reference_type' => 'nullable|string|max:50',
             'reference_id' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'agent_no' => 'required|string',
         ]);
 
         if ($validator->fails()) {
             return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
         }
 
+        // agent_no is now required by validation, no fallback needed
+        $agentNo = $request->input('agent_no');
+
         // Check if sufficient stock is available
-        $currentStock = $this->calculateCurrentStock($request->ITEMNO);
+        $currentStock = $this->calculateCurrentStock($request->ITEMNO, $agentNo);
         if ($currentStock < $request->quantity) {
             return makeResponse(400, 'Insufficient stock. Available: ' . $currentStock, null);
         }
@@ -290,12 +304,16 @@ class InventoryController extends Controller
      * @param string $itemno ITEMNO from icitem table
      * @return float
      */
-    private function calculateCurrentStock($itemno)
+    private function calculateCurrentStock($itemno, $agentNo)
     {
-        // Sum all quantities from transactions
-        // ITEMNO in item_transactions references icitem.ITEMNO
-        $total = ItemTransaction::where('ITEMNO', $itemno)
-            ->sum('quantity');
+        if (!$agentNo || empty($agentNo)) {
+            throw new \InvalidArgumentException('agentNo is required for stock calculations. Stock is by agent.');
+        }
+
+        $query = ItemTransaction::where('ITEMNO', $itemno)
+            ->where('agent_no', $agentNo);
+
+        $total = $query->sum('quantity');
 
         // If no transactions found, return 0 (no stock)
         return $total !== null ? (float)$total : 0.0;
@@ -312,27 +330,22 @@ class InventoryController extends Controller
     public function getInventorySummary(Request $request)
     {
         $request->validate([
-            'agent_no' => 'nullable|string',
+            'agent_no' => 'required|string',
             'group_name' => 'nullable|string',
         ]);
 
-        
-
         // Get all items from icitem table (actual inventory data)
         $query = Icitem::query();
-        
+
         // Filter by product group if provided (use GROUP field from icitem)
         if ($request->has('group_name') && $request->input('group_name')) {
             $query->where('GROUP', $request->input('group_name'));
         }
-        
+
         $items = $query->orderBy('ITEMNO')->get();
 
-        // Get agent_no from request or default to current user
+        // agent_no is now required by validation
         $agentNo = $request->input('agent_no');
-        if (!$agentNo && auth()->user()) {
-            $agentNo = auth()->user()->name ?? auth()->user()->username;
-        }
         
         // Normalize agent_no: if it's a username, convert to user's name
         // (because orders store agent_no as user's name, not username)
@@ -347,22 +360,13 @@ class InventoryController extends Controller
         $stockService = new StockService();
 
         $inventory = $items->map(function ($item) use ($agentNo, $stockService) {
-            if ($agentNo) {
-                // Calculate stock totals for this agent
-                $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
-                $currentStock = $totals['available'];
-                $stockIn = $totals['stockIn'];
-                $stockOut = $totals['stockOut'];
-                $returnGood = $totals['returnGood'];
-                $returnBad = $totals['returnBad'];
-            } else {
-                // Fallback to old calculation if no agent specified
-                $currentStock = $this->calculateCurrentStock($item->ITEMNO);
-                $stockIn = 0;
-                $stockOut = 0;
-                $returnGood = 0;
-                $returnBad = 0;
-            }
+            // Calculate stock totals for this agent (required)
+            $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
+            $currentStock = $totals['available'];
+            $stockIn = $totals['stockIn'];
+            $stockOut = $totals['stockOut'];
+            $returnGood = $totals['returnGood'];
+            $returnBad = $totals['returnBad'];
 
             return [
                 'ITEMNO' => $item->ITEMNO,

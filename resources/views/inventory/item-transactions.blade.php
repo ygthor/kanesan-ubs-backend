@@ -149,6 +149,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            <?php $tota_qty = 0; ?>
                             @forelse($transactions as $trans)
                                 @php
                                     // Handle both array and object formats
@@ -157,6 +158,7 @@
                                         ? $trans['type'] ?? null
                                         : $trans->transaction_type ?? null;
                                     $quantity = is_array($trans) ? $trans['quantity'] ?? 0 : $trans->quantity ?? 0;
+                                    // stock_before and stock_after are now preprocessed in StockService
                                     $stockBefore = is_array($trans)
                                         ? $trans['stock_before'] ?? null
                                         : $trans->stock_before ?? null;
@@ -170,6 +172,13 @@
                                     $source = is_array($trans)
                                         ? $trans['source'] ?? 'item_transaction'
                                         : 'item_transaction';
+
+                                    if ($type == 'in' || $type == 'adjustment') {
+                                        $tota_qty += $quantity;
+                                    } else {
+                                        $tota_qty -= abs($quantity);
+                                    }
+
                                 @endphp
                                 <tr>
                                     <td>{{ $date ? \Carbon\Carbon::parse($date)->format('M d, Y H:i') : 'N/A' }}</td>
@@ -185,14 +194,11 @@
                                         @else
                                             <span class="badge badge-warning">Adjustment</span>
                                         @endif
-                                        @if ($source == 'order')
-                                            <small class="text-muted d-block">(from Order)</small>
-                                        @endif
                                     </td>
                                     <td>
                                         @php
                                             $absQuantity = abs($quantity);
-                                            if ($type == 'in' || $type == 'invoice_return') {
+                                            if ($type == 'in' || $type == 'adjustment') {
                                                 $displayQuantity = '+' . number_format($absQuantity, 2);
                                                 $colorClass = 'text-success';
                                             } else {
@@ -203,25 +209,21 @@
                                         <span class="{{ $colorClass }}">{{ $displayQuantity }}</span>
                                     </td>
                                     <td>
-                                        @if ($stockBefore !== null)
-                                            {{ number_format($stockBefore, 2) }}
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
+                                        {{ number_format($stockBefore, 2) }}
                                     </td>
                                     <td>
-                                        @if ($stockAfter !== null)
-                                            <strong>{{ number_format($stockAfter, 2) }}</strong>
-                                        @else
-                                            <span class="text-muted">-</span>
+                                        {{ number_format($stockAfter, 2) }}
+                                    </td>
+                                    <td>{{ $referenceId ?? '-' }}</td>
+                                    <td>
+                                        {{ $notes ?? '-' }} @if ($source == 'order')
+                                            <small class="text-muted">(from Order)</small>
                                         @endif
                                     </td>
-                                    <td>{{ $referenceId ?? 'N/A' }}</td>
-                                    <td>{{ $notes ?? '-' }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">
+                                    <td colspan="6" class="text-center text-muted py-4">
                                         <i class="fas fa-inbox fa-2x mb-2"></i>
                                         <p class="mb-0">No transactions found</p>
                                         @if (request('transaction_type') || request('date_from') || request('date_to'))
@@ -231,6 +233,10 @@
                                     </td>
                                 </tr>
                             @endforelse
+                            <tr>
+                                <td colspan="2">Total Quantity</td>
+                                <td><strong>{{ number_format($tota_qty, 2) }}</strong></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

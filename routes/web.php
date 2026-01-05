@@ -46,6 +46,11 @@ Route::get('/demo-users', function() {
     return view('demo-users');
 })->name('demo-users')->middleware('auth');
 
+// Debug route for order items and item transactions tally
+Route::get('/debug/order-items-transactions', [\App\Http\Controllers\Web\DebugController::class, 'orderItemsTransactions'])->name('debug.order-items-transactions')->middleware('auth');
+Route::post('/debug/create-transaction', [\App\Http\Controllers\Web\DebugController::class, 'createMissingTransaction'])->name('debug.create-transaction')->middleware('auth');
+Route::post('/debug/delete-transaction', [\App\Http\Controllers\Web\DebugController::class, 'deleteTransaction'])->name('debug.delete-transaction')->middleware('auth');
+
 // Admin routes (require authentication and permissions)
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     // User Management

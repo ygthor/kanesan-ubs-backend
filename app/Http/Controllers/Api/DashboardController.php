@@ -131,16 +131,22 @@ class DashboardController extends Controller
 
         // Inventory Value: Total value of all items in stock.
         // Calculate current stock from ItemTransaction and multiply by PRICE from icitem table.
+        // Filter by agent if user doesn't have full access
+        $agentNo = null;
+        if ($user && !hasFullAccess()) {
+            $agentNo = $user->name;
+        }
+
         $items = Icitem::select('ITEMNO', 'PRICE')->get();
         $inventoryValue = 0;
         $lowStockThreshold = 10;
         $lowStockItems = 0;
-        
+
         foreach ($items as $item) {
-            $currentStock = $this->calculateCurrentStock($item->ITEMNO);
+            $currentStock = $this->calculateCurrentStock($item->ITEMNO, $agentNo);
             $price = (float)($item->PRICE ?? 0);
             $inventoryValue += $currentStock * $price;
-            
+
             // Count low stock items (stock > 0 and < threshold)
             if ($currentStock > 0 && $currentStock < $lowStockThreshold) {
                 $lowStockItems++;
@@ -170,11 +176,16 @@ class DashboardController extends Controller
      * @param string $itemno
      * @return float
      */
-    private function calculateCurrentStock($itemno)
+    private function calculateCurrentStock($itemno, $agentNo)
     {
-        // Sum all quantities from transactions
-        $total = ItemTransaction::where('ITEMNO', $itemno)
-            ->sum('quantity');
+        if (!$agentNo || empty($agentNo)) {
+            throw new \InvalidArgumentException('agentNo is required for stock calculations. Stock is by agent.');
+        }
+
+        $query = ItemTransaction::where('ITEMNO', $itemno)
+            ->where('agent_no', $agentNo);
+
+        $total = $query->sum('quantity');
 
         // If no transactions, get from icitem.QTY
         if ($total === null) {
