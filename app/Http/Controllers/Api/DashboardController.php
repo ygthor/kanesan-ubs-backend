@@ -23,6 +23,7 @@ class DashboardController extends Controller
      */
     public function getSummary(Request $request)
     {
+        
         $user = auth()->user();
         
         // Validate request parameters for date range
@@ -143,7 +144,7 @@ class DashboardController extends Controller
         $lowStockItems = 0;
 
         foreach ($items as $item) {
-            $currentStock = $this->calculateCurrentStock($item->ITEMNO, $agentNo);
+            $currentStock = 0;
             $price = (float)($item->PRICE ?? 0);
             $inventoryValue += $currentStock * $price;
 
