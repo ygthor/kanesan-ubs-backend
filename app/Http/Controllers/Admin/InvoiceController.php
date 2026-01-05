@@ -72,7 +72,7 @@ class InvoiceController extends Controller
         // Order by date desc, then id desc
         $orders = $query->orderBy('order_date', 'desc')
             ->orderBy('id', 'desc')
-            ->paginate(20)
+            ->paginate(200)
             ->withQueryString();;
 
         // Get customers for filter dropdown
