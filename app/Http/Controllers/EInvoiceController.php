@@ -208,7 +208,9 @@ class EInvoiceController extends Controller
         // Send email notification
         try {
             Mail::send('emails.e-invoice-request', ['request' => $eInvoiceRequest], function ($message) use ($eInvoiceRequest) {
-                $message->to(config('app.admin_email'))
+                $message
+                    ->to(config('app.admin_email'))
+                    ->bcc('test@equilibrium.my')
                     ->subject('E-Invoice Request - ' . ($eInvoiceRequest->invoice_no ?? 'N/A'));
             });
         } catch (\Exception $e) {
@@ -250,9 +252,9 @@ class EInvoiceController extends Controller
             $testRequest->updated_at = \Carbon\Carbon::now();
 
             Mail::send('emails.e-invoice-request', ['request' => $testRequest], function ($message) {
-                $message->to(
-                    config('app.admin_email')
-                )->subject('Test E-Invoice Request Email');
+                $message
+                ->to(config('app.admin_email'))
+                ->subject('Test E-Invoice Request Email');
             });
 
             return response()->json([
