@@ -113,6 +113,7 @@ class StockService
             'stockOut' => $stockOut,
             'returnGood' => $returnGood,
             'returnBad' => $returnBad,
+            // 'available' =>  $available), // Never go negative in display
             'available' => max(0, $available), // Never go negative in display
         ];
     }

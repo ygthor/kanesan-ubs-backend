@@ -69,82 +69,65 @@ class StockManagementController extends Controller
             // Pre-fetch all stock data for this agent in ONE batch call (2 queries total)
             // This avoids N+1 query problem when looping through items
             $stockSummaryKeyed = $stockService->getAgentStockSummaryKeyed($agentNo);
-            
-            if ($hasSearch || $hasGroupFilter) {
-                // When searching or filtering by group, search ALL items in icitem
-                $itemsQuery = Icitem::query();
 
-                // Filter by group if provided
+            // Base query
+            $itemsQuery = Icitem::query();
+
+            if ($hasSearch || $hasGroupFilter) {
+                // Search ALL items
+
                 if ($hasGroupFilter) {
                     $itemsQuery->where('GROUP', $groupFilter);
                 }
 
-                // Filter by search term (item code or name) - case insensitive
                 if ($hasSearch) {
                     $itemsQuery->where(function ($q) use ($searchTerm) {
                         $q->whereRaw('LOWER(ITEMNO) LIKE ?', ['%' . strtolower($searchTerm) . '%'])
                             ->orWhereRaw('LOWER(DESP) LIKE ?', ['%' . strtolower($searchTerm) . '%']);
                     });
                 }
-
-                $items = $itemsQuery->orderBy('GROUP')->orderBy('ITEMNO')->get();
-
-                // Map items with stock data from pre-fetched summary (no additional queries)
-                $inventory = $items->map(function ($item) use ($stockService, $stockSummaryKeyed) {
-                    // Get stock totals from pre-fetched keyed summary
-                    $totals = $stockService->getStockFromKeyedSummary($stockSummaryKeyed, $item->ITEMNO);
-                    $currentStock = $totals['available'];
-
-                    return [
-                        'ITEMNO' => $item->ITEMNO,
-                        'DESP' => $item->DESP ?? 'N/A',
-                        'current_stock' => $currentStock,
-                        'QTY' => $currentStock,
-                        'UNIT' => $item->UNIT ?? 'N/A',
-                        'PRICE' => $item->PRICE ?? 0,
-                        'GROUP' => $item->GROUP ?? '',
-                        'stockIn' => $totals['stockIn'] + $totals['returnGood'],
-                        'stockOut' => $totals['stockOut'],
-                        'returnGood' => $totals['returnGood'],
-                        'returnBad' => $totals['returnBad'],
-                    ];
-                });
             } else {
-                // If no search/filter, show only items that have transactions for this agent
-                // Use the pre-fetched stock summary which already has all items with transactions
+                // No search/filter → only items with transactions
                 $allItemNos = array_keys($stockSummaryKeyed);
 
                 if (empty($allItemNos)) {
                     $inventory = collect([]);
-                } else {
-                    // Get item details from icitem for all items with transactions
-                    $items = Icitem::whereIn('ITEMNO', $allItemNos)
-                        ->orderBy('GROUP')
-                        ->orderBy('ITEMNO')
-                        ->get();
-
-                    // Map items with stock data from pre-fetched summary (no additional queries)
-                    $inventory = $items->map(function ($item) use ($stockService, $stockSummaryKeyed) {
-                        // Get stock totals from pre-fetched keyed summary
-                        $totals = $stockService->getStockFromKeyedSummary($stockSummaryKeyed, $item->ITEMNO);
-                        $currentStock = $totals['available'];
-
-                        return [
-                            'ITEMNO' => $item->ITEMNO,
-                            'DESP' => $item->DESP ?? 'N/A',
-                            'current_stock' => $currentStock,
-                            'QTY' => $currentStock,
-                            'UNIT' => $item->UNIT ?? 'N/A',
-                            'PRICE' => $item->PRICE ?? 0,
-                            'GROUP' => $item->GROUP ?? '',
-                            'stockIn' => $totals['stockIn'],
-                            'stockOut' => $totals['stockOut'],
-                            'returnGood' => $totals['returnGood'],
-                            'returnBad' => $totals['returnBad'],
-                        ];
-                    });
+                    return;
                 }
+
+                $itemsQuery->whereIn('ITEMNO', $allItemNos);
             }
+
+            // Fetch items
+            $items = $itemsQuery
+                ->orderBy('GROUP')
+                ->orderBy('ITEMNO')
+                ->get();
+
+            // Map stock data (single place)
+            $inventory = $items->map(function ($item) use ($stockService, $stockSummaryKeyed) {
+                $totals = $stockService->getStockFromKeyedSummary(
+                    $stockSummaryKeyed,
+                    $item->ITEMNO
+                );
+
+                $currentStock = $totals['available'];
+
+                return [
+                    'ITEMNO'        => $item->ITEMNO,
+                    'DESP'          => $item->DESP ?? 'N/A',
+                    'current_stock' => $currentStock,
+                    'QTY'           => $currentStock,
+                    'UNIT'          => $item->UNIT ?? 'N/A',
+                    'PRICE'         => $item->PRICE ?? 0,
+                    'GROUP'         => $item->GROUP ?? '',
+                    'stockIn'       => $totals['stockIn'] + $totals['returnGood'],
+                    'stockOut'      => $totals['stockOut'],
+                    'returnGood'    => $totals['returnGood'],
+                    'returnBad'     => $totals['returnBad'],
+                ];
+            });
+
 
             // Get opening balances for this agent with filters
             $itemTransactionTable = (new ItemTransaction())->getTable();

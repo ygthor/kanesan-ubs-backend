@@ -312,6 +312,10 @@
                                 </thead>
                                 <tbody>
                                     @forelse($inventory as $item)
+                                        <?php 
+                                        //stockIn included returnGood already
+                                        $count_stock = $item['stockIn'] - $item['stockOut'];
+                                        ?>
                                         <tr>
                                             <td><strong>{{ $item['ITEMNO'] }}</strong></td>
                                             <td>{{ $item['DESP'] ?? 'N/A' }}</td>
@@ -320,6 +324,11 @@
                                                 <strong>
                                                     {{ number_format($item['current_stock'], 2) }}
                                                 </strong>
+                                                <?php
+                                                    if($item['current_stock'] != $count_stock){
+                                                        echo '<br><span class="text-danger">'.$count_stock.'</span>';
+                                                    }
+                                                ?>
                                             </td>
                                             <td align="right" data-sort="{{ $item['stockIn'] ?? 0 }}" class="text-success">
                                                 {{ number_format($item['stockIn'] ?? 0, 2) }}
