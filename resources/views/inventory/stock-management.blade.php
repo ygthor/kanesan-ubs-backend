@@ -303,7 +303,7 @@
                                         <th class="text-center">Description</th>
                                         <th class="text-center">Group</th>
                                         <th class="text-center">Current Stock</th>
-                                        <th class="text-center">Stock In</th>
+                                        <th class="text-center">Stock In / Return Good</th>
                                         <th class="text-center">Stock Out</th>
                                         <th class="text-center">Unit</th>
                                         <th class="text-center">Price</th>
@@ -321,8 +321,11 @@
                                                     {{ number_format($item['current_stock'], 2) }}
                                                 </strong>
                                             </td>
-                                            <td align="right" data-sort="{{ $item['stockIn'] ?? 0 }}" class="text-success">
-                                                {{ number_format($item['stockIn'] ?? 0, 2) }}
+                                            <td align="right" data-sort="{{ ($item['stockIn'] ?? 0) + ($item['returnGood'] ?? 0) }}" class="text-success">
+                                                <div>{{ number_format($item['stockIn'] ?? 0, 2) }}</div>
+                                                @if(($item['returnGood'] ?? 0) > 0)
+                                                    <small class="text-muted">+{{ number_format($item['returnGood'] ?? 0, 2) }} (Return)</small>
+                                                @endif
                                             </td>
                                             <td align="right" data-sort="{{ $item['stockOut'] ?? 0 }}" class="text-danger">
                                                 {{ number_format($item['stockOut'] ?? 0, 2) }}
