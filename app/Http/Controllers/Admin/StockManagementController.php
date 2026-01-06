@@ -103,7 +103,7 @@ class StockManagementController extends Controller
                         'UNIT' => $item->UNIT ?? 'N/A',
                         'PRICE' => $item->PRICE ?? 0,
                         'GROUP' => $item->GROUP ?? '',
-                        'stockIn' => $totals['stockIn'],
+                        'stockIn' => $totals['stockIn'] + $totals['returnGood'],
                         'stockOut' => $totals['stockOut'],
                         'returnGood' => $totals['returnGood'],
                         'returnBad' => $totals['returnBad'],
