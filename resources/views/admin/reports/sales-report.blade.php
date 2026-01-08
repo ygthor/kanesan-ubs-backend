@@ -84,8 +84,26 @@
                                 <td class="text-right py-1">RM {{ number_format($totalSales ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold py-1">Return</td>
+                                <td colspan="2" class="font-weight-bold py-1 text-center">
+                                    
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">Return Good</td>
+                                <td class="text-right py-1">RM {{ number_format($returnsGood ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">Return Bad</td>
+                                <td class="text-right py-1">RM {{ number_format($returnsBad ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">Total Return</td>
                                 <td class="text-right py-1">RM {{ number_format($returnsTotal ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" class="font-weight-bold py-1 text-center">
+                                    
+                                </td>
                             </tr>
                             <tr class="bg-light">
                                 <td class="font-weight-bold py-1">Nett Sales</td>

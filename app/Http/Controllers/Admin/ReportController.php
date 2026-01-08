@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Customer;
 use App\Models\Receipt;
 use App\Models\User;
@@ -86,12 +87,12 @@ class ReportController extends Controller
         if ($fromDate && $toDate) {
             // Ensure dates include full time range
             if (strlen($fromDate) == 10) {
-                $fromDate .= ' 00:00:00';
+                $fromDatetime = $fromDate.' 00:00:00';
             }
             if (strlen($toDate) == 10) {
-                $toDate .= ' 23:59:59';
+                $toDatetime = $toDate.' 23:59:59';
             }
-            $query->whereBetween('order_date', [$fromDate, $toDate]);
+            $query->whereBetween('order_date', [$fromDatetime, $toDatetime]);
         }
 
         // Filter by customer_id
@@ -218,7 +219,8 @@ class ReportController extends Controller
         $crSalesTotal = $crSales->sum('orders.net_amount') ?? 0;
 
         // Return = CN orders (all CN orders are returns)
-        $returns = Order::where('type', 'CN');
+        $returns = OrderItem::leftJoin('orders', 'order_items.order_id', '=', 'orders.id');        
+        $returns->where('type', 'CN');
         
         // Apply same filters as main query
         if ($calcFromDate && $calcToDate) {
@@ -236,7 +238,16 @@ class ReportController extends Controller
                   ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
-        $returnsTotal = $returns->sum('net_amount') ?? 0;
+
+        $returns->SelectRaw('
+            SUM(IF(trade_return_is_good = 1, amount, 0)) as return_good,
+            SUM(IF(trade_return_is_good = 0, amount, 0)) as return_bad,
+            SUM(amount) as total_amount
+        ');
+        $returns = $returns->first();
+        $returnsTotal = $returns->total_amount ?? 0;
+        $returnsGood = $returns->return_good ?? 0;
+        $returnsBad = $returns->return_bad ?? 0;
 
         // Calculate totals
         $totalSales = $caSalesTotal + $crSalesTotal;
@@ -294,8 +305,8 @@ class ReportController extends Controller
 
         // Get agents for filter dropdown
         $agents = $this->getAgents();
-
-        return view('admin.reports.sales-report', compact('orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents', 'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'totalSales', 'nettSales', 'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollection', 'accountBalance'));
+        request()->flash();
+        return view('admin.reports.sales-report', compact('orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents', 'caSalesTotal', 'crSalesTotal', 'returnsTotal','returnsGood','returnsBad', 'totalSales', 'nettSales', 'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollection', 'accountBalance'));
     }
 
     /**
