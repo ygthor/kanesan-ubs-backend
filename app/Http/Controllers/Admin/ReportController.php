@@ -87,12 +87,12 @@ class ReportController extends Controller
         if ($fromDate && $toDate) {
             // Ensure dates include full time range
             if (strlen($fromDate) == 10) {
-                $fromDatetime = $fromDate.' 00:00:00';
+                $fromDateTime = $fromDate.' 00:00:00';
             }
             if (strlen($toDate) == 10) {
-                $toDatetime = $toDate.' 23:59:59';
+                $toDateTime = $toDate.' 23:59:59';
             }
-            $query->whereBetween('order_date', [$fromDatetime, $toDatetime]);
+            $query->whereBetween('order_date', [$fromDateTime, $toDateTime]);
         }
 
         // Filter by customer_id
@@ -119,9 +119,9 @@ class ReportController extends Controller
         $receiptQuery = Receipt::whereNull('deleted_at');
         
         // Apply date filter only if provided
-        if ($fromDate && $toDate) {
-            $receiptCalcFromDate = $fromDate;
-            $receiptCalcToDate = $toDate;
+        if ($fromDateTime && $toDateTime) {
+            $receiptCalcFromDate = $fromDateTime;
+            $receiptCalcToDate = $toDateTime;
             if (strlen($receiptCalcFromDate) == 10) {
                 $receiptCalcFromDate .= ' 00:00:00';
             }
@@ -155,8 +155,8 @@ class ReportController extends Controller
 
         // Calculate summary totals
         // Prepare date variables for calculations
-        $calcFromDate = $fromDate;
-        $calcToDate = $toDate;
+        $calcFromDate = $fromDateTime;
+        $calcToDate = $toDateTime;
         if ($calcFromDate && $calcToDate) {
             if (strlen($calcFromDate) == 10) {
                 $calcFromDate .= ' 00:00:00';
@@ -219,7 +219,7 @@ class ReportController extends Controller
         $crSalesTotal = $crSales->sum('orders.net_amount') ?? 0;
 
         // Return = CN orders (all CN orders are returns)
-        $returns = OrderItem::leftJoin('orders', 'order_items.order_id', '=', 'orders.id');        
+        $returns = OrderItem::leftJoin('orders', 'order_items.reference_no', '=', 'orders.reference_no');        
         $returns->where('type', 'CN');
         
         // Apply same filters as main query
@@ -238,13 +238,15 @@ class ReportController extends Controller
                   ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
-
         $returns->SelectRaw('
             SUM(IF(trade_return_is_good = 1, amount, 0)) as return_good,
             SUM(IF(trade_return_is_good = 0, amount, 0)) as return_bad,
+            SUM(IF(trade_return_is_good = 1, 1, 0)) as return_good_count,
+            SUM(IF(trade_return_is_good = 0, 1, 0)) as return_bad_count,
             SUM(amount) as total_amount
         ');
         $returns = $returns->first();
+        
         $returnsTotal = $returns->total_amount ?? 0;
         $returnsGood = $returns->return_good ?? 0;
         $returnsBad = $returns->return_bad ?? 0;
@@ -254,8 +256,8 @@ class ReportController extends Controller
         $nettSales = $totalSales - $returnsTotal;
 
         // Calculate receipt collections by payment type
-        $receiptCalcFromDate = $fromDate;
-        $receiptCalcToDate = $toDate;
+        $receiptCalcFromDate = $fromDateTime;
+        $receiptCalcToDate = $toDateTime;
         if ($receiptCalcFromDate && $receiptCalcToDate) {
             if (strlen($receiptCalcFromDate) == 10) {
                 $receiptCalcFromDate .= ' 00:00:00';
@@ -306,6 +308,7 @@ class ReportController extends Controller
         // Get agents for filter dropdown
         $agents = $this->getAgents();
         request()->flash();
+        
         return view('admin.reports.sales-report', compact('orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents', 'caSalesTotal', 'crSalesTotal', 'returnsTotal','returnsGood','returnsBad', 'totalSales', 'nettSales', 'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollection', 'accountBalance'));
     }
 
@@ -316,8 +319,8 @@ class ReportController extends Controller
     {
         $this->checkAccess();
         
-        $fromDate = $request->input('from_date');
-        $toDate = $request->input('to_date');
+        $fromDateTime = $request->input('from_date');
+        $toDateTime = $request->input('to_date');
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
@@ -326,15 +329,15 @@ class ReportController extends Controller
         $query = Order::query();
 
         // Apply date filter only if provided
-        if ($fromDate && $toDate) {
+        if ($fromDateTime && $toDateTime) {
             // Ensure dates include full time range
-            if (strlen($fromDate) == 10) {
-                $fromDate .= ' 00:00:00';
+            if (strlen($fromDateTime) == 10) {
+                $fromDateTime .= ' 00:00:00';
             }
-            if (strlen($toDate) == 10) {
-                $toDate .= ' 23:59:59';
+            if (strlen($toDateTime) == 10) {
+                $toDateTime .= ' 23:59:59';
             }
-            $query->whereBetween('order_date', [$fromDate, $toDate]);
+            $query->whereBetween('order_date', [$fromDateTime, $toDateTime]);
         }
 
         // Filter by type if provided
@@ -365,7 +368,7 @@ class ReportController extends Controller
         // Get agents for filter dropdown
         $agents = $this->getAgents();
 
-        return view('admin.reports.transaction-report', compact('orders', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'type', 'agents'));
+        return view('admin.reports.transaction-report', compact('orders', 'fromDateTime', 'toDateTime', 'customerId', 'agentNo', 'customerSearch', 'type', 'agents'));
     }
 
     /**
@@ -424,8 +427,8 @@ class ReportController extends Controller
     {
         $this->checkAccess();
         
-        $fromDate = $request->input('from_date');
-        $toDate = $request->input('to_date');
+        $fromDateTime = $request->input('from_date');
+        $toDateTime = $request->input('to_date');
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
@@ -434,15 +437,15 @@ class ReportController extends Controller
         $query = Receipt::whereNull('deleted_at');
 
         // Apply date filter only if provided
-        if ($fromDate && $toDate) {
+        if ($fromDateTime && $toDateTime) {
             // Ensure dates include full time range
-            if (strlen($fromDate) == 10) {
-                $fromDate .= ' 00:00:00';
+            if (strlen($fromDateTime) == 10) {
+                $fromDateTime .= ' 00:00:00';
             }
-            if (strlen($toDate) == 10) {
-                $toDate .= ' 23:59:59';
+            if (strlen($toDateTime) == 10) {
+                $toDateTime .= ' 23:59:59';
             }
-            $query->whereBetween('receipt_date', [$fromDate, $toDate]);
+            $query->whereBetween('receipt_date', [$fromDateTime, $toDateTime]);
         }
 
         // Filter by customer_id
