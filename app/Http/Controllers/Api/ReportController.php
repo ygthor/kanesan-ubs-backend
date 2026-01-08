@@ -32,11 +32,13 @@ class ReportController extends Controller
 
         // Ensure dates include full time range for datetime fields
         // fromDate should start at 00:00:00, toDate should end at 23:59:59
-        if (strlen($fromDate) == 10) {
-            $fromDate .= ' 00:00:00';
+        $fromDateForQuery = $fromDate;
+        $toDateForQuery = $toDate;
+        if (strlen($fromDateForQuery) == 10) {
+            $fromDateForQuery .= ' 00:00:00';
         }
-        if (strlen($toDate) == 10) {
-            $toDate .= ' 23:59:59';
+        if (strlen($toDateForQuery) == 10) {
+            $toDateForQuery .= ' 23:59:59';
         }
 
         // Use Orders table - artrans is deprecated
@@ -78,7 +80,7 @@ class ReportController extends Controller
         // CA Sales: Cash Sales from customers with payment_type 'Cash Sales' or 'Cash'
         $caSalesQuery = DB::table('orders')
             ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->whereBetween('orders.order_date', [$fromDate, $toDate])
+            ->whereBetween('orders.order_date', [$fromDateForQuery, $toDateForQuery])
             ->where('orders.type', 'INV')
             ->whereIn('customers.customer_type', ['Cash']);
 
@@ -97,7 +99,7 @@ class ReportController extends Controller
         $crSales = $crSalesQuery->sum('net_amount'); */
         $crSalesQuery = DB::table('orders')
             ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->whereBetween('orders.order_date', [$fromDate, $toDate])
+            ->whereBetween('orders.order_date', [$fromDateForQuery, $toDateForQuery])
             ->where('orders.type', 'INV')
             ->whereIn('customers.customer_type', ['CREDITOR']);
 
@@ -111,7 +113,7 @@ class ReportController extends Controller
         // Returns: Credit Notes (type='CN')
         $returnsQuery = DB::table('orders')
             ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->whereBetween('orders.order_date', [$fromDate, $toDate])
+            ->whereBetween('orders.order_date', [$fromDateForQuery, $toDateForQuery])
             ->where('orders.type', 'CN');
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($returnsQuery);
@@ -137,7 +139,7 @@ class ReportController extends Controller
         // Base query for all collections
         $collectionsBaseQuery = DB::table('receipts')
             ->join('customers', 'receipts.customer_id', '=', 'customers.id')
-            ->whereBetween('receipts.receipt_date', [$fromDate, $toDate])
+            ->whereBetween('receipts.receipt_date', [$fromDateForQuery, $toDateForQuery])
             ->whereNull('receipts.deleted_at'); // Exclude soft-deleted receipts
 
         if ($agentNoToFilter) {
@@ -226,17 +228,19 @@ class ReportController extends Controller
 
         // Ensure dates include full time range for datetime fields
         // fromDate should start at 00:00:00, toDate should end at 23:59:59
-        if (strlen($fromDate) == 10) {
-            $fromDate .= ' 00:00:00';
+        $fromDateForQuery = $fromDate;
+        $toDateForQuery = $toDate;
+        if (strlen($fromDateForQuery) == 10) {
+            $fromDateForQuery .= ' 00:00:00';
         }
-        if (strlen($toDate) == 10) {
-            $toDate .= ' 23:59:59';
+        if (strlen($toDateForQuery) == 10) {
+            $toDateForQuery .= ' 23:59:59';
         }
 
         $query = DB::table('orders')
             ->where('type', 'INV')
             ->select('id', 'reference_no', 'order_date', 'net_amount', 'customer_code', 'customer_name', 'customer_id', 'status', 'agent_no')
-            ->whereBetween('order_date', [$fromDate, $toDate]);
+            ->whereBetween('order_date', [$fromDateForQuery, $toDateForQuery]);
 
         if ($customerId) {
             $query->where('customer_id', $customerId);

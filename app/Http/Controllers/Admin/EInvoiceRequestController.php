@@ -38,13 +38,15 @@ class EInvoiceRequestController extends Controller
 
         // Apply date filter
         if ($fromDate && $toDate) {
-            if (strlen($fromDate) == 10) {
-                $fromDate .= ' 00:00:00';
+            $fromDateForQuery = $fromDate;
+            $toDateForQuery = $toDate;
+            if (strlen($fromDateForQuery) == 10) {
+                $fromDateForQuery .= ' 00:00:00';
             }
-            if (strlen($toDate) == 10) {
-                $toDate .= ' 23:59:59';
+            if (strlen($toDateForQuery) == 10) {
+                $toDateForQuery .= ' 23:59:59';
             }
-            $query->whereBetween('created_at', [$fromDate, $toDate]);
+            $query->whereBetween('created_at', [$fromDateForQuery, $toDateForQuery]);
         }
 
         // Filter by invoice number
