@@ -63,10 +63,10 @@
     <!-- Summary Tables -->
     <div class="row mb-3">
         <!-- Sales Summary Table -->
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card">
-                <div class="card-header py-2">
-                    <h5 class="card-title mb-0" style="font-size: 0.9rem;"><i class="fas fa-chart-line"></i> Sales</h5>
+                <div class="card-header py-2 bg-primary text-white">
+                    <h5 class="card-title mb-0" style="font-size: 0.9rem;"><i class="fas fa-chart-line"></i> Sales Summary</h5>
                 </div>
                 <div class="card-body p-1">
                     <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
@@ -84,9 +84,7 @@
                                 <td class="text-right py-1">RM {{ number_format($totalSales ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="2" class="font-weight-bold py-1 text-center">
-                                    
-                                </td>
+                                <td colspan="2" class="py-1"></td>
                             </tr>
                             <tr>
                                 <td class="font-weight-bold py-1">Return Good</td>
@@ -101,9 +99,7 @@
                                 <td class="text-right py-1">RM {{ number_format($returnsTotal ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="2" class="font-weight-bold py-1 text-center">
-                                    
-                                </td>
+                                <td colspan="2" class="py-1"></td>
                             </tr>
                             <tr class="bg-light">
                                 <td class="font-weight-bold py-1">Nett Sales</td>
@@ -115,11 +111,66 @@
             </div>
         </div>
 
-        <!-- Collection Summary Table -->
-        <div class="col-md-6">
+        <!-- Collection by Customer Type (matches Mobile App) -->
+        <div class="col-md-4">
             <div class="card">
-                <div class="card-header py-2">
-                    <h5 class="card-title mb-0" style="font-size: 0.9rem;"><i class="fas fa-money-check-alt"></i> Collection</h5>
+                <div class="card-header py-2 bg-success text-white">
+                    <h5 class="card-title mb-0" style="font-size: 0.9rem;">
+                        <i class="fas fa-users"></i> Collection by Customer Type
+                        <small class="d-block" style="font-size: 0.75rem; opacity: 0.9;">(Matches Mobile App)</small>
+                    </h5>
+                </div>
+                <div class="card-body p-1">
+                    <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
+                        <tbody>
+                            <tr>
+                                <td class="font-weight-bold py-1">CA Collection (Gross)</td>
+                                <td class="text-right py-1">RM {{ number_format($caCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1 pl-3">Less: CA Returns</td>
+                                <td class="text-right py-1">(RM {{ number_format($caReturns ?? 0, 2) }})</td>
+                            </tr>
+                            <tr class="bg-light">
+                                <td class="font-weight-bold py-1">CA Collection (Nett)</td>
+                                <td class="text-right font-weight-bold py-1">RM {{ number_format($caCollectionNett ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" class="py-1"></td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">CR Collection (Gross)</td>
+                                <td class="text-right py-1">RM {{ number_format($crCollection ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1 pl-3">Less: CR Returns</td>
+                                <td class="text-right py-1">(RM {{ number_format($crReturns ?? 0, 2) }})</td>
+                            </tr>
+                            <tr class="bg-light">
+                                <td class="font-weight-bold py-1">CR Collection (Nett)</td>
+                                <td class="text-right font-weight-bold py-1">RM {{ number_format($crCollectionNett ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" class="py-1"></td>
+                            </tr>
+                            <tr class="bg-success text-white">
+                                <td class="font-weight-bold py-1">Total Collection</td>
+                                <td class="text-right font-weight-bold py-1">RM {{ number_format($totalCollectionByCustomerType ?? 0, 2) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collection by Payment Type (for verification) -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2 bg-info text-white">
+                    <h5 class="card-title mb-0" style="font-size: 0.9rem;">
+                        <i class="fas fa-money-check-alt"></i> Collection by Payment Type
+                        <small class="d-block" style="font-size: 0.75rem; opacity: 0.9;">(For Verification)</small>
+                    </h5>
                 </div>
                 <div class="card-body p-1">
                     <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
@@ -148,9 +199,15 @@
                                 <td class="font-weight-bold py-1">PD CHEQUE</td>
                                 <td class="text-right py-1">RM {{ number_format($pdChequeCollection ?? 0, 2) }}</td>
                             </tr>
-                            <tr class="bg-light">
-                                <td class="font-weight-bold py-1">Total Collection</td>
-                                <td class="text-right font-weight-bold py-1">RM {{ number_format($totalCollection ?? 0, 2) }}</td>
+                            <tr>
+                                <td colspan="2" class="py-1"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" class="py-1"></td>
+                            </tr>
+                            <tr class="bg-info text-white">
+                                <td class="font-weight-bold py-1">Total (by Payment Type)</td>
+                                <td class="text-right font-weight-bold py-1">RM {{ number_format($totalCollectionByPaymentType ?? 0, 2) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -159,18 +216,33 @@
         </div>
     </div>
 
-    <!-- Account Balance -->
+    <!-- Account Balance & Verification Info -->
     <div class="row mb-3">
-        <div class="col-md-12">
-            <div class="card">
+        <div class="col-md-6">
+            <div class="card border-primary">
                 <div class="card-body py-2">
-                    <div class="row">
-                        <div class="col-md-12 text-center">
-                            <h5 class="mb-0" style="font-size: 0.95rem;">
-                                <strong>Account Balance = RM {{ number_format($accountBalance ?? 0, 2) }}</strong>
-                            </h5>
-                        </div>
+                    <div class="text-center">
+                        <h5 class="mb-0" style="font-size: 0.95rem;">
+                            <i class="fas fa-calculator"></i> <strong>Account Balance</strong>
+                        </h5>
+                        <h4 class="mb-0 mt-2 text-primary">
+                            <strong>RM {{ number_format($accountBalance ?? 0, 2) }}</strong>
+                        </h4>
+                        <small class="text-muted">Nett Sales - Total Collection (by Customer Type)</small>
                     </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-warning bg-light">
+                <div class="card-body py-2">
+                    <h6 class="mb-1" style="font-size: 0.85rem;"><i class="fas fa-info-circle text-warning"></i> <strong>Verification Notes:</strong></h6>
+                    <ul class="mb-0" style="font-size: 0.75rem; padding-left: 20px;">
+                        <li><strong>Customer Type Collection:</strong> Groups by customer type (CA/CR) - matches mobile app</li>
+                        <li><strong>Payment Type Collection:</strong> Groups by payment method (CASH, E-WALLET, etc.) - for accounting</li>
+                        <li><strong>Why different?</strong> A CR customer can pay with CASH (counted as CR in type, CASH in payment)</li>
+                        <li><strong>Returns:</strong> Deducted from customer type collections only</li>
+                    </ul>
                 </div>
             </div>
         </div>

@@ -302,16 +302,122 @@ class ReportController extends Controller
         $chequeCollection = $buildReceiptQuery()->where('payment_type', 'CHEQUE')->sum('paid_amount') ?? 0;
         $pdChequeCollection = $buildReceiptQuery()->where('payment_type', 'PD CHEQUE')->sum('paid_amount') ?? 0;
         
-        $totalCollection = $cashCollection + $ewalletCollection + $onlineTransferCollection + $cardCollection + $chequeCollection + $pdChequeCollection;
+        $totalCollectionByPaymentType = $cashCollection + $ewalletCollection + $onlineTransferCollection + $cardCollection + $chequeCollection + $pdChequeCollection;
+
+        // --- Collections by Customer Type (for verification) ---
+        // This matches the API/mobile app calculation logic
         
-        // Account Balance = Nett Sales - Total Collection
-        $accountBalance = $nettSales - $totalCollection;
+        // CA Collection: All receipts from Cash customers (regardless of payment type)
+        $caCollectionQuery = Receipt::whereNull('deleted_at')
+            ->join('customers', 'receipts.customer_id', '=', 'customers.id')
+            ->whereIn('customers.customer_type', ['Cash', 'CASH']);
+        
+        if ($receiptCalcFromDate && $receiptCalcToDate) {
+            $caCollectionQuery->whereBetween('receipts.receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
+        }
+        if ($customerId) {
+            $caCollectionQuery->where('receipts.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $caCollectionQuery->where('customers.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $caCollectionQuery->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $caCollection = $caCollectionQuery->sum('receipts.paid_amount') ?? 0;
+
+        // CR Collection: All receipts from CREDITOR customers (regardless of payment type)
+        $crCollectionQuery = Receipt::whereNull('deleted_at')
+            ->join('customers', 'receipts.customer_id', '=', 'customers.id')
+            ->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
+        
+        if ($receiptCalcFromDate && $receiptCalcToDate) {
+            $crCollectionQuery->whereBetween('receipts.receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
+        }
+        if ($customerId) {
+            $crCollectionQuery->where('receipts.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $crCollectionQuery->where('customers.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $crCollectionQuery->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $crCollection = $crCollectionQuery->sum('receipts.paid_amount') ?? 0;
+
+        // CA Returns: CN from Cash customers
+        $caReturnsQuery = Order::whereIn('type', ['CN'])
+            ->join('customers', 'orders.customer_id', '=', 'customers.id')
+            ->whereIn('customers.customer_type', ['Cash', 'CASH']);
+        
+        if ($calcFromDate && $calcToDate) {
+            $caReturnsQuery->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $caReturnsQuery->where('orders.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $caReturnsQuery->where('orders.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $caReturnsQuery->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $caReturns = $caReturnsQuery->sum('orders.net_amount') ?? 0;
+
+        // CR Returns: CN from CREDITOR customers
+        $crReturnsQuery = Order::whereIn('type', ['CN'])
+            ->join('customers', 'orders.customer_id', '=', 'customers.id')
+            ->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
+        
+        if ($calcFromDate && $calcToDate) {
+            $crReturnsQuery->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $crReturnsQuery->where('orders.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $crReturnsQuery->where('orders.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $crReturnsQuery->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $crReturns = $crReturnsQuery->sum('orders.net_amount') ?? 0;
+
+        // Calculate nett collections (matching API logic)
+        $caCollectionNett = $caCollection - $caReturns;
+        $crCollectionNett = $crCollection - $crReturns;
+        $totalCollectionByCustomerType = $caCollectionNett + $crCollectionNett;
+        
+        // Account Balance = Nett Sales - Total Collection (by customer type)
+        $accountBalance = $nettSales - $totalCollectionByCustomerType;
 
         // Get agents for filter dropdown
         $agents = $this->getAgents();
         request()->flash();
         
-        return view('admin.reports.sales-report', compact('orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents', 'caSalesTotal', 'crSalesTotal', 'returnsTotal','returnsGood','returnsBad', 'totalSales', 'nettSales', 'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollection', 'accountBalance'));
+        return view('admin.reports.sales-report', compact(
+            'orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents', 
+            'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'returnsGood', 'returnsBad', 'totalSales', 'nettSales',
+            'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
+            'caCollection', 'crCollection', 'caReturns', 'crReturns', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
+            'accountBalance'
+        ));
     }
 
     /**
