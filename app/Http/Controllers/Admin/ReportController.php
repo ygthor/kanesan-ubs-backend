@@ -377,27 +377,28 @@ class ReportController extends Controller
         $caReturns = $caReturnsQuery->sum('orders.net_amount') ?? 0;
 
         // CR Returns: CN from CREDITOR customers
-        $crReturnsQuery = Order::whereIn('type', ['CN'])
-            ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
+        // $crReturnsQuery = Order::whereIn('type', ['CN'])
+        //     ->join('customers', 'orders.customer_id', '=', 'customers.id')
+        //     ->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
         
-        if ($calcFromDate && $calcToDate) {
-            $crReturnsQuery->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
-        }
-        if ($customerId) {
-            $crReturnsQuery->where('orders.customer_id', $customerId);
-        }
-        if ($agentNo) {
-            $crReturnsQuery->where('orders.agent_no', $agentNo);
-        }
-        if ($customerSearch) {
-            $crReturnsQuery->where(function($q) use ($customerSearch) {
-                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
-            });
-        }
-        $crReturns = $crReturnsQuery->sum('orders.net_amount') ?? 0;
+        // if ($calcFromDate && $calcToDate) {
+        //     $crReturnsQuery->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
+        // }
+        // if ($customerId) {
+        //     $crReturnsQuery->where('orders.customer_id', $customerId);
+        // }
+        // if ($agentNo) {
+        //     $crReturnsQuery->where('orders.agent_no', $agentNo);
+        // }
+        // if ($customerSearch) {
+        //     $crReturnsQuery->where(function($q) use ($customerSearch) {
+        //         $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+        //           ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+        //           ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+        //     });
+        // }
+        // $crReturns = $crReturnsQuery->sum('orders.net_amount') ?? 0;
+        $crReturns = 0; // CUSTOMER SAID CR NO NEED RETURN
 
         // Calculate nett collections (matching API logic)
         $caCollectionNett = $caCollection - $caReturns;

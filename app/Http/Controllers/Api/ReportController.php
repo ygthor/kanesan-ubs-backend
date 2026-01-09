@@ -127,6 +127,7 @@ class ReportController extends Controller
         $crReturnQuery = clone $returnsQuery;
         $crReturnQuery->whereIn('customers.customer_type', ['CREDITOR']);
         $totalCrReturn = $crReturnQuery->sum('orders.net_amount') ?? 0;
+        $totalCrReturn = 0; // CUSTOMER SAID CR NO NEED RETURN
 
         $nettSales = $totalSales - $returns;
 
