@@ -119,11 +119,11 @@ class ReportController extends Controller
             'customer_id' => $customerId,
         ]);
 
-        $returns = $returnsInfo['Cash_withInv'];
+        $returns = $returnsInfo['Cash_withInv'] + $returnsInfo['Credit_withInv'];
         $totalCashReturn = $returnsInfo['Cash_withoutInv'];
         $totalCrReturn = 0; // CUSTOMER SAID CR NO NEED RETURN
 
-        $nettSales = $totalSales - $totalCashReturn - $totalCrReturn;
+        $nettSales = $totalSales - $returns;
 
         // --- Collections ---
         // IMPORTANT: CA and CR collections should follow customer_type, not payment_type
