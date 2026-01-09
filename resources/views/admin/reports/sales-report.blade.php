@@ -215,6 +215,40 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2 bg-info text-white">
+                    <h5 class="card-title mb-0" style="font-size: 0.9rem;">
+                        <i class="fas fa-info-circle"></i> Additional Info For verification
+                        <small class="d-block" style="font-size: 0.75rem; opacity: 0.9;">(For Verification)</small>
+                    </h5>
+                </div>
+                <div class="card-body p-1">
+                    <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
+                        <tbody>
+                            <tr>
+                                <td class="font-weight-bold py-1">Total Cash Return with Invoice</td>
+                                <td class="text-right py-1">RM {{ number_format($returnsInfo['Cash_withInv'] ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">Total Cash Return without Invoice</td>
+                                <td class="text-right py-1">RM {{ number_format($returnsInfo['Cash_withoutInv'] ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">Total Credit Return with Invoice</td>
+                                <td class="text-right py-1">RM {{ number_format($returnsInfo['Credit_withInv'] ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">Total Credit Return without Invoice</td>
+                                <td class="text-right py-1">RM {{ number_format($returnsInfo['Credit_withoutInv'] ?? 0, 2) }}</td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Account Balance & Verification Info -->

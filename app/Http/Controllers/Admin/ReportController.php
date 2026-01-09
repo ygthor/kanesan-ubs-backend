@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Receipt;
 use App\Models\User;
 use App\Models\Territory;
+use App\Services\BusinessReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -353,51 +354,15 @@ class ReportController extends Controller
         }
         $crCollection = $crCollectionQuery->sum('receipts.paid_amount') ?? 0;
 
-        // CA Returns: CN from Cash customers
-        $caReturnsQuery = Order::whereIn('type', ['CN'])
-            ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->whereIn('customers.customer_type', ['Cash', 'CASH']);
-        
-        if ($calcFromDate && $calcToDate) {
-            $caReturnsQuery->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
-        }
-        if ($customerId) {
-            $caReturnsQuery->where('orders.customer_id', $customerId);
-        }
-        if ($agentNo) {
-            $caReturnsQuery->where('orders.agent_no', $agentNo);
-        }
-        if ($customerSearch) {
-            $caReturnsQuery->where(function($q) use ($customerSearch) {
-                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
-            });
-        }
-        $caReturns = $caReturnsQuery->sum('orders.net_amount') ?? 0;
+        $BusinessReportService = new BusinessReportService();
+        $returnsInfo = $BusinessReportService->getTradeReturns([
+            'from_date' => $calcFromDate,
+            'to_date' => $calcToDate,
+            'agent_no' => $agentNo,
+            'customer_id' => $customerId,
+        ]);
 
-        // CR Returns: CN from CREDITOR customers
-        // $crReturnsQuery = Order::whereIn('type', ['CN'])
-        //     ->join('customers', 'orders.customer_id', '=', 'customers.id')
-        //     ->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
-        
-        // if ($calcFromDate && $calcToDate) {
-        //     $crReturnsQuery->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
-        // }
-        // if ($customerId) {
-        //     $crReturnsQuery->where('orders.customer_id', $customerId);
-        // }
-        // if ($agentNo) {
-        //     $crReturnsQuery->where('orders.agent_no', $agentNo);
-        // }
-        // if ($customerSearch) {
-        //     $crReturnsQuery->where(function($q) use ($customerSearch) {
-        //         $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-        //           ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-        //           ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
-        //     });
-        // }
-        // $crReturns = $crReturnsQuery->sum('orders.net_amount') ?? 0;
+        $caReturns = $returnsInfo['Cash_withoutInv'];
         $crReturns = 0; // CUSTOMER SAID CR NO NEED RETURN
 
         // Calculate nett collections (matching API logic)
@@ -417,7 +382,7 @@ class ReportController extends Controller
             'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'returnsGood', 'returnsBad', 'totalSales', 'nettSales',
             'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
             'caCollection', 'crCollection', 'caReturns', 'crReturns', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
-            'accountBalance'
+            'accountBalance','returnsInfo'
         ));
     }
 
