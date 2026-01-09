@@ -144,7 +144,8 @@
                             </tr>
                             <tr>
                                 <td class="font-weight-bold py-1 pl-3">Less: CR Returns</td>
-                                <td class="text-right py-1">(RM {{ number_format($crReturns ?? 0, 2) }})</td>
+                                <td class="text-right py-1">-- NO NEED --</td>
+                                {{-- <td class="text-right py-1">(RM {{ number_format($crReturns ?? 0, 2) }})</td> --}}
                             </tr>
                             <tr class="bg-light">
                                 <td class="font-weight-bold py-1">CR Collection (Nett)</td>
