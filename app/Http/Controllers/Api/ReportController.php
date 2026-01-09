@@ -31,6 +31,10 @@ class ReportController extends Controller
             return response()->json(['error' => 'from_date and to_date are required'], 422);
         }
 
+        
+        // $fromDate = '2026-01-08';
+        // $toDate = '2026-01-08';
+
         // Ensure dates include full time range for datetime fields
         // fromDate should start at 00:00:00, toDate should end at 23:59:59
         $fromDateForQuery = $fromDate;
@@ -55,6 +59,8 @@ class ReportController extends Controller
             // User has full access, allow filtering by provided agent_no
             $agentNoToFilter = $agentNo;
         }
+        // $agentNoToFilter= 'S02';
+
 
         // Helper function to apply agent_no filter
         $applyAgentFilter = function ($query) use ($agentNoToFilter) {
@@ -113,11 +119,12 @@ class ReportController extends Controller
 
         $BusinessReportService = new BusinessReportService();
         $returnsInfo = $BusinessReportService->getTradeReturns([
-            'from_date' => $fromDate,
-            'to_date' => $toDate,
+            'from_date' => $fromDateForQuery,
+            'to_date' => $toDateForQuery,
             'agent_no' => $agentNoToFilter,
             'customer_id' => $customerId,
         ]);
+        // dd($returnsInfo);
 
         $returns = $returnsInfo['Cash_withInv'] + $returnsInfo['Credit_withInv'];
         $totalCashReturn = $returnsInfo['Cash_withoutInv'];
