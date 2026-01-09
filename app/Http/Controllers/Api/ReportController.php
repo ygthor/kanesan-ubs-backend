@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
+use App\Services\BusinessReportService;
 
 class ReportController extends Controller
 {
@@ -56,21 +57,21 @@ class ReportController extends Controller
         }
 
         // Helper function to apply agent_no filter
-        $applyAgentFilter = function($query) use ($agentNoToFilter) {
+        $applyAgentFilter = function ($query) use ($agentNoToFilter) {
             if ($agentNoToFilter) {
                 $query->where('orders.agent_no', $agentNoToFilter);
             }
         };
 
-        $applyCustFilter = function($query) use ($customerId, $customerSearch) {
+        $applyCustFilter = function ($query) use ($customerId, $customerSearch) {
             if ($customerId) {
                 $query->where('orders.customer_id', $customerId);
             }
             if ($customerSearch) {
-                $query->where(function($q) use ($customerSearch) {
+                $query->where(function ($q) use ($customerSearch) {
                     $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                      ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                      ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                        ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                        ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
                 });
             }
         };
@@ -110,26 +111,19 @@ class ReportController extends Controller
 
         $totalSales = $caSales + $crSales;
 
-        // Returns: Credit Notes (type='CN')
-        $returnsQuery = DB::table('orders')
-            ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->whereBetween('orders.order_date', [$fromDateForQuery, $toDateForQuery])
-            ->where('orders.type', 'CN');
-        // Filter by agent_no directly on orders table (if user doesn't have full access)
-        $applyAgentFilter($returnsQuery);
-        $applyCustFilter($returnsQuery);
-        $returns = $returnsQuery->sum('orders.net_amount');
+        $BusinessReportService = new BusinessReportService();
+        $returnsInfo = $BusinessReportService->getTradeReturns([
+            'from_date' => $fromDate,
+            'to_date' => $toDate,
+            'agent_no' => $agentNoToFilter,
+            'customer_id' => $customerId,
+        ]);
 
-        $caReturnQuery = clone $returnsQuery;
-        $caReturnQuery->whereIn('customers.customer_type', ['CASH']);
-        $totalCashReturn = $caReturnQuery->sum('orders.net_amount') ?? 0;
-
-        $crReturnQuery = clone $returnsQuery;
-        $crReturnQuery->whereIn('customers.customer_type', ['CREDITOR']);
-        $totalCrReturn = $crReturnQuery->sum('orders.net_amount') ?? 0;
+        $returns = $returnsInfo['Cash_withInv'];
+        $totalCashReturn = $returnsInfo['Cash_withoutInv'];
         $totalCrReturn = 0; // CUSTOMER SAID CR NO NEED RETURN
 
-        $nettSales = $totalSales - $returns;
+        $nettSales = $totalSales - $totalCashReturn - $totalCrReturn;
 
         // --- Collections ---
         // IMPORTANT: CA and CR collections should follow customer_type, not payment_type
@@ -150,10 +144,10 @@ class ReportController extends Controller
             $collectionsBaseQuery->where('receipts.customer_id', $customerId);
         }
         if ($customerSearch) {
-            $collectionsBaseQuery->where(function($q) use ($customerSearch) {
+            $collectionsBaseQuery->where(function ($q) use ($customerSearch) {
                 $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
             });
         }
 
@@ -172,9 +166,9 @@ class ReportController extends Controller
         // Cheque collections: Track by payment_type (separate from CA/CR categorization)
         $chequeQuery = clone $collectionsBaseQuery;
         $chequeCollections = $chequeQuery
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->whereRaw('UPPER(TRIM(receipts.payment_type)) = ?', ['CHEQUE'])
-                  ->orWhereRaw('UPPER(TRIM(receipts.payment_type)) = ?', ['PD CHEQUE']);
+                    ->orWhereRaw('UPPER(TRIM(receipts.payment_type)) = ?', ['PD CHEQUE']);
             })
             ->select('receipts.payment_type', DB::raw('SUM(receipts.paid_amount) as total'))
             ->groupBy('receipts.payment_type')
@@ -265,9 +259,9 @@ class ReportController extends Controller
         }
 
         if ($customerSearch) {
-            $query->where(function($q) use ($customerSearch) {
+            $query->where(function ($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
 

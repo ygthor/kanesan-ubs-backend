@@ -111,6 +111,8 @@ Route::get('icitem', [IcitemController::class, 'index']);
 // Territory API routes
 Route::get('/territories', [\App\Http\Controllers\Api\TerritoryController::class, 'index'])->name('territories.index');
 
+Route::get('/businesssummary2', [ReportController::class, 'businessSummary']);
+
 // Route::middleware([])->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
 
