@@ -31,7 +31,7 @@ class ReportController extends Controller
             return response()->json(['error' => 'from_date and to_date are required'], 422);
         }
 
-        
+
         // $fromDate = '2026-01-08';
         // $toDate = '2026-01-08';
 
@@ -89,7 +89,7 @@ class ReportController extends Controller
             ->join('customers', 'orders.customer_id', '=', 'customers.id')
             ->whereBetween('orders.order_date', [$fromDateForQuery, $toDateForQuery])
             ->where('orders.type', 'INV')
-            ->whereIn('customers.customer_type', ['Cash']);
+            ->whereIn('customers.customer_type', ['Cash', 'CASH']);
 
         // Filter by agent_no directly on orders table (if user doesn't have full access)
         $applyAgentFilter($caSalesQuery);

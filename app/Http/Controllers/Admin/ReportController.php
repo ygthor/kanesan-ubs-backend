@@ -32,7 +32,7 @@ class ReportController extends Controller
     public function index()
     {
         $this->checkAccess();
-        
+
         $reports = [
             [
                 'name' => 'Sales Report',
@@ -65,7 +65,7 @@ class ReportController extends Controller
                 'icon' => 'fas fa-balance-scale',
             ],
         ];
-        
+
         return view('admin.reports.index', compact('reports'));
     }
 
@@ -75,7 +75,7 @@ class ReportController extends Controller
     public function salesReport(Request $request)
     {
         $this->checkAccess();
-        
+
         $fromDate = $request->input('from_date');
         $toDate = $request->input('to_date');
         $customerId = $request->input('customer_id');
@@ -120,7 +120,7 @@ class ReportController extends Controller
 
         // Fetch receipts with same filters
         $receiptQuery = Receipt::whereNull('deleted_at');
-        
+
         // Apply date filter only if provided
         if ($fromDate && $toDate) {
             $receiptCalcFromDate = $fromDate;
@@ -133,19 +133,19 @@ class ReportController extends Controller
             }
             $receiptQuery->whereBetween('receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
         }
-        
+
         // Filter by customer_id
         if ($customerId) {
             $receiptQuery->where('customer_id', $customerId);
         }
-        
+
         // Filter by agent_no (through customer)
         if ($agentNo) {
             $receiptQuery->whereHas('customer', function($q) use ($agentNo) {
                 $q->where('agent_no', $agentNo);
             });
         }
-        
+
         // Filter by customer search
         if ($customerSearch) {
             $receiptQuery->where(function($q) use ($customerSearch) {
@@ -153,7 +153,7 @@ class ReportController extends Controller
                   ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
-        
+
         $receipts = $receiptQuery->with('customer')->orderBy('receipt_date', 'desc')->get();
 
         // Calculate summary totals
@@ -173,9 +173,9 @@ class ReportController extends Controller
         $caSales = Order::whereIn('type', ['INV'])
             ->join('customers', 'orders.customer_id', '=', 'customers.id')
             ->where(function($q) {
-                $q->whereIn('customers.customer_type', ['Cash', 'Cash Sales']);
+                $q->whereIn('customers.customer_type', ['Cash', 'Cash Sales', 'CASH']);
             });
-        
+
         // Apply same filters as main query
         if ($calcFromDate && $calcToDate) {
             $caSales->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
@@ -201,7 +201,7 @@ class ReportController extends Controller
             ->where(function($q) {
                 $q->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
             });
-        
+
         // Apply same filters as main query
         if ($calcFromDate && $calcToDate) {
             $crSales->whereBetween('orders.order_date', [$calcFromDate, $calcToDate]);
@@ -222,9 +222,9 @@ class ReportController extends Controller
         $crSalesTotal = $crSales->sum('orders.net_amount') ?? 0;
 
         // Return = CN orders (all CN orders are returns)
-        $returns = OrderItem::leftJoin('orders', 'order_items.reference_no', '=', 'orders.reference_no');        
+        $returns = OrderItem::leftJoin('orders', 'order_items.reference_no', '=', 'orders.reference_no');
         $returns->where('type', 'CN');
-        
+
         // Apply same filters as main query
         if ($calcFromDate && $calcToDate) {
             $returns->whereBetween('order_date', [$calcFromDate, $calcToDate]);
@@ -249,7 +249,7 @@ class ReportController extends Controller
             SUM(amount) as total_amount
         ');
         $returns = $returns->first();
-        
+
         $returnsTotal = $returns->total_amount ?? 0;
         $returnsGood = $returns->return_good ?? 0;
         $returnsBad = $returns->return_bad ?? 0;
@@ -273,7 +273,7 @@ class ReportController extends Controller
         // Helper function to build receipt query with filters
         $buildReceiptQuery = function() use ($receiptCalcFromDate, $receiptCalcToDate, $customerId, $agentNo, $customerSearch) {
             $query = Receipt::whereNull('deleted_at');
-            
+
             if ($receiptCalcFromDate && $receiptCalcToDate) {
                 $query->whereBetween('receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
             }
@@ -291,7 +291,7 @@ class ReportController extends Controller
                       ->orWhere('customer_name', 'like', "%{$customerSearch}%");
                 });
             }
-            
+
             return $query;
         };
 
@@ -302,17 +302,17 @@ class ReportController extends Controller
         $cardCollection = $buildReceiptQuery()->where('payment_type', 'CARD')->sum('paid_amount') ?? 0;
         $chequeCollection = $buildReceiptQuery()->where('payment_type', 'CHEQUE')->sum('paid_amount') ?? 0;
         $pdChequeCollection = $buildReceiptQuery()->where('payment_type', 'PD CHEQUE')->sum('paid_amount') ?? 0;
-        
+
         $totalCollectionByPaymentType = $cashCollection + $ewalletCollection + $onlineTransferCollection + $cardCollection + $chequeCollection + $pdChequeCollection;
 
         // --- Collections by Customer Type (for verification) ---
         // This matches the API/mobile app calculation logic
-        
+
         // CA Collection: All receipts from Cash customers (regardless of payment type)
         $caCollectionQuery = Receipt::whereNull('deleted_at')
             ->join('customers', 'receipts.customer_id', '=', 'customers.id')
             ->whereIn('customers.customer_type', ['Cash', 'CASH']);
-        
+
         if ($receiptCalcFromDate && $receiptCalcToDate) {
             $caCollectionQuery->whereBetween('receipts.receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
         }
@@ -335,7 +335,7 @@ class ReportController extends Controller
         $crCollectionQuery = Receipt::whereNull('deleted_at')
             ->join('customers', 'receipts.customer_id', '=', 'customers.id')
             ->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
-        
+
         if ($receiptCalcFromDate && $receiptCalcToDate) {
             $crCollectionQuery->whereBetween('receipts.receipt_date', [$receiptCalcFromDate, $receiptCalcToDate]);
         }
@@ -369,16 +369,16 @@ class ReportController extends Controller
         $caCollectionNett = $caCollection - $caReturns;
         $crCollectionNett = $crCollection - $crReturns;
         $totalCollectionByCustomerType = $caCollectionNett + $crCollectionNett;
-        
+
         // Account Balance = Nett Sales - Total Collection (by customer type)
         $accountBalance = $nettSales - $totalCollectionByCustomerType;
 
         // Get agents for filter dropdown
         $agents = $this->getAgents();
         request()->flash();
-        
+
         return view('admin.reports.sales-report', compact(
-            'orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents', 
+            'orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents',
             'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'returnsGood', 'returnsBad', 'totalSales', 'nettSales',
             'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
             'caCollection', 'crCollection', 'caReturns', 'crReturns', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
@@ -392,7 +392,7 @@ class ReportController extends Controller
     public function transactionReport(Request $request)
     {
         $this->checkAccess();
-        
+
         $fromDate = $request->input('from_date');
         $toDate= $request->input('to_date');
         $customerId = $request->input('customer_id');
@@ -453,7 +453,7 @@ class ReportController extends Controller
     public function customerReport(Request $request)
     {
         $this->checkAccess();
-        
+
         $customerSearch = $request->input('customer_search');
         $customerType = $request->input('customer_type');
         $territoryId = $request->input('territory_id');
@@ -502,7 +502,7 @@ class ReportController extends Controller
     public function receiptReport(Request $request)
     {
         $this->checkAccess();
-        
+
         $fromDateTime = $request->input('from_date');
         $toDateTime = $request->input('to_date');
         $customerId = $request->input('customer_id');
@@ -659,7 +659,7 @@ class ReportController extends Controller
     public function getCustomerBalanceDetail(Request $request, $customerId)
     {
         $this->checkAccess();
-        
+
         $fromDate = $request->input('from_date');
         $toDate = $request->input('to_date');
 
@@ -765,17 +765,17 @@ class ReportController extends Controller
     public function getOrderDetail($id)
     {
         $this->checkAccess();
-        
+
         // Try to find by reference_no first, then by ID
         $order = Order::where('reference_no', $id)
             ->orWhere('id', $id)
             ->with('items.item', 'customer')
             ->first();
-        
+
         if (!$order) {
             return response()->json(['error' => true, 'message' => 'Order not found.'], 404);
         }
-        
+
         return response()->json([
             'error' => false,
             'data' => $order->toArray()
