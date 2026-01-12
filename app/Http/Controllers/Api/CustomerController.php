@@ -34,9 +34,9 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        
+
         $query = Customer::query();
-        
+
         // KBS user or admin has full access to all customers
         if ($user && hasFullAccess()) {
             // No filtering needed for KBS user or admin
@@ -49,7 +49,7 @@ class CustomerController extends Controller
                 $query->whereRaw('1 = 0'); // This ensures no results are returned
             }
         }
-        
+
         // Handle territory filtering if provided
         if ($request->has('territory') && $request->input('territory') !== null && $request->input('territory') !== '') {
             $territory = $request->input('territory');
@@ -59,31 +59,31 @@ class CustomerController extends Controller
                   ->orWhereRaw('LOWER(territory) LIKE ?', ['%' . strtolower($territory) . '%']);
             });
         }
-        
+
         // Handle sorting
         $sortBy = $request->input('sort_by', 'created_at'); // Default to created_at
         $sortOrder = $request->input('sort_order', 'desc'); // Default to desc
-        
+
         // Validate sort_by field
         $allowedSortFields = ['created_at', 'company_name', 'customer_code'];
         if (!in_array($sortBy, $allowedSortFields)) {
             $sortBy = 'created_at';
         }
-        
+
         // Validate sort_order
         $sortOrder = strtolower($sortOrder);
         if (!in_array($sortOrder, ['asc', 'desc'])) {
             $sortOrder = 'desc';
         }
-        
+
         // Apply sorting
         $query->orderBy($sortBy, $sortOrder);
-        
+
         // Add secondary sort by company_name if not already the primary sort
         if ($sortBy !== 'company_name') {
             $query->orderBy('company_name', 'asc');
         }
-        
+
         $customers = $query->with('users')->get();
         return makeResponse(200, 'Customers retrieved successfully.', $customers);
     }
@@ -97,13 +97,13 @@ class CustomerController extends Controller
     public function getStates(Request $request)
     {
         $user = auth()->user();
-        
+
         $query = Customer::select('state')
             ->whereNotNull('state')
             ->where('state', '!=', '')
             ->distinct()
             ->orderBy('state', 'asc');
-        
+
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
             if (!empty($user->name)) {
@@ -113,7 +113,7 @@ class CustomerController extends Controller
                 $query->whereRaw('1 = 0'); // This ensures no results are returned
             }
         }
-        
+
         $states = $query->pluck('state')->toArray();
         return makeResponse(200, 'Customer states retrieved successfully.', $states);
     }
@@ -129,7 +129,7 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         $user = auth()->user();
-        
+
         $validator = Validator::make($request->all(), [
             'customer_code' => 'sometimes|nullable|string|max:255|unique:customers,customer_code',
             'customer_type' => 'required|string|max:255',
@@ -172,7 +172,7 @@ class CustomerController extends Controller
             if (empty($customerCode) || trim($customerCode) === '') {
                 $customerCode = $this->generateCustomerCode($request->input('customer_type'), $user->username);
             }
-            
+
             // Ensure all fields from your Flutter form are included in $fillable in Customer model
             // and are passed here in $request->only([...])
             $customerData = $request->only([
@@ -204,15 +204,15 @@ class CustomerController extends Controller
                 // Ensure this list matches the $fillable array in your Customer model
                 // and the fields sent from your Flutter "Detailed Form".
             ]);
-            
+
             // Cast customer_type to uppercase before saving
             if (isset($customerData['customer_type'])) {
                 $customerData['customer_type'] = strtoupper($customerData['customer_type']);
             }
-            
+
             // Add the generated customer_code
             $customerData['customer_code'] = $customerCode;
-            
+
             // Derive agent_no from assigned_user_id if provided, else creator
             if ($request->filled('assigned_user_id')) {
                 $assignedUser = \App\Models\User::find($request->assigned_user_id);
@@ -220,13 +220,13 @@ class CustomerController extends Controller
             } else {
                 $customerData['agent_no'] = $customerData['agent_no'] ?? ($user->name ?? $user->username ?? null);
             }
-            
+
             $customer = Customer::create($customerData);
 
             // Handle user assignment using many-to-many relationship
             // Always link the customer to the user who created it
             $customer->users()->attach($user->id);
-            
+
             // If admin assigned a different user, also link to that user
             if ($request->has('assigned_user_id') && $request->assigned_user_id && $request->assigned_user_id != $user->id) {
                 // Admin assigned a different user, link both creator and assigned user
@@ -251,12 +251,12 @@ class CustomerController extends Controller
     public function show(Customer $customer)
     {
         $user = auth()->user();
-        
+
         // Check if user has access to this customer
         if (!$this->userHasAccessToCustomer($user, $customer)) {
             return makeResponse(403, 'Access denied. You do not have permission to view this customer.', null);
         }
-        
+
         $customer->load('users');
         return makeResponse(200, 'Customer retrieved successfully.', $customer);
     }
@@ -271,26 +271,26 @@ class CustomerController extends Controller
     public function showByCode(Request $request)
     {
         $user = auth()->user();
-        
+
         // Get customer_code from query parameter
         $customerCode = $request->input('customer_code');
-        
+
         if (!$customerCode) {
             return makeResponse(422, 'Customer code is required.', ['error' => 'customer_code parameter is missing']);
         }
-        
+
         // Find customer by customer_code
         $customer = Customer::where('customer_code', $customerCode)->first();
-        
+
         if (!$customer) {
             return makeResponse(404, 'Customer not found.', null);
         }
-        
+
         // Check if user has access to this customer
         if (!$this->userHasAccessToCustomer($user, $customer)) {
             return makeResponse(403, 'Access denied. You do not have permission to view this customer.', null);
         }
-        
+
         $customer->load('users');
         return makeResponse(200, 'Customer retrieved successfully.', $customer);
     }
@@ -305,12 +305,12 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer)
     {
         $user = auth()->user();
-        
+
         // Check if user has access to this customer
         if (!$this->userHasAccessToCustomer($user, $customer)) {
             return makeResponse(403, 'Access denied. You do not have permission to update this customer.', null);
         }
-        
+
         $validator = Validator::make($request->all(), [
             'customer_code' => [
                 'sometimes',
@@ -384,12 +384,12 @@ class CustomerController extends Controller
                 'address',
                 'agent_no',
             ]);
-            
+
             // Cast customer_type to uppercase before updating
             if (isset($updateData['customer_type'])) {
                 $updateData['customer_type'] = strtoupper($updateData['customer_type']);
             }
-            
+
             $customer->update($updateData);
 
             // Handle user assignment using many-to-many relationship
@@ -424,12 +424,12 @@ class CustomerController extends Controller
     public function destroy(Customer $customer)
     {
         $user = auth()->user();
-        
+
         // Check if user has access to this customer
         if (!$this->userHasAccessToCustomer($user, $customer)) {
             return makeResponse(403, 'Access denied. You do not have permission to delete this customer.', null);
         }
-        
+
         try {
             $customer->delete();
             // Use custom response function for success, data can be null or an empty array
@@ -454,12 +454,12 @@ class CustomerController extends Controller
         if ($user && ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my')) {
             return true;
         }
-        
+
         // Check if user is assigned to this customer
         if ($user && $user->customers()->where('customers.id', $customer->id)->exists()) {
             return true;
         }
-        
+
         return false;
     }
 
@@ -473,13 +473,13 @@ class CustomerController extends Controller
     private function generateCustomerCode($customerType, $username)
     {
         $prefix = null;
-        
+
         // Normalize customer type to uppercase for comparison
         $customerTypeUpper = strtoupper($customerType);
-        
-        if ($customerTypeUpper === 'CREDITOR') {
-            $prefix = '3000';
-        } elseif ($customerTypeUpper === 'CASH SALES' || $customerTypeUpper === 'CASH') {
+
+        //if ($customerTypeUpper === 'CREDITOR') {
+        //    $prefix = '3000';
+        //} elseif ($customerTypeUpper === 'CASH SALES' || $customerTypeUpper === 'CASH') {
             $usernameUpper = strtoupper($username);
             if ($usernameUpper === 'S01') {
                 $prefix = '3010';
@@ -503,15 +503,15 @@ class CustomerController extends Controller
                 // Fallback for Cash Sales with invalid username
                 throw new \Exception('Cash Sales is only available for users S01, S02, S03, S04, S05, S06, S07, S08, or S09. Your username: ' . $username);
             }
-        } else {
-            throw new \Exception('Invalid customer type: ' . $customerType);
-        }
-        
+        //} else {
+        //    throw new \Exception('Invalid customer type: ' . $customerType);
+        //}
+
         // Find the next running number for this prefix
         $customers = Customer::where('customer_code', 'like', $prefix . '/%')
             ->pluck('customer_code')
             ->toArray();
-        
+
         $nextNumber = 1;
         if (!empty($customers)) {
             $numbers = [];
@@ -525,7 +525,7 @@ class CustomerController extends Controller
                 $nextNumber = max($numbers) + 1;
             }
         }
-        
+
         // Format as 3000/001, 3000/002, etc.
         return $prefix . '/' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
     }
@@ -533,7 +533,7 @@ class CustomerController extends Controller
     /**
      * Update company_name2 and name fields based on duplicate logic.
      * This is a maintenance script endpoint.
-     * 
+     *
      * Logic:
      * 1. If company_name2 matches company_name, set company_name2 to null
      * 2. If name matches company_name, set name to null
