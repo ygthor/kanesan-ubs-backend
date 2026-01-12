@@ -126,7 +126,7 @@ class ReportController extends Controller
         ]);
         // dd($returnsInfo);
 
-        $returns = $returnsInfo['Cash_withInv'] + $returnsInfo['Credit_withInv'];
+        $returns = $returnsInfo['Cash_withInv'] + $returnsInfo['Credit_withInv'] + $returnsInfo['Cash_withoutInv'] + $returnsInfo['Credit_withoutInv'];
         $totalCashReturn = $returnsInfo['Cash_withoutInv'];
         $totalCrReturn = 0; // CUSTOMER SAID CR NO NEED RETURN
 
