@@ -130,6 +130,8 @@ class ReportController extends Controller
         $totalCashReturn = $returnsInfo['Cash_withoutInv'] + $returnsInfo['Cash_withInv'];
         $totalCrReturn = $returnsInfo['Credit_withoutInv'] + $returnsInfo['Credit_withInv'];
 
+        $CaReturnWithoutInv = $returnsInfo['Cash_withoutInv']; // THIS ONLY DEDUCT THE TOTAL CA COLLECT
+
         $nettSales = $totalSales - $returns;
 
         // --- Collections ---
@@ -194,7 +196,7 @@ class ReportController extends Controller
         }
 
         $totalCrCollect = $totalCrCollect;
-        $totalCashCollect = $totalCashCollect - $totalCashReturn;
+        $totalCashCollect = $totalCashCollect - $CaReturnWithoutInv;
 
         // Total collection = CA + CR (cheques are already included in CA/CR totals)
         // Cheques are shown separately for reporting but are part of CA/CR based on customer_type
