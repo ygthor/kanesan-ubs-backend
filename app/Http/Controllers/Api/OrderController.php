@@ -36,6 +36,8 @@ class OrderController extends Controller
         if($paginate === null){
             $paginate = true;
         }
+        if($paginate == 'false') $paginate = false;
+        if($paginate == 'true') $paginate = true;
 
         // Start building the query
         $orders = Order::with('items.item', 'customer');
@@ -57,7 +59,9 @@ class OrderController extends Controller
                       ->orWhere('company_name', 'like', "%{$customerName}%");
                 });
             });
+            
         }
+        
         if($customerCode){
             $orders->where('customer_code', 'like', "{$customerCode}");
         }
@@ -144,6 +148,8 @@ class OrderController extends Controller
                 // For non-INV orders, adjusted_net_amount is the same as net_amount
                 $order->setAttribute('adjusted_net_amount', $order->net_amount ?? 0.0);
             }
+            $order->setAttribute('with_credit_note', $order->with_credit_note);
+            $order->setAttribute('with_receipt', $order->with_receipt);
         }
 
         return makeResponse(200, 'Orders retrieved successfully.', $orders);

@@ -84,6 +84,17 @@ class Order extends BaseModel
         return $value;
     }
 
+    public function getWithCreditNoteAttribute()
+    {
+        $cnOrder = Order::where('credit_invoice_no', $this->reference_no)->where('type', 'CN')->first();
+        return $cnOrder ? true : false;
+    }
+    public function getWithReceiptAttribute()
+    {
+        $receiptOrder = ReceiptInvoice::where('order_refno', $this->reference_no)->first();
+        return $receiptOrder ? true : false;
+    }
+
     /**
      * Get the invoices that were created from this order.
      * Many-to-many relationship through invoice_orders pivot table.

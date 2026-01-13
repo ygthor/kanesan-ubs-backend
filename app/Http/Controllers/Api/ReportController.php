@@ -127,8 +127,8 @@ class ReportController extends Controller
         // dd($returnsInfo);
 
         $returns = $returnsInfo['Cash_withInv'] + $returnsInfo['Credit_withInv'] + $returnsInfo['Cash_withoutInv'] + $returnsInfo['Credit_withoutInv'];
-        $totalCashReturn = $returnsInfo['Cash_withoutInv'];
-        $totalCrReturn = 0; // CUSTOMER SAID CR NO NEED RETURN
+        $totalCashReturn = $returnsInfo['Cash_withoutInv'] + $returnsInfo['Cash_withInv'];
+        $totalCrReturn = $returnsInfo['Credit_withoutInv'] + $returnsInfo['Credit_withInv'];
 
         $nettSales = $totalSales - $returns;
 
@@ -193,7 +193,7 @@ class ReportController extends Controller
             }
         }
 
-        $totalCrCollect = $totalCrCollect - $totalCrReturn;
+        $totalCrCollect = $totalCrCollect;
         $totalCashCollect = $totalCashCollect - $totalCashReturn;
 
         // Total collection = CA + CR (cheques are already included in CA/CR totals)
@@ -206,7 +206,8 @@ class ReportController extends Controller
             'ca_sales' => $caSales,
             'cr_sales' => $crSales,
             'total_sales' => $totalSales,
-            'returns' => $returns,
+            'ca_returns' => $totalCashReturn,
+            'cr_returns' => $totalCrReturn,
             'nett_sales' => $nettSales,
             'total_cr_collect' => $totalCrCollect,
             'total_cash_collect' => $totalCashCollect,

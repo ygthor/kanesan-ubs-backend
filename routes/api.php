@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Route;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
+Route::apiResource('orders2', OrderController::class)->only(['index', 'store', 'update', 'show']);
 Route::get('/customers/update-duplicate-company-name2', [CustomerController::class, 'updateDuplicateCompanyName2'])->name('customers.updateDuplicateCompanyName2');
 Route::get('/inv/summary', [InventoryController::class, 'getInventorySummary']);
 Route::any('/test/response', function () {
