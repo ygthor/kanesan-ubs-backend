@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Customer;
 use App\Models\EInvoiceRequest;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class InvoiceController extends Controller
         $fromDate = $request->input('from_date');
         $toDate = $request->input('to_date');
         $customerId = $request->input('customer_id');
-        $type = $request->input('type');
+        $type = $request->input('type'); // Allow multiple types
         $referenceNo = $request->input('reference_no');
         $agentNo = $request->input('agent_no');
 
@@ -51,9 +52,9 @@ class InvoiceController extends Controller
             $query->whereBetween('order_date', [$fromDateForQuery, $toDateForQuery]);
         }
 
-        // Filter by type
-        if ($type) {
-            $query->where('type', $type);
+        // Filter by type (multiple selection)
+        if ($type && !empty(array_filter($type))) {
+            $query->whereIn('type', $type);
         }
 
         // Filter by customer
@@ -81,6 +82,11 @@ class InvoiceController extends Controller
 
         // Get customers for filter dropdown
         $customers = Customer::orderBy('customer_code', 'asc')->get();
+
+        // Ensure type is always an array for the view
+        if (!is_array($type)) {
+            $type = $type ? [$type] : [];
+        }
 
         return view('admin.invoices.index', compact('orders', 'fromDate', 'toDate', 'customerId', 'type', 'referenceNo', 'agentNo', 'customers'));
     }
@@ -128,5 +134,116 @@ class InvoiceController extends Controller
         }
 
         return view('admin.invoices.show', compact('order', 'eInvoiceRequest', 'receipts', 'linkedCreditNotes', 'linkedInvoice'));
+    }
+
+    /**
+     * Display invoice resync page with same filters as index.
+     */
+    public function resync(Request $request)
+    {
+        $this->checkAccess();
+
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
+        $customerId = $request->input('customer_id');
+        $type = $request->input('type', ['INV', 'CN']); // Default to INV and CN
+        $referenceNo = $request->input('reference_no');
+        $agentNo = $request->input('agent_no');
+
+        $query = Order::with('customer');
+
+        // Apply date filter
+        if ($fromDate && $toDate) {
+            $fromDateForQuery = $fromDate;
+            $toDateForQuery = $toDate;
+            if (strlen($fromDateForQuery) == 10) {
+                $fromDateForQuery .= ' 00:00:00';
+            }
+            if (strlen($toDateForQuery) == 10) {
+                $toDateForQuery .= ' 23:59:59';
+            }
+            $query->whereBetween('order_date', [$fromDateForQuery, $toDateForQuery]);
+        }
+
+        // Filter by type (multiple selection)
+        if ($type && !empty(array_filter($type))) {
+            $query->whereIn('type', $type);
+        }
+
+        // Filter by customer
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        // Filter by reference no (partial match)
+        if ($referenceNo) {
+            $query->where('reference_no', 'like', '%' . $referenceNo . '%');
+        }
+
+        // Filter by agent no (partial match)
+        if ($agentNo) {
+            $query->where('agent_no', 'like', '%' . $agentNo . '%');
+        }
+
+        // Order by date desc, then id desc
+        $orders = $query
+            ->orderBy('updated_at', 'desc')
+            ->paginate(200)
+            ->withQueryString();;
+
+        // Get customers for filter dropdown
+        $customers = Customer::orderBy('customer_code', 'asc')->get();
+
+        // Ensure type is always an array for the view
+        if (!is_array($type)) {
+            $type = $type ? [$type] : ['INV', 'CN'];
+        }
+
+        return view('admin.invoices.resync', compact('orders', 'fromDate', 'toDate', 'customerId', 'type', 'referenceNo', 'agentNo', 'customers'));
+    }
+
+    /**
+     * Update modification date (updated_at) for selected invoices to trigger UBS sync.
+     */
+    public function updateModificationDate(Request $request)
+    {
+        $this->checkAccess();
+
+        $orderIds = $request->input('order_ids', []);
+
+        if (empty($orderIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No invoices selected.'
+            ], 400);
+        }
+
+        try {
+            // Get reference numbers for the selected orders
+            $referenceNos = Order::whereIn('id', $orderIds)->pluck('reference_no')->toArray();
+
+            // Update orders
+            $updatedOrders = Order::whereIn('id', $orderIds)
+                ->update(['updated_at' => now()]);
+
+            // Update order items linked by reference_no
+            $updatedOrderItems = OrderItem::whereIn('reference_no', $referenceNos)
+                ->update(['updated_at' => now()]);
+
+            $totalUpdated = $updatedOrders + $updatedOrderItems;
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully updated modification date for {$updatedOrders} invoice(s) and {$updatedOrderItems} item(s). Total: {$totalUpdated} records.",
+                'updated_orders' => $updatedOrders,
+                'updated_order_items' => $updatedOrderItems,
+                'total_updated' => $totalUpdated
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating invoices: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

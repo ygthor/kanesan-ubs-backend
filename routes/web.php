@@ -82,6 +82,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('invoices', [\App\Http\Controllers\Admin\InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{id}', [\App\Http\Controllers\Admin\InvoiceController::class, 'show'])->name('invoices.show');
 
+    // Invoice Resync Management (KBS/admin only - checked in controller)
+    Route::get('invoice/resync', [\App\Http\Controllers\Admin\InvoiceController::class, 'resync'])->name('invoice.resync');
+    Route::post('invoice/resync', [\App\Http\Controllers\Admin\InvoiceController::class, 'updateModificationDate'])->name('invoice.resync.update');
+
     // Report routes (KBS/admin only - checked in controller)
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\ReportController::class, 'index'])->name('index');

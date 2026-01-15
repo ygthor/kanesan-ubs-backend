@@ -30,12 +30,11 @@
             <div class="col-md-3">
                 <div class="form-group">
                     <label>Type</label>
-                    <select name="type" class="form-control">
-                        <option value="">All Types</option>
-                        <option value="INV" {{ ($type ?? '') == 'INV' ? 'selected' : '' }}>INV</option>
-                        <option value="DO" {{ ($type ?? '') == 'DO' ? 'selected' : '' }}>DO</option>
-                        <option value="CN" {{ ($type ?? '') == 'CN' ? 'selected' : '' }}>CN</option>
-                        <option value="SO" {{ ($type ?? '') == 'SO' ? 'selected' : '' }}>SO</option>
+                    <select name="type[]" class="form-control" id="typeSelect" multiple>
+                        <option value="INV" {{ in_array('INV', $type ?? []) ? 'selected' : '' }}>INV</option>
+                        <option value="DO" {{ in_array('DO', $type ?? []) ? 'selected' : '' }}>DO</option>
+                        <option value="CN" {{ in_array('CN', $type ?? []) ? 'selected' : '' }}>CN</option>
+                        <option value="SO" {{ in_array('SO', $type ?? []) ? 'selected' : '' }}>SO</option>
                     </select>
                 </div>
             </div>
@@ -147,4 +146,20 @@
         {{ $orders->links() }}
     </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<script>
+$(document).ready(function() {
+    // Initialize select2 for type dropdown
+    $('#typeSelect').select2({
+        placeholder: "Select invoice types",
+        allowClear: true,
+        width: '100%'
+    });
+});
+</script>
+@endpush
 
