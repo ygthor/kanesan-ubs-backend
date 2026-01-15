@@ -12,6 +12,10 @@
 @section('card-title', 'Invoices')
 
 @section('admin-content')
+
+    <div class="my-3 text-right">
+        <a href="/admin/invoice/resync" class="btn btn-sm btn-primary">Trigger Resync</a>
+    </div>
     <!-- Filters -->
     <form method="GET" action="{{ route('admin.invoices.index') }}" class="mb-4">
         <div class="row">

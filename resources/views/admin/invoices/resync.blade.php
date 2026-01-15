@@ -118,7 +118,7 @@
                     @forelse($orders as $order)
                         <tr>
                             <td>
-                                <input type="checkbox" name="order_ids[]" value="{{ $order->id }}" class="">
+                                <input type="checkbox" name="order_ids[]" value="{{ $order->id }}" class="order-checkbox">
                             </td>
                             <td>{{ $order->reference_no }}</td>
                             <td>{{ \Carbon\Carbon::parse($order->order_date)->format('d/m/Y') }}</td>
