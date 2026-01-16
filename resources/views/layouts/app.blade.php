@@ -123,6 +123,13 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a href="/admin/periods"
+                                    class="nav-link {{ request()->is('admin/periods*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-calendar-alt"></i>
+                                    <p>Period Management</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a href="/admin/reports"
                                     class="nav-link {{ request()->is('admin/reports*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-file"></i>

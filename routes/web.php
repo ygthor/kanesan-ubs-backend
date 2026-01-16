@@ -55,23 +55,26 @@ Route::post('/debug/delete-transaction', [\App\Http\Controllers\Web\DebugControl
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     // User Management
     Route::resource('users', \App\Http\Controllers\Admin\UserManagementController::class);
-    
+
     // User Customer Assignment Management (user-centric)
     Route::get('users/{user}/customers', [\App\Http\Controllers\UserCustomerController::class, 'userCustomers'])->name('users.customers');
     Route::post('users/{user}/customers', [\App\Http\Controllers\UserCustomerController::class, 'storeUserCustomers'])->name('users.customers.store');
     Route::delete('users/{user}/customers/{userCustomer}', [\App\Http\Controllers\UserCustomerController::class, 'destroyUserCustomer'])->name('users.customers.destroy');
-    
+
     // Role Management (to be implemented)
     Route::resource('roles', \App\Http\Controllers\Admin\RoleManagementController::class);
-    
+
     // Permission Management (to be implemented)
     Route::resource('permissions', \App\Http\Controllers\Admin\PermissionManagementController::class);
-    
+
     // Territory Management
     Route::resource('territories', \App\Http\Controllers\Admin\TerritoryManagementController::class);
 
     // Announcement Management
     Route::resource('announcements', \App\Http\Controllers\Admin\AnnouncementController::class);
+
+    // Period Management
+    Route::resource('periods', \App\Http\Controllers\Admin\PeriodManagementController::class);
 
     // E-Invoice Request Management (KBS/admin only - checked in controller)
     Route::get('e-invoice-requests', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'index'])->name('e-invoice-requests.index');
@@ -129,15 +132,15 @@ Route::get('/test/check-stock/{itemno}', function($itemno){
     if (!$item) {
         return response()->json(['error' => 'Item not found'], 404);
     }
-    
+
     // Get all transactions
     $transactions = ItemTransaction::where('ITEMNO', $itemno)
         ->orderBy('CREATED_ON', 'desc')
         ->get();
-    
+
     // Calculate stock from transactions
     $calculatedStock = ItemTransaction::where('ITEMNO', $itemno)->sum('quantity');
-    
+
     return response()->json([
         'item' => [
             'ITEMNO' => $item->ITEMNO,
@@ -169,17 +172,17 @@ Route::get('/test/add-stock-all', function(){
         $items = Icitem::all();
         $count = 0;
         $quantity = 10;
-        
+
         foreach ($items as $item) {
             // Calculate current stock from transactions
             $stockBefore = ItemTransaction::where('ITEMNO', $item->ITEMNO)->sum('quantity');
             if ($stockBefore === null) {
                 $stockBefore = $item->QTY ?? 0;
             }
-            
+
             // Calculate new stock
             $stockAfter = $stockBefore + $quantity;
-            
+
             // Create transaction record
             ItemTransaction::create([
                 'ITEMNO' => $item->ITEMNO,
@@ -195,18 +198,18 @@ Route::get('/test/add-stock-all', function(){
                 'CREATED_ON' => now(),
                 'UPDATED_ON' => now(),
             ]);
-            
+
             // Update icitem QTY field
             $item->QTY = $stockAfter;
             $item->UPDATED_BY = auth()->user()->id ?? null;
             $item->UPDATED_ON = now();
             $item->save();
-            
+
             $count++;
         }
-        
+
         DB::commit();
-        
+
         return response()->json([
             'success' => true,
             'message' => "Successfully added {$quantity} quantity to {$count} items",
