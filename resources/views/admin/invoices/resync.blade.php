@@ -71,8 +71,9 @@
         <div class="row">
             <div class="col-md-3">
                 <div class="form-group">
-                    <label>Reference No</label>
-                    <input type="text" name="reference_no" class="form-control" value="{{ $referenceNo ?? '' }}" placeholder="Search by reference number">
+                    <label>Reference No (Comma-separated)</label>
+                    <textarea name="reference_no" class="form-control" rows="3" placeholder="Paste comma-separated reference numbers&#10;e.g., ORD001,ORD002,ORD003">{{ $referenceNo ?? '' }}</textarea>
+                    <small class="form-text text-muted">Paste comma-separated values directly</small>
                 </div>
             </div>
             <div class="col-md-3">

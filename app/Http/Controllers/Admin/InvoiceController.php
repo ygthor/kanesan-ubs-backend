@@ -181,9 +181,16 @@ class InvoiceController extends Controller
             $query->where('customer_id', $customerId);
         }
 
-        // Filter by reference no (partial match)
+        // Filter by reference no (exact match using comma-separated list with WHERE IN)
         if ($referenceNo) {
-            $query->where('reference_no', 'like', '%' . $referenceNo . '%');
+            // Parse comma-separated values
+            $refNos = array_map('trim', explode(',', $referenceNo));
+            // Remove empty values
+            $refNos = array_filter($refNos);
+            
+            if (!empty($refNos)) {
+                $query->whereIn('reference_no', $refNos);
+            }
         }
 
         // Filter by agent no (partial match)
