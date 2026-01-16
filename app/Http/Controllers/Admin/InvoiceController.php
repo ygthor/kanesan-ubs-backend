@@ -150,10 +150,23 @@ class InvoiceController extends Controller
         $referenceNo = $request->input('reference_no');
         $agentNo = $request->input('agent_no');
         $perPage = $request->input('per_page', 15); // Default to 15
+        $sort = $request->input('sort', 'updated_at'); // Default sort column
+        $direction = $request->input('direction', 'desc'); // Default sort direction
 
         // Validate per_page to prevent abuse
         if (!in_array($perPage, [15, 100, 500, 1000])) {
             $perPage = 15;
+        }
+
+        // Validate sort column
+        $allowedSorts = ['reference_no', 'order_date', 'type', 'customer_code', 'customer_name', 'agent_no', 'net_amount', 'updated_at'];
+        if (!in_array($sort, $allowedSorts)) {
+            $sort = 'updated_at';
+        }
+
+        // Validate direction
+        if (!in_array($direction, ['asc', 'desc'])) {
+            $direction = 'desc';
         }
 
         $query = Order::with('customer');
@@ -198,9 +211,9 @@ class InvoiceController extends Controller
             $query->where('agent_no', 'like', '%' . $agentNo . '%');
         }
 
-        // Order by date desc, then id desc
+        // Apply sorting
         $orders = $query
-            ->orderBy('updated_at', 'desc')
+            ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString();
 

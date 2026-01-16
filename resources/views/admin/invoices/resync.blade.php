@@ -116,14 +116,86 @@
                         <th width="50">
                             <input type="checkbox" id="selectAllCheckbox" class="">
                         </th>
-                        <th>Reference No</th>
-                        <th>Date</th>
-                        <th>Type</th>
-                        <th>Customer Code</th>
-                        <th>Customer Name</th>
-                        <th>Agent No</th>
-                        <th>Net Amount</th>
-                        <th>Last Modified</th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'reference_no', 'direction' => request('sort') == 'reference_no' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Reference No
+                                @if(request('sort') == 'reference_no')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'order_date', 'direction' => request('sort') == 'order_date' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Date
+                                @if(request('sort') == 'order_date')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'type', 'direction' => request('sort') == 'type' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Type
+                                @if(request('sort') == 'type')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'customer_code', 'direction' => request('sort') == 'customer_code' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Customer Code
+                                @if(request('sort') == 'customer_code')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'customer_name', 'direction' => request('sort') == 'customer_name' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Customer Name
+                                @if(request('sort') == 'customer_name')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'agent_no', 'direction' => request('sort') == 'agent_no' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Agent No
+                                @if(request('sort') == 'agent_no')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'net_amount', 'direction' => request('sort') == 'net_amount' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Net Amount
+                                @if(request('sort') == 'net_amount')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ route('admin.invoice.resync', array_merge(request()->query(), ['sort' => 'updated_at', 'direction' => request('sort') == 'updated_at' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" class="text-white">
+                                Last Modified
+                                @if(request('sort') == 'updated_at')
+                                    <i class="fas fa-sort-{{ request('direction') == 'asc' ? 'up' : 'down' }}"></i>
+                                @else
+                                    <i class="fas fa-sort text-muted"></i>
+                                @endif
+                            </a>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
