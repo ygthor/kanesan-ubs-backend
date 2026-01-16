@@ -149,6 +149,12 @@ class InvoiceController extends Controller
         $type = $request->input('type', ['INV', 'CN']); // Default to INV and CN
         $referenceNo = $request->input('reference_no');
         $agentNo = $request->input('agent_no');
+        $perPage = $request->input('per_page', 15); // Default to 15
+
+        // Validate per_page to prevent abuse
+        if (!in_array($perPage, [15, 100, 500, 1000])) {
+            $perPage = 15;
+        }
 
         $query = Order::with('customer');
 
@@ -188,8 +194,8 @@ class InvoiceController extends Controller
         // Order by date desc, then id desc
         $orders = $query
             ->orderBy('updated_at', 'desc')
-            ->paginate(200)
-            ->withQueryString();;
+            ->paginate($perPage)
+            ->withQueryString();
 
         // Get customers for filter dropdown
         $customers = Customer::orderBy('customer_code', 'asc')->get();
@@ -199,7 +205,7 @@ class InvoiceController extends Controller
             $type = $type ? [$type] : ['INV', 'CN'];
         }
 
-        return view('admin.invoices.resync', compact('orders', 'fromDate', 'toDate', 'customerId', 'type', 'referenceNo', 'agentNo', 'customers'));
+        return view('admin.invoices.resync', compact('orders', 'fromDate', 'toDate', 'customerId', 'type', 'referenceNo', 'agentNo', 'customers', 'perPage'));
     }
 
     /**

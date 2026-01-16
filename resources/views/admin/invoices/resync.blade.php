@@ -81,6 +81,17 @@
                     <input type="text" name="agent_no" class="form-control" value="{{ $agentNo ?? '' }}" placeholder="Search by agent number">
                 </div>
             </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label>Per Page</label>
+                    <select name="per_page" class="form-control">
+                        <option value="15" {{ ($perPage ?? 15) == 15 ? 'selected' : '' }}>15</option>
+                        <option value="100" {{ ($perPage ?? 15) == 100 ? 'selected' : '' }}>100</option>
+                        <option value="500" {{ ($perPage ?? 15) == 500 ? 'selected' : '' }}>500</option>
+                        <option value="1000" {{ ($perPage ?? 15) == 1000 ? 'selected' : '' }}>1000</option>
+                    </select>
+                </div>
+            </div>
         </div>
         <div class="row">
             <div class="col-md-12">
@@ -145,7 +156,7 @@
 
     <!-- Pagination -->
     <div class="d-flex justify-content-center">
-        {{ $orders->links() }}
+        {{ $orders->appends(request()->query())->links() }}
     </div>
 @endsection
 
