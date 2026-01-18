@@ -18,23 +18,6 @@
 @endsection
 
 @section('admin-content')
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            {{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
 
     <!-- Search and Filters -->
     <div class="row mb-3">
@@ -56,10 +39,9 @@
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Name</th>
                     <th>Start Date</th>
                     <th>End Date</th>
-                    <th>Status</th>
+                    <th>Total Months</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -67,19 +49,21 @@
                 @forelse($periods ?? [] as $period)
                     <tr>
                         <td>{{ $period->id }}</td>
-                        <td>
-                            <strong>{{ $period->name }}</strong>
-                            @if($period->description)
-                                <br><small class="text-muted">{{ $period->description }}</small>
-                            @endif
-                        </td>
+                        
                         <td>{{ $period->start_date?->format('M d, Y') ?? 'N/A' }}</td>
                         <td>{{ $period->end_date?->format('M d, Y') ?? 'N/A' }}</td>
                         <td>
-                            @if($period->is_active)
-                                <span class="badge badge-success">Active</span>
+                            @if($period->start_date && $period->end_date)
+                                @php
+                                    $startYear = $period->start_date->year;
+                                    $startMonth = $period->start_date->month;
+                                    $endYear = $period->end_date->year;
+                                    $endMonth = $period->end_date->month;
+                                    $months = ($endYear - $startYear) * 12 + ($endMonth - $startMonth) + 1;
+                                @endphp
+                                {{ $months }} month{{ $months !== 1 ? 's' : '' }}
                             @else
-                                <span class="badge badge-secondary">Inactive</span>
+                                N/A
                             @endif
                         </td>
                         <td class="action-buttons">

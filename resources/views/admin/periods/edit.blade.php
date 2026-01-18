@@ -1,4 +1,4 @@
-@extends('layouts.form')
+@extends('layouts.admin')
 
 @section('title', 'Edit Period - Kanesan UBS Backend')
 
@@ -12,82 +12,127 @@
 
 @section('card-title', 'Edit Period')
 
-@section('form-action', route('admin.periods.update', $period->id))
-
-@section('form-method')
-    @method('PUT')
+@section('admin-content')
+    <form method="POST" action="{{ route('admin.periods.update', $period->id) }}" enctype="multipart/form-data">
+        @csrf
+        @method('PUT')
+        
+        <div class="row">
+            <div class="col-md-8">
+                @include('admin.periods._form')
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Period Information</h5>
+                    </div>
+                    <div class="card-body">
+                        @if($period)
+                            <p class="text-muted small">
+                                <strong>Created:</strong> {{ $period->created_at?->format('M d, Y') ?? 'N/A' }}<br>
+                                <strong>Updated:</strong> {{ $period->updated_at?->format('M d, Y') ?? 'N/A' }}
+                            </p>
+                            <hr>
+                        @endif
+                        <p class="text-muted small">
+                            Periods are used to define date ranges for reporting and data management.
+                            Make sure the start date is before the end date.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card-footer text-right">
+                    <a href="{{ route('admin.periods.index') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Period
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
 @endsection
 
-@section('submit-text', 'Update Period')
+@push('styles')
+    <style>
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .card-footer {
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            padding: 1rem;
+        }
+        
+        .help-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+        
+        .required-field::after {
+            content: " *";
+            color: #dc3545;
+        }
+        
+        .form-check-input:checked {
+            background-color: #667eea;
+            border-color: #667eea;
+        }
+    </style>
+@endpush
 
-@section('cancel-url', route('admin.periods.index'))
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+    const monthCountInput = document.getElementById('month_count');
 
-@section('form-fields')
-    <div class="form-group">
-        <label for="name" class="form-label required-field">Period Name</label>
-        <input type="text" class="form-control @error('name') is-invalid @enderror"
-               id="name" name="name" value="{{ old('name', $period->name) }}" required>
-        @error('name')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Enter a descriptive name for this period</div>
-    </div>
+    function calculateMonthCount() {
+        if (!startDateInput.value || !endDateInput.value) {
+            monthCountInput.value = '';
+            return;
+        }
 
-    <div class="form-group">
-        <label for="start_date" class="form-label required-field">Start Date</label>
-        <input type="date" class="form-control @error('start_date') is-invalid @enderror"
-               id="start_date" name="start_date" value="{{ old('start_date', $period->start_date?->format('Y-m-d')) }}" required>
-        @error('start_date')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Select the start date of the period</div>
-    </div>
+        // Parse date string explicitly to avoid timezone issues
+        const [startYear, startMonth, startDay] = startDateInput.value.split('-').map(Number);
+        const [endYear, endMonth, endDay] = endDateInput.value.split('-').map(Number);
+        
+        const startDate = new Date(startYear, startMonth - 1, startDay);
+        const endDate = new Date(endYear, endMonth - 1, endDay);
 
-    <div class="form-group">
-        <label for="end_date" class="form-label required-field">End Date</label>
-        <input type="date" class="form-control @error('end_date') is-invalid @enderror"
-               id="end_date" name="end_date" value="{{ old('end_date', $period->end_date?->format('Y-m-d')) }}" required>
-        @error('end_date')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Select the end date of the period (must be after start date)</div>
-    </div>
+        if (startDate <= endDate) {
+            // Calculate months difference
+            const months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+            monthCountInput.value = months + ' month' + (months !== 1 ? 's' : '');
+        } else {
+            monthCountInput.value = '';
+        }
+    }
 
-    <div class="form-group">
-        <label for="description" class="form-label">Description</label>
-        <input type="text" class="form-control @error('description') is-invalid @enderror"
-               id="description" name="description" value="{{ old('description', $period->description) }}"
-               placeholder="Optional description">
-        @error('description')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Enter an optional description for this period</div>
-    </div>
+    startDateInput.addEventListener('change', calculateMonthCount);
+    endDateInput.addEventListener('change', calculateMonthCount);
 
-    <div class="form-group">
-        <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" value="1"
-                   {{ old('is_active', $period->is_active) ? 'checked' : '' }}>
-            <label class="form-check-label" for="is_active">Active</label>
-        </div>
-        <div class="help-text">Check to make this period active</div>
-    </div>
-@endsection
-
-@section('form-sidebar')
-    <div class="card">
-        <div class="card-header">
-            <h5 class="card-title">Period Information</h5>
-        </div>
-        <div class="card-body">
-            <p class="text-muted small">
-                <strong>Created:</strong> {{ $period->created_at?->format('M d, Y') ?? 'N/A' }}<br>
-                <strong>Updated:</strong> {{ $period->updated_at?->format('M d, Y') ?? 'N/A' }}
-            </p>
-            <hr>
-            <p class="text-muted small">
-                Make sure the start date is before the end date.
-            </p>
-        </div>
-    </div>
-@endsection
+    // Calculate on page load if dates are already set
+    calculateMonthCount();
+});
+</script>
+@endpush

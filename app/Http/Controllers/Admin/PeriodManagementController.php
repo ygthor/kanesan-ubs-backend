@@ -18,6 +18,17 @@ class PeriodManagementController extends Controller
     }
 
     /**
+     * Get validation rules for period creation and update.
+     */
+    private function getPeriodValidationRules()
+    {
+        return [
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ];
+    }
+
+    /**
      * Show the form for creating a new period.
      */
     public function create()
@@ -30,20 +41,27 @@ class PeriodManagementController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'description' => 'nullable|string|max:255',
-            'is_active' => 'boolean',
-        ]);
+        $request->validate($this->getPeriodValidationRules());
+
+        // Check for overlapping periods
+        $overlappingPeriod = Period::where(function ($query) use ($request) {
+            $query->whereBetween('start_date', [$request->start_date, $request->end_date])
+                  ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
+                  ->orWhere(function ($q) use ($request) {
+                      $q->where('start_date', '<=', $request->start_date)
+                        ->where('end_date', '>=', $request->end_date);
+                  });
+        })->first();
+
+        if ($overlappingPeriod) {
+            return back()
+                ->withInput()
+                ->withErrors(['overlap' => 'The selected date range overlaps with an existing period: "' . $overlappingPeriod->name . '" (' . $overlappingPeriod->start_date->format('M d, Y') . ' - ' . $overlappingPeriod->end_date->format('M d, Y') . ')']);
+        }
 
         Period::create([
-            'name' => $request->name,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-            'description' => $request->description,
-            'is_active' => $request->has('is_active'),
         ]);
 
         return redirect()->route('admin.periods.index')
@@ -71,20 +89,29 @@ class PeriodManagementController extends Controller
      */
     public function update(Request $request, Period $period)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'description' => 'nullable|string|max:255',
-            'is_active' => 'boolean',
-        ]);
+        $request->validate($this->getPeriodValidationRules());
+
+        // Check for overlapping periods (excluding current period)
+        $overlappingPeriod = Period::where('id', '!=', $period->id)
+            ->where(function ($query) use ($request) {
+                $query->whereBetween('start_date', [$request->start_date, $request->end_date])
+                      ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
+                      ->orWhere(function ($q) use ($request) {
+                          $q->where('start_date', '<=', $request->start_date)
+                            ->where('end_date', '>=', $request->end_date);
+                      });
+            })->first();
+
+        if ($overlappingPeriod) {
+            return back()
+                ->withInput()
+                ->withErrors(['overlap' => 'The selected date range overlaps with an existing period: "' . $overlappingPeriod->name . '" (' . $overlappingPeriod->start_date->format('M d, Y') . ' - ' . $overlappingPeriod->end_date->format('M d, Y') . ')']);
+        }
 
         $period->update([
-            'name' => $request->name,
+            
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-            'description' => $request->description,
-            'is_active' => $request->has('is_active'),
         ]);
 
         return redirect()->route('admin.periods.index')

@@ -24,25 +24,17 @@
 @section('admin-content')
     <div class="row">
         <div class="col-md-8">
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-body">
                     <dl class="row">
                         <dt class="col-sm-3">ID:</dt>
                         <dd class="col-sm-9">{{ $period->id }}</dd>
-
-                        <dt class="col-sm-3">Name:</dt>
-                        <dd class="col-sm-9">
-                            <strong>{{ $period->name }}</strong>
-                        </dd>
 
                         <dt class="col-sm-3">Start Date:</dt>
                         <dd class="col-sm-9">{{ $period->start_date?->format('M d, Y') ?? 'N/A' }}</dd>
 
                         <dt class="col-sm-3">End Date:</dt>
                         <dd class="col-sm-9">{{ $period->end_date?->format('M d, Y') ?? 'N/A' }}</dd>
-
-                        <dt class="col-sm-3">Description:</dt>
-                        <dd class="col-sm-9">{{ $period->description ?? 'N/A' }}</dd>
 
                         <dt class="col-sm-3">Status:</dt>
                         <dd class="col-sm-9">
@@ -61,6 +53,51 @@
                     </dl>
                 </div>
             </div>
+
+            <!-- Months Breakdown -->
+            @if($period->start_date && $period->end_date)
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-calendar"></i> Months in Period</h5>
+                    </div>
+                    <div class="card-body">
+                        @php
+                            $months = [];
+                            $current = $period->start_date->copy();
+                            $end = $period->end_date->copy();
+                            
+                            while ($current <= $end) {
+                                $months[] = $current->copy();
+                                $current->addMonth();
+                            }
+                            
+                            $monthCount = count($months);
+                        @endphp
+                        <p class="text-muted mb-3">
+                            <strong>Total:</strong> {{ $monthCount }} month{{ $monthCount !== 1 ? 's' : '' }}
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th class="text-center" style="width: 10%">#</th>
+                                        <th>Year-Month</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($months as $index => $month)
+                                        <tr>
+                                            <td class="text-center">{{ $index + 1 }}</td>
+                                            <td>{{ $month->format('Y') }}-{{ $month->format('m') }} </td>
+                                            
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
         <div class="col-md-4">
             <div class="card">

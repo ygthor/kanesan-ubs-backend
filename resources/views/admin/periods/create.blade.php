@@ -1,4 +1,4 @@
-@extends('layouts.form')
+@extends('layouts.admin')
 
 @section('title', 'Create Period - Kanesan UBS Backend')
 
@@ -12,75 +12,119 @@
 
 @section('card-title', 'Create New Period')
 
-@section('form-action', route('admin.periods.store'))
-
-@section('submit-text', 'Create Period')
-
-@section('cancel-url', route('admin.periods.index'))
-
-@section('form-fields')
-    <div class="form-group">
-        <label for="name" class="form-label required-field">Period Name</label>
-        <input type="text" class="form-control @error('name') is-invalid @enderror"
-               id="name" name="name" value="{{ old('name') }}" required
-               placeholder="e.g., Q1 2026, January 2026">
-        @error('name')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Enter a descriptive name for this period</div>
-    </div>
-
-    <div class="form-group">
-        <label for="start_date" class="form-label required-field">Start Date</label>
-        <input type="date" class="form-control @error('start_date') is-invalid @enderror"
-               id="start_date" name="start_date" value="{{ old('start_date') }}" required>
-        @error('start_date')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Select the start date of the period</div>
-    </div>
-
-    <div class="form-group">
-        <label for="end_date" class="form-label required-field">End Date</label>
-        <input type="date" class="form-control @error('end_date') is-invalid @enderror"
-               id="end_date" name="end_date" value="{{ old('end_date') }}" required>
-        @error('end_date')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Select the end date of the period (must be after start date)</div>
-    </div>
-
-    <div class="form-group">
-        <label for="description" class="form-label">Description</label>
-        <input type="text" class="form-control @error('description') is-invalid @enderror"
-               id="description" name="description" value="{{ old('description') }}"
-               placeholder="Optional description">
-        @error('description')
-            <div class="invalid-feedback">{{ $message }}</div>
-        @enderror
-        <div class="help-text">Enter an optional description for this period</div>
-    </div>
-
-    <div class="form-group">
-        <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" value="1"
-                   {{ old('is_active', true) ? 'checked' : '' }}>
-            <label class="form-check-label" for="is_active">Active</label>
+@section('admin-content')
+    <form method="POST" action="{{ route('admin.periods.store') }}" enctype="multipart/form-data">
+        @csrf
+        
+        <div class="row">
+            <div class="col-md-8">
+                @include('admin.periods._form')
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Period Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            Periods are used to define date ranges for reporting and data management.
+                            Make sure the start date is before the end date.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="help-text">Check to make this period active</div>
-    </div>
+        
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card-footer text-right">
+                    <a href="{{ route('admin.periods.index') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Create Period
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
 @endsection
 
-@section('form-sidebar')
-    <div class="card">
-        <div class="card-header">
-            <h5 class="card-title">Period Information</h5>
-        </div>
-        <div class="card-body">
-            <p class="text-muted small">
-                Periods are used to define date ranges for reporting and data management.
-                Make sure the start date is before the end date.
-            </p>
-        </div>
-    </div>
-@endsection
+@push('styles')
+    <style>
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .card-footer {
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            padding: 1rem;
+        }
+        
+        .help-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+        
+        .required-field::after {
+            content: " *";
+            color: #dc3545;
+        }
+        
+        .form-check-input:checked {
+            background-color: #667eea;
+            border-color: #667eea;
+        }
+    </style>
+@endpush
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+    const monthCountInput = document.getElementById('month_count');
+
+    function calculateMonthCount() {
+        if (!startDateInput.value || !endDateInput.value) {
+            monthCountInput.value = '';
+            return;
+        }
+
+        // Parse date string explicitly to avoid timezone issues
+        const [startYear, startMonth, startDay] = startDateInput.value.split('-').map(Number);
+        const [endYear, endMonth, endDay] = endDateInput.value.split('-').map(Number);
+        
+        const startDate = new Date(startYear, startMonth - 1, startDay);
+        const endDate = new Date(endYear, endMonth - 1, endDay);
+
+        if (startDate <= endDate) {
+            // Calculate months difference
+            const months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+            monthCountInput.value = months + ' month' + (months !== 1 ? 's' : '');
+        } else {
+            monthCountInput.value = '';
+        }
+    }
+
+    startDateInput.addEventListener('change', calculateMonthCount);
+    endDateInput.addEventListener('change', calculateMonthCount);
+
+    // Calculate on page load if dates are already set
+    calculateMonthCount();
+});
+</script>
+@endpush
