@@ -31,25 +31,16 @@
                         <dd class="col-sm-9">{{ $period->id }}</dd>
 
                         <dt class="col-sm-3">Start Date:</dt>
-                        <dd class="col-sm-9">{{ $period->start_date?->format('M d, Y') ?? 'N/A' }}</dd>
+                        <dd class="col-sm-9">{{ $period->start_date?->format('Y-m-d') ?? 'N/A' }}</dd>
 
                         <dt class="col-sm-3">End Date:</dt>
-                        <dd class="col-sm-9">{{ $period->end_date?->format('M d, Y') ?? 'N/A' }}</dd>
-
-                        <dt class="col-sm-3">Status:</dt>
-                        <dd class="col-sm-9">
-                            @if($period->is_active)
-                                <span class="badge badge-success">Active</span>
-                            @else
-                                <span class="badge badge-secondary">Inactive</span>
-                            @endif
-                        </dd>
+                        <dd class="col-sm-9">{{ $period->end_date?->format('Y-m-d') ?? 'N/A' }}</dd>
 
                         <dt class="col-sm-3">Created At:</dt>
-                        <dd class="col-sm-9">{{ $period->created_at?->format('M d, Y H:i:s') ?? 'N/A' }}</dd>
+                        <dd class="col-sm-9">{{ $period->created_at ?? 'N/A' }}</dd>
 
                         <dt class="col-sm-3">Updated At:</dt>
-                        <dd class="col-sm-9">{{ $period->updated_at?->format('M d, Y H:i:s') ?? 'N/A' }}</dd>
+                        <dd class="col-sm-9">{{ $period->updated_at ?? 'N/A' }}</dd>
                     </dl>
                 </div>
             </div>
