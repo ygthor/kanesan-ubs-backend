@@ -39,6 +39,10 @@ Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(func
     Route::put('/stock-management/opening-balance/{id}', [\App\Http\Controllers\Admin\StockManagementController::class, 'updateOpeningBalance'])->name('stock-management.opening-balance.update');
     Route::delete('/stock-management/opening-balance/{id}', [\App\Http\Controllers\Admin\StockManagementController::class, 'deleteOpeningBalance'])->name('stock-management.opening-balance.delete');
     Route::get('/item-movements', [\App\Http\Controllers\Admin\StockManagementController::class, 'itemMovements'])->name('item-movements');
+
+    // Export routes for stock management
+    Route::get('/stock-management/export/excel', [\App\Http\Controllers\Admin\StockManagementController::class, 'exportExcel'])->name('stock-management.export.excel');
+    Route::get('/stock-management/export/pdf', [\App\Http\Controllers\Admin\StockManagementController::class, 'exportPdf'])->name('stock-management.export.pdf');
 });
 
 // Demo route for testing

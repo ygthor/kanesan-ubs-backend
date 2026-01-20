@@ -295,6 +295,20 @@
                     <!-- Transactions Tab -->
                     <div class="tab-pane fade {{ request()->get('tab') == 'transactions' ? 'show active' : '' }}" id="transactions" role="tabpanel" aria-labelledby="transactions-tab">
 
+                        <!-- Export Buttons -->
+                        <div class="mb-3 d-flex justify-content-end gap-2">
+                            <a href="{{ route('inventory.stock-management.export.excel', request()->query()) }}"
+                               class="btn btn-success btn-sm"
+                               title="Export to Excel">
+                                <i class="fas fa-file-excel"></i> Export Excel
+                            </a>
+                            <a href="{{ route('inventory.stock-management.export.pdf', request()->query()) }}"
+                               class="btn btn-danger btn-sm"
+                               title="Export to PDF">
+                                <i class="fas fa-file-pdf"></i> Export PDF
+                            </a>
+                        </div>
+
                         <div class="table-responsive">
                             <table class="table table-striped table-hover" id="stockSummaryTable">
                                 <thead>

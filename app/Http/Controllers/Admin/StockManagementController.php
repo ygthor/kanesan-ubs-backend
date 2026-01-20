@@ -10,6 +10,9 @@ use App\Models\User;
 use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Services\PDF\StockManagementPDF;
+
 
 class StockManagementController extends Controller
 {
@@ -1138,5 +1141,245 @@ class StockManagementController extends Controller
                 'available' => $totals['available'],
             ]
         ]);
+    }
+
+    /**
+     * Export stock management data to Excel
+     */
+    public function exportExcel(Request $request)
+    {
+        $user = auth()->user();
+
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        // Get selected agent from request
+        $selectedAgent = $request->input('agent_no');
+
+        if (!$selectedAgent) {
+            return redirect()->route('inventory.stock-management')
+                ->with('error', 'Agent number is required for export.');
+        }
+
+        // Normalize agent_no: if it's a username, convert to user's name
+        $agentUser = User::where('username', $selectedAgent)->first();
+        if ($agentUser && $agentUser->name) {
+            $selectedAgent = $agentUser->name;
+        }
+
+        // Get filters from request
+        $searchTerm = trim($request->input('search', ''));
+        $groupFilter = trim($request->input('group', ''));
+
+        // Get inventory data (same logic as index method)
+        $stockService = new StockService();
+        $stockSummaryKeyed = $stockService->getAgentStockSummaryKeyed($selectedAgent);
+
+        // Base query
+        $itemsQuery = Icitem::query();
+
+        if ($searchTerm || $groupFilter) {
+            // Search ALL items
+            if ($groupFilter) {
+                $itemsQuery->where('GROUP', $groupFilter);
+            }
+
+            if ($searchTerm) {
+                $itemsQuery->where(function ($q) use ($searchTerm) {
+                    $q->whereRaw('LOWER(ITEMNO) LIKE ?', ['%' . strtolower($searchTerm) . '%'])
+                        ->orWhereRaw('LOWER(DESP) LIKE ?', ['%' . strtolower($searchTerm) . '%']);
+                });
+            }
+        } else {
+            // No search/filter → only items with transactions
+            $allItemNos = array_keys($stockSummaryKeyed);
+
+            if (empty($allItemNos)) {
+                return redirect()->route('inventory.stock-management', ['agent_no' => $request->input('agent_no')])
+                    ->with('error', 'No items found with transactions for this agent.');
+            }
+
+            $itemsQuery->whereIn('ITEMNO', $allItemNos);
+        }
+
+        // Fetch items
+        $items = $itemsQuery
+            ->orderBy('GROUP')
+            ->orderBy('ITEMNO')
+            ->get();
+
+        // Map stock data
+        $inventory = $items->map(function ($item) use ($stockService, $stockSummaryKeyed) {
+            $totals = $stockService->getStockFromKeyedSummary(
+                $stockSummaryKeyed,
+                $item->ITEMNO
+            );
+
+            $currentStock = $totals['available'];
+
+            return [
+                'ITEMNO' => $item->ITEMNO,
+                'DESP' => $item->DESP ?? 'N/A',
+                'current_stock' => $currentStock,
+                'QTY' => $currentStock,
+                'UNIT' => $item->UNIT ?? 'N/A',
+                'PRICE' => $item->PRICE ?? 0,
+                'GROUP' => $item->GROUP ?? '',
+                'stockIn' => $totals['stockIn'] + $totals['returnGood'],
+                'stockOut' => $totals['stockOut'],
+                'returnGood' => $totals['returnGood'],
+                'returnBad' => $totals['returnBad'],
+            ];
+        });
+
+        // Generate filename with timestamp and agent
+        $filename = 'stock_management_' . $selectedAgent . '_' . date('Y-m-d_H-i-s') . '.xlsx';
+
+        return Excel::download(new \App\Exports\StockManagementExport($inventory, $selectedAgent), $filename);
+    }
+
+    /**
+     * Export stock management data to PDF
+     */
+    public function exportPdf(Request $request)
+    {
+        $user = auth()->user();
+
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        // Get selected agent from request
+        $selectedAgent = $request->input('agent_no');
+
+        if (!$selectedAgent) {
+            return redirect()->route('inventory.stock-management')
+                ->with('error', 'Agent number is required for export.');
+        }
+
+        // Normalize agent_no: if it's a username, convert to user's name
+        $agentUser = User::where('username', $selectedAgent)->first();
+        if ($agentUser && $agentUser->name) {
+            $selectedAgent = $agentUser->name;
+        }
+
+        // Get filters from request
+        $searchTerm = trim($request->input('search', ''));
+        $groupFilter = trim($request->input('group', ''));
+
+        // Get inventory data (same logic as index method)
+        $stockService = new StockService();
+        $stockSummaryKeyed = $stockService->getAgentStockSummaryKeyed($selectedAgent);
+
+        // Base query
+        $itemsQuery = Icitem::query();
+
+        if ($searchTerm || $groupFilter) {
+            // Search ALL items
+            if ($groupFilter) {
+                $itemsQuery->where('GROUP', $groupFilter);
+            }
+
+            if ($searchTerm) {
+                $itemsQuery->where(function ($q) use ($searchTerm) {
+                    $q->whereRaw('LOWER(ITEMNO) LIKE ?', ['%' . strtolower($searchTerm) . '%'])
+                        ->orWhereRaw('LOWER(DESP) LIKE ?', ['%' . strtolower($searchTerm) . '%']);
+                });
+            }
+        } else {
+            // No search/filter → only items with transactions
+            $allItemNos = array_keys($stockSummaryKeyed);
+
+            if (empty($allItemNos)) {
+                return redirect()->route('inventory.stock-management', ['agent_no' => $request->input('agent_no')])
+                    ->with('error', 'No items found with transactions for this agent.');
+            }
+
+            $itemsQuery->whereIn('ITEMNO', $allItemNos);
+        }
+
+        // Fetch items
+        $items = $itemsQuery
+            ->orderBy('GROUP')
+            ->orderBy('ITEMNO')
+            ->get();
+
+        // Map stock data
+        $inventory = $items->map(function ($item) use ($stockService, $stockSummaryKeyed) {
+            $totals = $stockService->getStockFromKeyedSummary(
+                $stockSummaryKeyed,
+                $item->ITEMNO
+            );
+
+            $currentStock = $totals['available'];
+
+            return [
+                'ITEMNO' => $item->ITEMNO,
+                'DESP' => $item->DESP ?? 'N/A',
+                'current_stock' => $currentStock,
+                'QTY' => $currentStock,
+                'UNIT' => $item->UNIT ?? 'N/A',
+                'PRICE' => $item->PRICE ?? 0,
+                'GROUP' => $item->GROUP ?? '',
+                'stockIn' => $totals['stockIn'] + $totals['returnGood'],
+                'stockOut' => $totals['stockOut'],
+                'returnGood' => $totals['returnGood'],
+                'returnBad' => $totals['returnBad'],
+            ];
+        });
+
+        // Generate PDF using custom StockManagementPDF class
+        $filename = 'stock_management_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $selectedAgent) . '_' . date('Y-m-d_H-i-s') . '.pdf';
+        $exportDate = now()->format('Y-m-d H:i:s');
+
+        $html = view('pdf.stock-management', [
+            'inventory' => $inventory,
+            'selectedAgent' => $selectedAgent,
+            'exportDate' => $exportDate,
+            'filters' => [
+                'search' => $searchTerm,
+                'group' => $groupFilter,
+            ]
+        ])->render();
+
+        // Create custom PDF instance with header/footer
+        $pdf = new StockManagementPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+        $pdf->setAgentName($selectedAgent);
+        $pdf->setExportDate($exportDate);
+
+        // Set document information
+        $pdf->SetCreator('KBS System');
+        $pdf->SetAuthor($user->name ?? 'System');
+        $pdf->SetTitle('Stock Management Report - ' . $selectedAgent);
+        $pdf->SetSubject('Stock Management Export');
+
+        // Enable header and footer
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+
+        // Set margins (left, top, right) - top margin accounts for header
+        $pdf->SetMargins(10, 35, 10);
+        $pdf->SetHeaderMargin(10);
+        $pdf->SetFooterMargin(10);
+
+        // Set auto page breaks
+        $pdf->SetAutoPageBreak(true, 20);
+
+        // Add first page
+        $pdf->AddPage();
+
+        // Write HTML content
+        $pdf->writeHTML($html, true, false, true, false, '');
+
+        // Save to file
+        $pdf->Output(storage_path('app/' . $filename), 'F');
+
+        return response()->file(storage_path('app/' . $filename), [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"'
+        ])->deleteFileAfterSend(true);
     }
 }
