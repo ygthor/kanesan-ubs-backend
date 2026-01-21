@@ -8,6 +8,7 @@ use App\Models\Order;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DebtController extends Controller
 {
@@ -78,11 +79,16 @@ class DebtController extends Controller
             ->get();
 
         // Filter out invoices without customer data and group by customer
+        // $customersWithDebts = $invoicesWithCustomers
+        //     ->filter(function ($invoice) {
+        //         return !empty($invoice->customer_code);
+        //     })
+        //     ->groupBy('customer_code');
         $customersWithDebts = $invoicesWithCustomers
             ->filter(function ($invoice) {
                 return !empty($invoice->customer_code);
-            })
-            ->groupBy('customer_code');
+            });
+            //->groupBy('customer_code');
 
         // Transform the data to match the Flutter UI's expected structure
         $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) {
@@ -108,7 +114,7 @@ class DebtController extends Controller
                         $itemAmount = (float) ($item->amount ?? 0.0);
                         $salesAmount += $itemAmount;
                     }
-                } 
+                }
                 // Calculate credit note amount from linked CN orders
                 $creditAmount = 0.0;
                 $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
@@ -173,7 +179,7 @@ class DebtController extends Controller
             $formattedData->values()
         ), true);
 
-        
+
         // GET ALL ORDER WITH ZERO REGULAR ITEM
         foreach ($formattedData as &$customer) {
             $date_group = [];
@@ -197,7 +203,7 @@ class DebtController extends Controller
                     // THIS IS THE KEY FIX: Re-index the array to make it a proper list
                     $customer['debtItems'] = array_values($customer['debtItems']);
                 }
-                
+
             }
         }
         // dd($formattedData);
