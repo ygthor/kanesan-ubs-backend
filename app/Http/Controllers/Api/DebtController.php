@@ -8,6 +8,7 @@ use App\Models\Order;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DebtController extends Controller
 {
@@ -95,7 +96,7 @@ class DebtController extends Controller
                 $orderDate = $invoice->order_date instanceof Carbon ? $invoice->order_date : Carbon::parse($invoice->order_date);
                 // Calculate due date based on payment term
                 $dueDate = $this->calculateDueDate($orderDate, $firstInvoice->payment_term);
-
+                Log::info("Calculating debt for Invoice REFNO={$invoice->reference_no}, OrderDate={$orderDate->toDateString()}, PaymentTerm={$firstInvoice->payment_term}, DueDate={$dueDate->toDateString()}");
                 // Calculate total payments made
                 $totalPayments = (float) ($invoice->total_payments ?? 0);
 
@@ -138,6 +139,8 @@ class DebtController extends Controller
                 if ($totalPayments > 0 && $outstandingBalance > 0) {
                     \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, creditAmount={$creditAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
                 }
+
+                Log::info("Invoice REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, creditAmount={$creditAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
 
                 return [
                     'salesNo' => $invoice->reference_no, // Invoice reference number
