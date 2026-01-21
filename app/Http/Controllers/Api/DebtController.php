@@ -78,15 +78,11 @@ class DebtController extends Controller
             ->get();
 
         // Filter out invoices without customer data and group by customer
-        // $customersWithDebts = $invoicesWithCustomers
-        //     ->filter(function ($invoice) {
-        //         return !empty($invoice->customer_code);
-        //     })
-        //     ->groupBy('customer_code');
         $customersWithDebts = $invoicesWithCustomers
             ->filter(function ($invoice) {
                 return !empty($invoice->customer_code);
-            });
+            })
+            ->groupBy('customer_code');
 
         // Transform the data to match the Flutter UI's expected structure
         $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) {
