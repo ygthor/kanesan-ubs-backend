@@ -137,6 +137,13 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a href="{{ route('admin.reports.customers') }}"
+                                    class="nav-link {{ request()->is('admin/reports/customers*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-user-friends"></i>
+                                    <p>Customers</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a href="{{ route('admin.invoices.index') }}"
                                     class="nav-link {{ request()->is('admin/invoices*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-file-invoice-dollar"></i>

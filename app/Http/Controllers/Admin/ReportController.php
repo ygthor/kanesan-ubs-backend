@@ -461,12 +461,17 @@ class ReportController extends Controller
 
         $query = Customer::query();
 
-        // Filter by customer search
+        // Filter by customer search (supports wildcards: * = any, ? = single)
         if ($customerSearch) {
-            $query->where(function($q) use ($customerSearch) {
-                $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('name', 'like', "%{$customerSearch}%")
-                  ->orWhere('company_name', 'like', "%{$customerSearch}%");
+            $pattern = trim($customerSearch);
+            $pattern = str_replace(['*', '?'], ['%', '_'], $pattern);
+            if (strpos($pattern, '%') === false && strpos($pattern, '_') === false) {
+                $pattern = '%' . $pattern . '%';
+            }
+            $query->where(function($q) use ($pattern) {
+                $q->where('customer_code', 'like', $pattern)
+                  ->orWhere('name', 'like', $pattern)
+                  ->orWhere('company_name', 'like', $pattern);
             });
         }
 
@@ -494,6 +499,39 @@ class ReportController extends Controller
         $agents = $this->getAgents();
 
         return view('admin.reports.customer-report', compact('customers', 'customerSearch', 'customerType', 'territoryId', 'agentNo', 'agents'));
+    }
+
+    /**
+     * Update modification date (updated_at) for selected customers to trigger sync.
+     */
+    public function updateCustomerModificationDate(Request $request)
+    {
+        $this->checkAccess();
+
+        $customerIds = $request->input('customer_ids', []);
+
+        if (empty($customerIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No customers selected.'
+            ], 400);
+        }
+
+        try {
+            $updatedCustomers = Customer::whereIn('id', $customerIds)
+                ->update(['updated_at' => now()]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully updated modification date for {$updatedCustomers} customer(s).",
+                'updated_customers' => $updatedCustomers,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating customers: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

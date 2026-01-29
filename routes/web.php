@@ -100,6 +100,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/transactions', [\App\Http\Controllers\Admin\ReportController::class, 'transactionReport'])->name('transactions');
         Route::get('/transactions/{id}/detail', [\App\Http\Controllers\Admin\ReportController::class, 'getOrderDetail'])->name('transactions.detail');
         Route::get('/customers', [\App\Http\Controllers\Admin\ReportController::class, 'customerReport'])->name('customers');
+        Route::post('/customers/update-modification-date', [\App\Http\Controllers\Admin\ReportController::class, 'updateCustomerModificationDate'])->name('customers.update-modification-date');
         Route::get('/receipts', [\App\Http\Controllers\Admin\ReportController::class, 'receiptReport'])->name('receipts');
         Route::get('/customer-balance', [\App\Http\Controllers\Admin\ReportController::class, 'customerBalanceReport'])->name('customer-balance');
         Route::get('/customer-balance/{customerId}/detail', [\App\Http\Controllers\Admin\ReportController::class, 'getCustomerBalanceDetail'])->name('customer-balance.detail');
