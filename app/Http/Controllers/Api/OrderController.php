@@ -138,7 +138,8 @@ class OrderController extends Controller
                 foreach ($order->items as $item) {
                     // Check if item is a free good
                     if (!$item->isFreeGood) {
-                        $adjustedNetAmount += ($item->quantity * $item->unit_price);
+                        // $adjustedNetAmount += ($item->quantity * $item->unit_price);
+                        $adjustedNetAmount += ($item->amount);
                     }
                 }
 
