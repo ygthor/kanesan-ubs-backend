@@ -80,6 +80,25 @@ class InvoiceController extends Controller
             ->paginate(200)
             ->withQueryString();;
 
+        $orderReferenceNos = $orders->getCollection()
+            ->pluck('reference_no')
+            ->filter()
+            ->values();
+
+        $totalReceiptAmounts = collect();
+        if ($orderReferenceNos->isNotEmpty()) {
+            $totalReceiptAmounts = DB::table('receipt_orders')
+                ->whereIn('order_refno', $orderReferenceNos)
+                ->select('order_refno', DB::raw('SUM(amount_applied) as total_amount_applied'))
+                ->groupBy('order_refno')
+                ->pluck('total_amount_applied', 'order_refno');
+        }
+
+        $orders->getCollection()->transform(function ($order) use ($totalReceiptAmounts) {
+            $order->total_receipt_amount = $totalReceiptAmounts->get($order->reference_no);
+            return $order;
+        });
+
         // Get customers for filter dropdown
         $customers = Customer::orderBy('customer_code', 'asc')->get();
 

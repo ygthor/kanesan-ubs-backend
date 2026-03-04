@@ -94,6 +94,7 @@
                     <th>Customer Name</th>
                     <th>Agent No</th>
                     <th>Net Amount</th>
+                    <th>Receipt Amount</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -111,6 +112,13 @@
                         <td>{{ $order->customer_name }}</td>
                         <td>{{ $order->agent_no ?? 'N/A' }}</td>
                         <td class="text-right">RM {{ number_format($order->net_amount ?? 0, 2) }}</td>
+                        <td class="text-right">
+                            @if(!is_null($order->total_receipt_amount))
+                                RM {{ number_format($order->total_receipt_amount, 2) }}
+                            @else
+                                -
+                            @endif
+                        </td>
                         <td>
                             <a href="{{ route('admin.invoices.show', $order->id) }}" class="btn btn-sm btn-link p-0 text-info">
                                 View
@@ -138,7 +146,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center">No invoices found.</td>
+                        <td colspan="9" class="text-center">No invoices found.</td>
                     </tr>
                 @endforelse
             </tbody>
