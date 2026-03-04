@@ -175,7 +175,7 @@
                                             <td>{{ $item->product_name ?? 'N/A' }}</td>
                                             <td>{{ $item->description ?? 'N/A' }}</td>
                                             <td>{{ $item->sku_code ?? 'N/A' }}</td>
-                                            <td class="text-right">{{ number_format($item->quantity ?? 0, 2) }}</td>
+                                            <td class="text-right">{{ $item->quantity ?? 0 }}</td>
                                             <td class="text-right">RM {{ number_format($item->unit_price ?? 0, 2) }}</td>
                                             <td class="text-right">RM {{ number_format($item->discount ?? 0, 2) }}</td>
                                             <td class="text-right"><strong>RM {{ number_format($item->amount ?? 0, 2) }}</strong></td>
