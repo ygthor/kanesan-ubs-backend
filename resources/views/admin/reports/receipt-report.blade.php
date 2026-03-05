@@ -63,6 +63,17 @@
             </div>
         </div>
         <div class="row">
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label>Customer Type</label>
+                    <select name="customer_type" class="form-control">
+                        <option value="">All Types</option>
+                        <option value="CREDITOR" {{ ($customerType ?? '') == 'CREDITOR' ? 'selected' : '' }}>Creditor</option>
+                        <option value="Cash" {{ ($customerType ?? '') == 'Cash' ? 'selected' : '' }}>Cash</option>
+                        <option value="Cash Sales" {{ ($customerType ?? '') == 'Cash Sales' ? 'selected' : '' }}>Cash Sales</option>
+                    </select>
+                </div>
+            </div>
             <div class="col-md-12">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-search"></i> Filter

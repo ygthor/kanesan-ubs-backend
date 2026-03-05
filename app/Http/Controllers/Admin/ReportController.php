@@ -547,6 +547,7 @@ class ReportController extends Controller
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
         $paymentType = $request->input('payment_type');
+        $customerType = $request->input('customer_type');
 
         $query = Receipt::whereNull('deleted_at');
 
@@ -574,6 +575,21 @@ class ReportController extends Controller
             $query->where('payment_type', $paymentType);
         }
 
+        // Filter by customer type (through customer)
+        if ($customerType) {
+            $query->whereHas('customer', function($q) use ($customerType) {
+                if ($customerType === 'Cash') {
+                    $q->whereIn('customer_type', ['Cash', 'CASH']);
+                } elseif ($customerType === 'CREDITOR') {
+                    $q->whereIn('customer_type', ['CREDITOR', 'Creditor']);
+                } elseif ($customerType === 'Cash Sales') {
+                    $q->whereIn('customer_type', ['Cash Sales', 'CASH SALES']);
+                } else {
+                    $q->where('customer_type', $customerType);
+                }
+            });
+        }
+
         // Filter by agent_no (through customer)
         if ($agentNo) {
             $query->whereHas('customer', function($q) use ($agentNo) {
@@ -596,7 +612,7 @@ class ReportController extends Controller
         // Get agents for filter dropdown
         $agents = $this->getAgents();
 
-        return view('admin.reports.receipt-report', compact('receipts', 'fromDateTime', 'toDateTime', 'customerId', 'agentNo', 'customerSearch', 'paymentType', 'agents'));
+        return view('admin.reports.receipt-report', compact('receipts', 'fromDateTime', 'toDateTime', 'customerId', 'agentNo', 'customerSearch', 'paymentType', 'customerType', 'agents'));
     }
 
     /**
