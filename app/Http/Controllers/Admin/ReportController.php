@@ -543,6 +543,8 @@ class ReportController extends Controller
 
         $fromDateTime = $request->input('from_date');
         $toDateTime = $request->input('to_date');
+        $fromDate = $fromDateTime;
+        $toDate = $toDateTime;
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
@@ -612,7 +614,7 @@ class ReportController extends Controller
         // Get agents for filter dropdown
         $agents = $this->getAgents();
 
-        return view('admin.reports.receipt-report', compact('receipts', 'fromDateTime', 'toDateTime', 'customerId', 'agentNo', 'customerSearch', 'paymentType', 'customerType', 'agents'));
+        return view('admin.reports.receipt-report', compact('receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'paymentType', 'customerType', 'agents'));
     }
 
     /**
