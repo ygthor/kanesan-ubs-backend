@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\EnsureTokenIsValid;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,10 +24,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (AuthenticationException $e) {
-            $response['statusCode'] = 403;
-            $response['message'] = 'Unauthorized';
-            return makeResponse(403,'Unauthorized');
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return makeResponse(401, 'Unauthenticated');
+            }
+
+            return redirect()->guest(route('login'))
+                ->with('error', 'Session expired, please login again.');
         });
         
     })->create();
