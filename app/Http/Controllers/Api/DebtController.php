@@ -28,36 +28,46 @@ class DebtController extends Controller
 
         $searchTerm = $request->input('search');
 
-        // Fetch invoice-type orders with outstanding balances
+        // All aggregations (sales_amount, credit_amount, total_payments) are computed in SQL.
+        // This eliminates: ->with(['items']) + PHP sum loop, allLinkedCNs query,
+        // and the duplicate total_payments subquery that previously ran in both SELECT and WHERE.
+        // HAVING filters outstanding rows using the aliased columns (no repeated subqueries).
         $invoicesQuery = Order::select([
-            'orders.*',
-            'customers.customer_code',
-            'customers.id as customer_id',
+            'orders.id',
+            'orders.reference_no',
+            'orders.customer_id',
+            'orders.customer_code',
+            'orders.order_date',
+            'orders.net_amount',
+            'orders.type',
             'customers.name as customer_name',
             'customers.company_name',
             'customers.payment_type',
             'customers.payment_term',
+            // Sum item amounts in SQL — replaces ->with(['items']) + PHP sum loop
             DB::raw('COALESCE((
-                    SELECT SUM(receipt_orders.amount_applied)
-                    FROM receipt_orders
-                    INNER JOIN receipts ON receipt_orders.receipt_id = receipts.id
-                    WHERE receipt_orders.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
-                    AND receipts.deleted_at IS NULL
-                ), 0) as total_payments')
+                SELECT SUM(oi.amount)
+                FROM order_items oi
+                WHERE oi.reference_no = orders.reference_no
+            ), 0) as sales_amount'),
+            // Total receipts applied — computed once, referenced in HAVING (no duplication)
+            DB::raw('COALESCE((
+                SELECT SUM(ro.amount_applied)
+                FROM receipt_orders ro
+                INNER JOIN receipts r ON ro.receipt_id = r.id
+                WHERE ro.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
+                AND r.deleted_at IS NULL
+            ), 0) as total_payments'),
+            // CN credit amount — replaces allLinkedCNs query + groupBy
+            DB::raw('COALESCE((
+                SELECT SUM(cn.net_amount)
+                FROM orders cn
+                WHERE cn.credit_invoice_no = orders.reference_no
+                AND cn.type = "CN"
+            ), 0) as credit_amount'),
         ])
             ->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
-            ->where('orders.type', 'INV')
-            ->whereRaw('(
-                COALESCE((
-                    SELECT SUM(receipt_orders.amount_applied)
-                    FROM receipt_orders
-                    INNER JOIN receipts ON receipt_orders.receipt_id = receipts.id
-                    WHERE receipt_orders.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
-                    AND receipts.deleted_at IS NULL
-                ), 0) < (COALESCE(orders.net_amount, orders.grand_amount, 0) - 0.01)
-                OR
-                orders.net_amount = "0"
-            )');
+            ->where('orders.type', 'INV');
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -73,9 +83,16 @@ class DebtController extends Controller
             });
         }
 
-        $invoicesWithCustomers = $invoicesQuery
-            ->with(['items', 'customer'])
-            ->orderBy('orders.order_date', 'asc')
+        // Wrap in a derived table so we can filter on computed columns (sales_amount, etc.)
+        // with a plain WHERE — avoids the MySQL ONLY_FULL_GROUP_BY HAVING restriction
+        // on non-aggregated columns (error 1463).
+        $invoicesWithCustomers = DB::query()
+            ->fromSub($invoicesQuery, 'inv_data')
+            ->where(function ($q) {
+                $q->whereRaw('(sales_amount - credit_amount - total_payments) > 0.01')
+                  ->orWhere('net_amount', 0);
+            })
+            ->orderBy('order_date', 'asc')
             ->get();
 
         // Filter out invoices without customer data and group by customer
@@ -102,28 +119,11 @@ class DebtController extends Controller
                     Log::info("Calculating debt for Invoice REFNO={$invoice->reference_no}, OrderDate={$orderDate->toDateString()}, PaymentTerm={$firstInvoice->payment_term}, DueDate={$dueDate->toDateString()}");
                 }
 
-                // Calculate total payments made
-                $totalPayments = (float) ($invoice->total_payments ?? 0);
-
-                // Calculate trade return amount from order items
+                // All amounts come from SQL aggregations — no extra queries needed
+                $totalPayments     = (float) ($invoice->total_payments ?? 0);
+                $salesAmount       = (float) ($invoice->sales_amount ?? 0);
+                $creditAmount      = (float) ($invoice->credit_amount ?? 0);
                 $tradeReturnAmount = 0.0;
-                $salesAmount = 0.0;
-
-                if ($invoice->relationLoaded('items')) {
-                    foreach ($invoice->items as $item) {
-                        $itemAmount = (float) ($item->amount ?? 0.0);
-                        $salesAmount += $itemAmount;
-                    }
-                }
-                // Calculate credit note amount from linked CN orders
-                $creditAmount = 0.0;
-                $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
-                    ->where('type', 'CN')
-                    ->get();
-
-                foreach ($linkedCNs as $cnOrder) {
-                    $creditAmount += (float) ($cnOrder->net_amount ?? 0);
-                }
 
                 $totalReturnAmt = $tradeReturnAmount + $creditAmount;
 
