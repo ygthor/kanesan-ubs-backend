@@ -166,6 +166,41 @@ class ReportController extends Controller
         $caCollectionQuery->whereIn('customers.customer_type', ['CASH']);
         $totalCashCollect = $caCollectionQuery->sum('receipts.paid_amount') ?? 0;
 
+        // Total negative CASH orders:
+        // Invoice adjusted amount can become negative when linked trade return (CN) exceeds invoice amount.
+        // We deduct the absolute negative amount from CASH collection.
+        $cnTotalsSubQuery = DB::table('orders as cn')
+            ->select('cn.credit_invoice_no', DB::raw('SUM(cn.net_amount) as total_cn_amount'))
+            ->where('cn.type', 'CN')
+            ->groupBy('cn.credit_invoice_no');
+
+        $negativeCashOrderQuery = DB::table('orders as inv')
+            ->join('customers', 'inv.customer_id', '=', 'customers.id')
+            ->leftJoinSub($cnTotalsSubQuery, 'cn_totals', function ($join) {
+                $join->on('inv.reference_no', '=', 'cn_totals.credit_invoice_no');
+            })
+            ->whereBetween('inv.order_date', [$fromDateForQuery, $toDateForQuery])
+            ->where('inv.type', 'INV')
+            ->whereIn('customers.customer_type', ['CASH']);
+
+        if ($agentNoToFilter) {
+            $negativeCashOrderQuery->where('inv.agent_no', $agentNoToFilter);
+        }
+        if ($customerId) {
+            $negativeCashOrderQuery->where('inv.customer_id', $customerId);
+        }
+        if ($customerSearch) {
+            $negativeCashOrderQuery->where(function ($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+
+        $totalNegativeCashOrder = $negativeCashOrderQuery
+            ->selectRaw('SUM(CASE WHEN (COALESCE(inv.net_amount, 0) - COALESCE(cn_totals.total_cn_amount, 0)) < 0 THEN ABS(COALESCE(inv.net_amount, 0) - COALESCE(cn_totals.total_cn_amount, 0)) ELSE 0 END) as total_negative_cash_order')
+            ->value('total_negative_cash_order') ?? 0;
+
         // CR Collection: All receipts from CREDITOR customers (regardless of payment type)
         // Matches CR Sales logic: customer_type = 'CREDITOR'
         $crCollectionQuery = clone $collectionsBaseQuery;
@@ -196,7 +231,7 @@ class ReportController extends Controller
         }
 
         $totalCrCollect = $totalCrCollect;
-        $totalCashCollect = $totalCashCollect - $CaReturnWithoutInv;
+        $totalCashCollect = $totalCashCollect - $CaReturnWithoutInv - $totalNegativeCashOrder;
 
         // Total collection = CA + CR (cheques are already included in CA/CR totals)
         // Cheques are shown separately for reporting but are part of CA/CR based on customer_type
@@ -213,6 +248,7 @@ class ReportController extends Controller
             'nett_sales' => $nettSales,
             'total_cr_collect' => $totalCrCollect,
             'total_cash_collect' => $totalCashCollect,
+            'total_negative_cash_order' => $totalNegativeCashOrder,
             'cheque_collect' => $chequeCollect,
             //'total_bank_collect' => $totalBankCollect,
             'total_collection' => $totalCollection,
