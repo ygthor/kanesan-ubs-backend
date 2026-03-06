@@ -331,6 +331,41 @@ class ReportController extends Controller
         }
         $caCollection = $caCollectionQuery->sum('receipts.paid_amount') ?? 0;
 
+        // Negative CASH invoices: linked CN total exceeds invoice net amount
+        $cnTotalsSubQuery = Order::from('orders as cn')
+            ->select('cn.credit_invoice_no', DB::raw('SUM(cn.net_amount) as total_cn_amount'))
+            ->where('cn.type', 'CN')
+            ->groupBy('cn.credit_invoice_no');
+
+        $negativeCashOrderQuery = Order::from('orders as inv')
+            ->join('customers', 'inv.customer_id', '=', 'customers.id')
+            ->leftJoinSub($cnTotalsSubQuery, 'cn_totals', function ($join) {
+                $join->on('inv.reference_no', '=', 'cn_totals.credit_invoice_no');
+            })
+            ->where('inv.type', 'INV')
+            ->whereIn('customers.customer_type', ['Cash', 'CASH']);
+
+        if ($calcFromDate && $calcToDate) {
+            $negativeCashOrderQuery->whereBetween('inv.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $negativeCashOrderQuery->where('inv.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $negativeCashOrderQuery->where('inv.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $negativeCashOrderQuery->where(function($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
+
+        $totalNegativeCashOrder = $negativeCashOrderQuery
+            ->selectRaw('SUM(CASE WHEN (COALESCE(inv.net_amount, 0) - COALESCE(cn_totals.total_cn_amount, 0)) < 0 THEN ABS(COALESCE(inv.net_amount, 0) - COALESCE(cn_totals.total_cn_amount, 0)) ELSE 0 END) as total_negative_cash_order')
+            ->value('total_negative_cash_order') ?? 0;
+
         // CR Collection: All receipts from CREDITOR customers (regardless of payment type)
         $crCollectionQuery = Receipt::whereNull('deleted_at')
             ->join('customers', 'receipts.customer_id', '=', 'customers.id')
@@ -366,7 +401,7 @@ class ReportController extends Controller
         $crReturns = 0; // CUSTOMER SAID CR NO NEED RETURN
 
         // Calculate nett collections (matching API logic)
-        $caCollectionNett = $caCollection - $caReturns;
+        $caCollectionNett = $caCollection - $caReturns - $totalNegativeCashOrder;
         $crCollectionNett = $crCollection - $crReturns;
         $totalCollectionByCustomerType = $caCollectionNett + $crCollectionNett;
 
@@ -381,7 +416,7 @@ class ReportController extends Controller
             'orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents',
             'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'returnsGood', 'returnsBad', 'totalSales', 'nettSales',
             'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
-            'caCollection', 'crCollection', 'caReturns', 'crReturns', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
+            'caCollection', 'crCollection', 'caReturns', 'crReturns', 'totalNegativeCashOrder', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
             'accountBalance','returnsInfo'
         ));
     }

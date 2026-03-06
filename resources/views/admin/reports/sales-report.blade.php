@@ -131,6 +131,10 @@
                                 <td class="font-weight-bold py-1 pl-3">Less: CA Returns</td>
                                 <td class="text-right py-1">(RM {{ number_format($caReturns ?? 0, 2) }})</td>
                             </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1 pl-3">Less: Negative Invoice Returns</td>
+                                <td class="text-right py-1">(RM {{ number_format($totalNegativeCashOrder ?? 0, 2) }})</td>
+                            </tr>
                             <tr class="bg-light">
                                 <td class="font-weight-bold py-1">CA Collection (Nett)</td>
                                 <td class="text-right font-weight-bold py-1">RM {{ number_format($caCollectionNett ?? 0, 2) }}</td>
