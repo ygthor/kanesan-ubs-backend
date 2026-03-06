@@ -30,11 +30,25 @@ class DebtController extends Controller
 
         $searchTerm = $request->input('search');
 
-        // Inner query: all aggregations computed in SQL to avoid N+1 queries.
-        // - sales_amount  : replaces ->with(['items']) + PHP sum loop
-        // - total_payments: computed once (was duplicated in SELECT + WHERE before)
-        // - credit_amount : replaces per-invoice CN query inside the map loop
-        $invoicesQuery = Order::select([
+        // Pre-aggregate related data once and join to invoices.
+        // This avoids correlated subqueries per row and scales better on large datasets.
+        $orderItemsAgg = DB::table('order_items as oi')
+            ->selectRaw('oi.reference_no, SUM(oi.amount) as sales_amount')
+            ->groupBy('oi.reference_no');
+
+        $paymentsAgg = DB::table('receipt_orders as ro')
+            ->join('receipts as r', 'ro.receipt_id', '=', 'r.id')
+            ->whereNull('r.deleted_at')
+            ->selectRaw('ro.order_refno, SUM(ro.amount_applied) as total_payments')
+            ->groupBy('ro.order_refno');
+
+        $creditAgg = DB::table('orders as cn')
+            ->where('cn.type', 'CN')
+            ->selectRaw('cn.credit_invoice_no, SUM(cn.net_amount) as credit_amount')
+            ->groupBy('cn.credit_invoice_no');
+
+        $invoicesQuery = Order::query()
+            ->select([
             'orders.id',
             'orders.reference_no',
             'orders.customer_id',
@@ -46,27 +60,26 @@ class DebtController extends Controller
             'customers.company_name',
             'customers.payment_type',
             'customers.payment_term',
-            DB::raw('COALESCE((
-                SELECT SUM(oi.amount)
-                FROM order_items oi
-                WHERE oi.reference_no = orders.reference_no
-            ), 0) as sales_amount'),
-            DB::raw('COALESCE((
-                SELECT SUM(ro.amount_applied)
-                FROM receipt_orders ro
-                INNER JOIN receipts r ON ro.receipt_id = r.id
-                WHERE ro.order_refno COLLATE utf8mb4_unicode_ci = orders.reference_no COLLATE utf8mb4_unicode_ci
-                AND r.deleted_at IS NULL
-            ), 0) as total_payments'),
-            DB::raw('COALESCE((
-                SELECT SUM(cn.net_amount)
-                FROM orders cn
-                WHERE cn.credit_invoice_no = orders.reference_no
-                AND cn.type = "CN"
-            ), 0) as credit_amount'),
+            DB::raw('COALESCE(oi_sum.sales_amount, 0) as sales_amount'),
+            DB::raw('COALESCE(pay_sum.total_payments, 0) as total_payments'),
+            DB::raw('COALESCE(cn_sum.credit_amount, 0) as credit_amount'),
         ])
+            ->leftJoinSub($orderItemsAgg, 'oi_sum', function ($join) {
+                $join->on('oi_sum.reference_no', '=', 'orders.reference_no');
+            })
+            ->leftJoinSub($paymentsAgg, 'pay_sum', function ($join) {
+                // Keep collation alignment on orders side to avoid mismatches while preserving index usage on pay_sum.order_refno.
+                $join->on('pay_sum.order_refno', '=', DB::raw('orders.reference_no COLLATE utf8mb4_unicode_ci'));
+            })
+            ->leftJoinSub($creditAgg, 'cn_sum', function ($join) {
+                $join->on('cn_sum.credit_invoice_no', '=', 'orders.reference_no');
+            })
             ->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
-            ->where('orders.type', 'INV');
+            ->where('orders.type', 'INV')
+            ->where(function ($q) {
+                $q->whereRaw('(COALESCE(oi_sum.sales_amount, 0) - COALESCE(cn_sum.credit_amount, 0) - COALESCE(pay_sum.total_payments, 0)) > 0.01')
+                  ->orWhere('orders.net_amount', 0);
+            });
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -82,14 +95,7 @@ class DebtController extends Controller
             });
         }
 
-        // Wrap in derived table so computed columns can be filtered with plain WHERE.
-        // This avoids MySQL error 1463 (non-grouping field in HAVING without GROUP BY).
-        $invoicesWithCustomers = DB::query()
-            ->fromSub($invoicesQuery, 'inv_data')
-            ->where(function ($q) {
-                $q->whereRaw('(sales_amount - credit_amount - total_payments) > 0.01')
-                  ->orWhere('net_amount', 0);
-            })
+                $invoicesWithCustomers = $invoicesQuery
             ->orderBy('order_date', 'asc')
             ->get();
 
@@ -138,14 +144,6 @@ class DebtController extends Controller
                     };
                 }
 
-                // Debug logging for partially paid invoices
-                if ($totalPayments > 0 && $outstandingBalance > 0) {
-                    \Log::info("Partially paid invoice: REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, creditAmount={$creditAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
-                }
-                if ($customerCode == "3040/124")
-                {
-                    Log::info("Invoice REFNO={$invoice->reference_no}, salesAmount={$salesAmount}, returnAmount={$tradeReturnAmount}, creditAmount={$creditAmount}, total_payments={$totalPayments}, outstanding={$outstandingBalance}");
-                }
 
                 return [
                     'salesNo' => $invoice->reference_no, // Invoice reference number
