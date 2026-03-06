@@ -132,7 +132,7 @@
                                 <td class="text-right py-1">(RM {{ number_format($caReturns ?? 0, 2) }})</td>
                             </tr>
                             <tr>
-                                <td class="font-weight-bold py-1 pl-3">Less: Negative Invoice Returns</td>
+                                <td class="font-weight-bold py-1 pl-3">Less: Negative Order</td>
                                 <td class="text-right py-1">(RM {{ number_format($totalNegativeCashOrder ?? 0, 2) }})</td>
                             </tr>
                             <tr class="bg-light">
