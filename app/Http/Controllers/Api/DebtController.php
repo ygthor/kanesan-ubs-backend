@@ -74,9 +74,18 @@ class DebtController extends Controller
         }
 
         $invoicesWithCustomers = $invoicesQuery
-            ->with(['items', 'customer'])
+            ->with(['items'])
             ->orderBy('orders.order_date', 'asc')
             ->get();
+
+        // Pre-fetch ALL linked CN orders in one query to avoid N+1.
+        // Previously, a separate query fired per invoice inside the map loop.
+        $allReferenceNos = $invoicesWithCustomers->pluck('reference_no');
+        $allLinkedCNs = Order::select(['credit_invoice_no', 'net_amount'])
+            ->whereIn('credit_invoice_no', $allReferenceNos)
+            ->where('type', 'CN')
+            ->get()
+            ->groupBy('credit_invoice_no');
 
         // Filter out invoices without customer data and group by customer
         $customersWithDebts = $invoicesWithCustomers
@@ -86,12 +95,12 @@ class DebtController extends Controller
             ->groupBy('customer_code');
 
         // Transform the data to match the Flutter UI's expected structure
-        $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) {
+        $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) use ($allLinkedCNs) {
             // Get customer data from the first invoice (all invoices have same customer data)
             $firstInvoice = $invoices->first();
 
             // Map the invoices to the 'debtItems' structure
-            $debtItems = $invoices->map(function ($invoice) use ($firstInvoice, $customerCode) {
+            $debtItems = $invoices->map(function ($invoice) use ($firstInvoice, $customerCode, $allLinkedCNs) {
 
                 $orderDate = $invoice->order_date instanceof Carbon ? $invoice->order_date : Carbon::parse($invoice->order_date);
                 // Calculate due date based on payment term
@@ -115,11 +124,9 @@ class DebtController extends Controller
                         $salesAmount += $itemAmount;
                     }
                 }
-                // Calculate credit note amount from linked CN orders
+                // Calculate credit note amount from pre-fetched CN orders (no extra queries)
                 $creditAmount = 0.0;
-                $linkedCNs = Order::where('credit_invoice_no', $invoice->reference_no)
-                    ->where('type', 'CN')
-                    ->get();
+                $linkedCNs = $allLinkedCNs[$invoice->reference_no] ?? collect();
 
                 foreach ($linkedCNs as $cnOrder) {
                     $creditAmount += (float) ($cnOrder->net_amount ?? 0);
