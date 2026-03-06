@@ -12,6 +12,7 @@ use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
@@ -775,6 +776,7 @@ class OrderController extends Controller
 
         $linkedCreditNotes = [];
         if ($order->type === 'INV') {
+            Log::info("Fetching linked credit notes for invoice: {$order->reference_no}");
             $linkedCNOrders = Order::where('credit_invoice_no', $order->reference_no)
                 ->where('type', 'CN')
                 ->with('items.item', 'customer')
