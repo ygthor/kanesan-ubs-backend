@@ -59,9 +59,9 @@ class OrderController extends Controller
                       ->orWhere('company_name', 'like', "%{$customerName}%");
                 });
             });
-            
+
         }
-        
+
         if($customerCode){
             $orders->where('customer_code', 'like', "{$customerCode}");
         }
@@ -770,18 +770,47 @@ class OrderController extends Controller
             return makeResponse(403, 'Access denied. You do not have permission to view this order.', null);
         }
 
-        // Load items and customer relationship for detailed view
-        // Also load order relationship for items to optimize linked_credit_note_count calculation
-        $order->load('items.item', 'items.order', 'customer');
+        // Load items and customer (removed 'items.order' — handled below to avoid N+1)
+        $order->load('items.item', 'customer');
 
-        // If this is an INV order, also load linked CN orders
         $linkedCreditNotes = [];
         if ($order->type === 'INV') {
-            $linkedCreditNotes = Order::where('credit_invoice_no', $order->reference_no)
+            $linkedCNOrders = Order::where('credit_invoice_no', $order->reference_no)
                 ->where('type', 'CN')
                 ->with('items.item', 'customer')
-                ->get()
-                ->toArray();
+                ->get();
+
+            // Pre-compute linked_credit_note_count per product_no in ONE query.
+            // This replaces the N+1 accessor (getLinkedCreditNoteCountAttribute) which
+            // was firing 1+M queries per item, causing 30s timeouts on large orders.
+            if ($linkedCNOrders->isNotEmpty()) {
+                $cnReferenceNos = $linkedCNOrders->pluck('reference_no');
+                $cnItemCounts = OrderItem::whereIn('reference_no', $cnReferenceNos)
+                    ->selectRaw('product_no, COUNT(*) as cnt')
+                    ->groupBy('product_no')
+                    ->pluck('cnt', 'product_no');
+            } else {
+                $cnItemCounts = collect();
+            }
+
+            // Set pre-computed value on each INV item (bypasses the accessor)
+            foreach ($order->items as $item) {
+                $item->setAttribute('linked_credit_note_count', $cnItemCounts[$item->product_no] ?? 0);
+            }
+
+            // Pre-set count=0 on CN items to prevent lazy-loading their order relationship
+            foreach ($linkedCNOrders as $cnOrder) {
+                foreach ($cnOrder->items as $item) {
+                    $item->setAttribute('linked_credit_note_count', 0);
+                }
+            }
+
+            $linkedCreditNotes = $linkedCNOrders->toArray();
+        } else {
+            // Non-INV orders: set count=0 for all items (avoids any lazy loading)
+            foreach ($order->items as $item) {
+                $item->setAttribute('linked_credit_note_count', 0);
+            }
         }
 
         $responseData = $order->toArray();
