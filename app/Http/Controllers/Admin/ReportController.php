@@ -343,6 +343,7 @@ class ReportController extends Controller
                 $join->on('inv.reference_no', '=', 'cn_totals.credit_invoice_no');
             })
             ->where('inv.type', 'INV')
+            ->where('inv.net_amount', '>', 0)
             ->whereIn('customers.customer_type', ['Cash', 'CASH']);
 
         if ($calcFromDate && $calcToDate) {
