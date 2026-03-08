@@ -181,6 +181,7 @@ class ReportController extends Controller
             })
             ->whereBetween('inv.order_date', [$fromDateForQuery, $toDateForQuery])
             ->where('inv.type', 'INV')
+            ->where('inv.net_amount', '>', 0)
             ->whereIn('customers.customer_type', ['CASH']);
 
         if ($agentNoToFilter) {
