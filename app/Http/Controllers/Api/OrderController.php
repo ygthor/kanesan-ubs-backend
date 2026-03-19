@@ -26,6 +26,7 @@ class OrderController extends Controller
         $user = auth()->user();
 
         // Retrieve all filter parameters from the request
+        $agentNo = $request->input('agent_no'); // agent_no filter for assigned customers
         $customerId = $request->input('customer_id');
         $customerCode = $request->input('customer_code');
         $customerName = $request->input('customer_name');
@@ -48,6 +49,9 @@ class OrderController extends Controller
             $orders->whereHas('customer', function ($query) use ($user) {
                 $query->whereIn('agent_no', [$user->name]);
             });
+        }
+        if($agentNo){
+            $orders->where('orders.agent_no', 'like', $agentNo);
         }
 
         // --- Apply filters conditionally ---
@@ -103,7 +107,7 @@ class OrderController extends Controller
         }
 
         // Order the results
-        $orders->orderBy('order_date', 'desc');
+        $orders->orderByRaw('DATE_FORMAT(order_date, "%Y-%m-%d") DESC');
         $orders->orderBy('id', 'desc');
 
         // Paginate the results
