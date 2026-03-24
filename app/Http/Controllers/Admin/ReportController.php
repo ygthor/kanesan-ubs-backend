@@ -1244,7 +1244,7 @@ class ReportController extends Controller
                 SUM(COALESCE(oi.quantity, 0)) as qty
             ")
             ->groupBy('oi.product_no')
-            ->groupByRaw("COALESCE(NULLIF(TRIM(o.agent_no), ''), 'N/A')")
+            ->groupBy('o.agent_no')
             ->get();
 
         $agentColumns = $rows->pluck('agent_no')->unique()->sort()->values()->all();
