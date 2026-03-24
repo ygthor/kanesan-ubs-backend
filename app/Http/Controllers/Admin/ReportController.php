@@ -1141,11 +1141,12 @@ class ReportController extends Controller
 
         $rows = $aggQuery
             ->selectRaw("
-                oi.product_no COLLATE utf8mb4_unicode_ci as item_code,
+                oi.product_no as item_code,
                 MONTH(o.order_date) as month_no,
                 SUM(COALESCE(oi.quantity, 0)) as qty
             ")
-            ->groupByRaw("oi.product_no COLLATE utf8mb4_unicode_ci, MONTH(o.order_date)")
+            ->groupBy('oi.product_no')
+            ->groupByRaw('MONTH(o.order_date)')
             ->get();
 
         $months = [
@@ -1238,14 +1239,12 @@ class ReportController extends Controller
 
         $rows = $aggQuery
             ->selectRaw("
-                oi.product_no COLLATE utf8mb4_unicode_ci as item_code,
-                COALESCE(NULLIF(TRIM(o.agent_no) COLLATE utf8mb4_unicode_ci, ''), 'N/A') as agent_no,
+                oi.product_no as item_code,
+                COALESCE(NULLIF(TRIM(o.agent_no), ''), 'N/A') as agent_no,
                 SUM(COALESCE(oi.quantity, 0)) as qty
             ")
-            ->groupByRaw("
-                oi.product_no COLLATE utf8mb4_unicode_ci,
-                COALESCE(NULLIF(TRIM(o.agent_no) COLLATE utf8mb4_unicode_ci, ''), 'N/A')
-            ")
+            ->groupBy('oi.product_no')
+            ->groupByRaw("COALESCE(NULLIF(TRIM(o.agent_no), ''), 'N/A')")
             ->get();
 
         $agentColumns = $rows->pluck('agent_no')->unique()->sort()->values()->all();
