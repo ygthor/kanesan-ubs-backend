@@ -68,15 +68,15 @@
                     formtarget="_blank"
                     class="btn btn-danger"
                 >
-                    <i class="fas fa-file-pdf"></i> Print PDF (Landscape)
+                    <i class="fas fa-file-pdf"></i> Print PDF
                 </button>
-                <button
+                {{-- <button
                     type="submit"
                     formaction="{{ route('admin.reports.group-product-sales-year.export.excel') }}"
                     class="btn btn-success"
                 >
                     <i class="fas fa-file-excel"></i> Export Excel
-                </button>
+                </button> --}}
             </div>
         </div>
     </form>

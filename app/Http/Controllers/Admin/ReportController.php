@@ -248,7 +248,7 @@ class ReportController extends Controller
         $pdf->SetCreator('KBS System');
         $pdf->SetAuthor(auth()->user()->name ?? 'System');
         $pdf->SetTitle('Group Product Sales Report By Agent');
-        $pdf->SetMargins(4, 4, 4);
+        $pdf->SetMargins(8, 4, 8);
         $pdf->SetAutoPageBreak(true, 9);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(true);
@@ -1338,11 +1338,14 @@ class ReportController extends Controller
 
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
         $colCode = 25.0;
-        $colDesc = 94.0;
+        $colDesc = 78.0;
         $remaining = max(40, $pageWidth - $colCode - $colDesc);
         $agentCount = max(1, count($agentColumns));
         $colOther = $remaining / ($agentCount + 1); // +1 total column
         $colTotal = $colOther;
+
+        // Add slight inner left/right spacing for better readability in cells.
+        // $pdf->setCellPaddings(1.2, 0.5, 1.2, 0.5);
 
         $drawTableHeader = function () use (
             $pdf,
@@ -1362,15 +1365,15 @@ class ReportController extends Controller
             $year = (int) date('Y', strtotime($fromDate));
             $periodLabel = $report['periodLabel'] ?? 'CUSTOM';
 
-            $pdf->SetFont('helvetica', 'B', 11);
+            $pdf->SetFont('helvetica', 'B', 10);
             $pdf->Cell(0, 6, 'PERKHIDMATAN DAN JUALAN KANESAN BERSAUDARA', 0, 1, 'C');
             $pdf->Cell(0, 6, 'GROUP PRODUCT SALES REPORT - YEAR ' . $year, 0, 1, 'C');
-            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->SetFont('helvetica', 'B', 9);
             $pdf->Cell(0, 6, date('d/m/Y', strtotime($fromDate)) . ' - ' . date('d/m/Y', strtotime($toDate)), 0, 1, 'C');
             $pdf->Ln(1);
 
             // Totals row with period badge at right
-            $pdf->SetFont('helvetica', '', 10);
+            $pdf->SetFont('helvetica', '', 9);
             $pdf->SetFillColor(255, 255, 255);
             $pdf->Cell($colCode, 6, '', 0, 0, 'C', true);
             $pdf->Cell($colDesc, 6, '', 0, 0, 'C', true);
@@ -1383,16 +1386,16 @@ class ReportController extends Controller
             $pdf->SetTextColor(0, 0, 0);
 
             // Row: CODE / ITEM DESCRIPTION / QTY SOLD span
-            $pdf->SetFont('helvetica', 'BI', 10);
+            $pdf->SetFont('helvetica', 'BI', 9);
             $pdf->SetFillColor(245, 245, 245);
             $pdf->Cell($colCode, 7, 'CODE', 1, 0, 'C', true);
             $pdf->Cell($colDesc, 7, 'ITEM DESCRIPTION', 1, 0, 'C', true);
             $pdf->Cell($colOther * count($agentColumns), 7, 'QTY SOLD', 1, 0, 'C', true);
-            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->SetFont('helvetica', 'B', 9);
             $pdf->Cell($colTotal, 7, '', 1, 1, 'C', true);
 
             // Agent headers row
-            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->SetFont('helvetica', 'B', 9);
             $pdf->Cell($colCode, 10, '', 1, 0, 'C', true);
             $pdf->Cell($colDesc, 10, '', 1, 0, 'C', true);
             foreach ($agentColumns as $idx => $agent) {
@@ -1416,13 +1419,13 @@ class ReportController extends Controller
 
         foreach ($groupedItems as $groupName => $items) {
             $ensureSpace(7);
-            $pdf->SetFont('helvetica', 'B', 12);
+            $pdf->SetFont('helvetica', 'B', 11);
             $pdf->SetFillColor(245, 245, 245);
             $pdf->Cell($colCode + $colDesc + ($colOther * count($agentColumns)) + $colTotal, 7, 'Group :' . $groupName, 1, 1, 'L', true);
 
             foreach ($items as $item) {
                 $ensureSpace(6);
-                $pdf->SetFont('helvetica', '', 10);
+                $pdf->SetFont('helvetica', '', 9);
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->Cell($colCode, 6, (string) $item['item_code'], 1, 0, 'L', true);
                 $pdf->Cell($colDesc, 6, (string) $item['item_description'], 1, 0, 'L', true);
@@ -1431,19 +1434,19 @@ class ReportController extends Controller
                     $pdf->Cell($colOther, 6, $formatQty($item['agents'][$agent] ?? 0), 1, 0, 'C', true);
                 }
 
-                $pdf->SetFont('helvetica', 'B', 10);
+                $pdf->SetFont('helvetica', 'B', 9);
                 $pdf->Cell($colTotal, 6, $formatQty($item['total'] ?? 0), 1, 1, 'C', true);
             }
 
             $ensureSpace(6);
-            $pdf->SetFont('helvetica', '', 10);
+            $pdf->SetFont('helvetica', '', 9);
             $pdf->SetFillColor(255, 255, 255);
             $pdf->Cell($colCode + $colDesc + ($colOther * count($agentColumns)) + $colTotal, 6, '', 1, 1, 'L', true);
         }
 
         // Grand total footer row
         $ensureSpace(7);
-        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetFillColor(245, 245, 245);
         $pdf->Cell($colCode + $colDesc, 7, 'GRAND TOTAL', 1, 0, 'R', true);
         foreach ($agentColumns as $agent) {
