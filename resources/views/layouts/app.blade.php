@@ -97,7 +97,14 @@
                                     <p>Stock Management</p>
                                 </a>
                             </li>
-                           
+                            <li class="nav-item">
+                                <a href="{{ route('admin.stock-requests.index') }}"
+                                    class="nav-link {{ request()->is('admin/stock-requests*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-clipboard-list"></i>
+                                    <p>Stock Requests</p>
+                                </a>
+                            </li>
+
                         @endif
 
                         @if (auth()->check() && auth()->user()->hasRole('admin'))

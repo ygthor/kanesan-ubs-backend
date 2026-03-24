@@ -10,8 +10,12 @@ use App\Models\Receipt;
 use App\Models\User;
 use App\Models\Territory;
 use App\Services\BusinessReportService;
+use App\Exports\GroupProductSalesByYearExport;
+use App\Exports\GroupProductSalesByAgentExport;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
@@ -64,9 +68,225 @@ class ReportController extends Controller
                 'route' => route('admin.reports.customer-balance'),
                 'icon' => 'fas fa-balance-scale',
             ],
+            [
+                'name' => 'Group Product Sales Report By Year',
+                'description' => 'Grouped product sales with monthly quantity columns',
+                'route' => route('admin.reports.group-product-sales-year'),
+                'icon' => 'fas fa-calendar-alt',
+            ],
+            [
+                'name' => 'Group Product Sales Report By Agent',
+                'description' => 'Grouped product sales with agent quantity columns',
+                'route' => route('admin.reports.group-product-sales-agent'),
+                'icon' => 'fas fa-user-friends',
+            ],
         ];
 
         return view('admin.reports.index', compact('reports'));
+    }
+
+    /**
+     * Group Product Sales Report By Year (Preview)
+     */
+    public function groupProductSalesByYearReport(Request $request)
+    {
+        $this->checkAccess();
+
+        $filters = [
+            'year' => (int) $request->input('year', now()->year),
+            'agent_no' => $request->input('agent_no'),
+            'product_search' => trim((string) $request->input('product_search', '')),
+            'group' => trim((string) $request->input('group', '')),
+        ];
+
+        $report = $this->buildGroupProductSalesByYearData($filters);
+        $agents = $this->getAgents();
+        $groups = $this->getItemGroups();
+
+        return view('admin.reports.group-product-sales-year-report', array_merge($report, [
+            'filters' => $filters,
+            'agents' => $agents,
+            'groups' => $groups,
+        ]));
+    }
+
+    /**
+     * Group Product Sales Report By Agent (Preview)
+     */
+    public function groupProductSalesByAgentReport(Request $request)
+    {
+        $this->checkAccess();
+
+        [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
+            $request->input('date_preset', 'this_month'),
+            $request->input('from_date'),
+            $request->input('to_date')
+        );
+
+        $filters = [
+            'date_preset' => $datePreset,
+            'from_date' => $fromDate,
+            'to_date' => $toDate,
+            'product_search' => trim((string) $request->input('product_search', '')),
+            'group' => trim((string) $request->input('group', '')),
+            'period_label' => $this->getAgentPeriodLabel($datePreset, $fromDate, $toDate),
+        ];
+
+        $report = $this->buildGroupProductSalesByAgentData($filters);
+        $groups = $this->getItemGroups();
+
+        return view('admin.reports.group-product-sales-agent-report', array_merge($report, [
+            'filters' => $filters,
+            'groups' => $groups,
+        ]));
+    }
+
+    /**
+     * Group Product Sales Report By Year (PDF - Landscape)
+     */
+    public function exportGroupProductSalesByYearPdf(Request $request)
+    {
+        $this->checkAccess();
+
+        $filters = [
+            'year' => (int) $request->input('year', now()->year),
+            'agent_no' => $request->input('agent_no'),
+            'product_search' => trim((string) $request->input('product_search', '')),
+            'group' => trim((string) $request->input('group', '')),
+        ];
+
+        $report = $this->buildGroupProductSalesByYearData($filters);
+
+        $printedAt = now()->format('Y-m-d H:i:s');
+        $filename = 'group_product_sales_by_year_' . $filters['year'] . '_' . now()->format('Ymd_His') . '.pdf';
+        $pdf = new class('L', 'mm', 'A4', true, 'UTF-8', false) extends \TCPDF {
+            public string $printedAt = '';
+
+            public function Footer()
+            {
+                $this->SetY(-7);
+                $this->SetFont('helvetica', '', 8);
+                $this->Cell(0, 4, 'Printed at ' . $this->printedAt, 0, 0, 'L');
+                $this->Cell(0, 4, 'Page ' . $this->getAliasNumPage() . ' of ' . $this->getAliasNbPages(), 0, 0, 'R');
+            }
+        };
+        $pdf->printedAt = $printedAt;
+        $pdf->SetCreator('KBS System');
+        $pdf->SetAuthor(auth()->user()->name ?? 'System');
+        $pdf->SetTitle('Group Product Sales Report By Year');
+        $pdf->SetMargins(4, 4, 4);
+        $pdf->SetAutoPageBreak(true, 9);
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(true);
+        $pdf->AddPage();
+        $this->renderGroupProductSalesByYearPdfCells($pdf, $report, $filters);
+
+        return response($pdf->Output($filename, 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * Group Product Sales Report By Year (Excel)
+     */
+    public function exportGroupProductSalesByYearExcel(Request $request)
+    {
+        $this->checkAccess();
+
+        $filters = [
+            'year' => (int) $request->input('year', now()->year),
+            'agent_no' => $request->input('agent_no'),
+            'product_search' => trim((string) $request->input('product_search', '')),
+            'group' => trim((string) $request->input('group', '')),
+        ];
+
+        $report = $this->buildGroupProductSalesByYearData($filters);
+        $filename = 'group_product_sales_by_year_' . $filters['year'] . '_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(new GroupProductSalesByYearExport(array_merge($report, ['filters' => $filters])), $filename);
+    }
+
+    /**
+     * Group Product Sales Report By Agent (PDF - Portrait)
+     */
+    public function exportGroupProductSalesByAgentPdf(Request $request)
+    {
+        $this->checkAccess();
+
+        [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
+            $request->input('date_preset', 'this_month'),
+            $request->input('from_date'),
+            $request->input('to_date')
+        );
+
+        $filters = [
+            'date_preset' => $datePreset,
+            'from_date' => $fromDate,
+            'to_date' => $toDate,
+            'product_search' => trim((string) $request->input('product_search', '')),
+            'group' => trim((string) $request->input('group', '')),
+            'period_label' => $this->getAgentPeriodLabel($datePreset, $fromDate, $toDate),
+        ];
+
+        $report = $this->buildGroupProductSalesByAgentData($filters);
+
+        $printedAt = now()->format('Y-m-d H:i:s');
+        $filename = 'group_product_sales_by_agent_' . now()->format('Ymd_His') . '.pdf';
+        $pdf = new class('P', 'mm', 'A4', true, 'UTF-8', false) extends \TCPDF {
+            public string $printedAt = '';
+
+            public function Footer()
+            {
+                $this->SetY(-7);
+                $this->SetFont('helvetica', '', 8);
+                $this->Cell(0, 4, 'Printed at ' . $this->printedAt, 0, 0, 'L');
+                $this->Cell(0, 4, 'Page ' . $this->getAliasNumPage() . ' of ' . $this->getAliasNbPages(), 0, 0, 'R');
+            }
+        };
+        $pdf->printedAt = $printedAt;
+        $pdf->SetCreator('KBS System');
+        $pdf->SetAuthor(auth()->user()->name ?? 'System');
+        $pdf->SetTitle('Group Product Sales Report By Agent');
+        $pdf->SetMargins(4, 4, 4);
+        $pdf->SetAutoPageBreak(true, 9);
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(true);
+        $pdf->AddPage();
+        $this->renderGroupProductSalesByAgentPdfCells($pdf, $report, $filters);
+
+        return response($pdf->Output($filename, 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * Group Product Sales Report By Agent (Excel)
+     */
+    public function exportGroupProductSalesByAgentExcel(Request $request)
+    {
+        $this->checkAccess();
+
+        [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
+            $request->input('date_preset', 'this_month'),
+            $request->input('from_date'),
+            $request->input('to_date')
+        );
+
+        $filters = [
+            'date_preset' => $datePreset,
+            'from_date' => $fromDate,
+            'to_date' => $toDate,
+            'product_search' => trim((string) $request->input('product_search', '')),
+            'group' => trim((string) $request->input('group', '')),
+            'period_label' => $this->getAgentPeriodLabel($datePreset, $fromDate, $toDate),
+        ];
+
+        $report = $this->buildGroupProductSalesByAgentData($filters);
+        $filename = 'group_product_sales_by_agent_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(new GroupProductSalesByAgentExport(array_merge($report, ['filters' => $filters])), $filename);
     }
 
     /**
@@ -872,6 +1092,515 @@ class ReportController extends Controller
             'error' => false,
             'data' => $order->toArray()
         ]);
+    }
+
+    private function buildGroupProductSalesByYearData(array $filters): array
+    {
+        $year = max(2000, (int) ($filters['year'] ?? now()->year));
+        $startDate = sprintf('%04d-01-01 00:00:00', $year);
+        $endDate = sprintf('%04d-12-31 23:59:59', $year);
+
+        // 1) Base list: include all products from master item table
+        $baseItemsQuery = DB::table('icitem as i')
+            ->selectRaw("
+                COALESCE(i.`GROUP` COLLATE utf8mb4_unicode_ci, '') as item_group,
+                i.ITEMNO COLLATE utf8mb4_unicode_ci as item_code,
+                COALESCE(NULLIF(i.DESP COLLATE utf8mb4_unicode_ci, ''), i.ITEMNO COLLATE utf8mb4_unicode_ci) as item_description
+            ")
+            ->whereNotNull('i.GROUP')
+            ->whereRaw("TRIM(i.`GROUP`) != ''");
+
+        if (!empty($filters['group'])) {
+            $baseItemsQuery->whereRaw(
+                "COALESCE(i.`GROUP` COLLATE utf8mb4_unicode_ci, '') = CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci",
+                [$filters['group']]
+            );
+        }
+        if (!empty($filters['product_search'])) {
+            $search = $filters['product_search'];
+            $baseItemsQuery->where(function ($q) use ($search) {
+                $q->whereRaw("i.ITEMNO COLLATE utf8mb4_unicode_ci LIKE CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci", ["%{$search}%"])
+                    ->orWhereRaw("COALESCE(i.DESP, '') COLLATE utf8mb4_unicode_ci LIKE CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci", ["%{$search}%"]);
+            });
+        }
+
+        $baseItems = $baseItemsQuery
+            ->orderByRaw("COALESCE(i.`GROUP`, '')")
+            ->orderBy('i.ITEMNO')
+            ->get();
+
+        // 2) Sales qty aggregated by product + month
+        $aggQuery = DB::table('order_items as oi')
+            ->join('orders as o', 'o.reference_no', '=', 'oi.reference_no')
+            ->where('o.type', 'INV')
+            ->whereBetween('o.order_date', [$startDate, $endDate]);
+
+        if (!empty($filters['agent_no'])) {
+            $aggQuery->where('o.agent_no', $filters['agent_no']);
+        }
+
+        $rows = $aggQuery
+            ->selectRaw("
+                oi.product_no COLLATE utf8mb4_unicode_ci as item_code,
+                MONTH(o.order_date) as month_no,
+                SUM(COALESCE(oi.quantity, 0)) as qty
+            ")
+            ->groupByRaw("oi.product_no COLLATE utf8mb4_unicode_ci, MONTH(o.order_date)")
+            ->get();
+
+        $months = [
+            1 => 'JAN', 2 => 'FEB', 3 => 'MAR', 4 => 'APR', 5 => 'MAY', 6 => 'JUN',
+            7 => 'JUL', 8 => 'AUG', 9 => 'SEP', 10 => 'OCT', 11 => 'NOV', 12 => 'DEC',
+        ];
+
+        $items = [];
+        $itemKeyByCode = [];
+        $monthTotals = array_fill(1, 12, 0);
+
+        foreach ($baseItems as $baseItem) {
+            $itemKey = $baseItem->item_group . '|' . $baseItem->item_code;
+            $items[$itemKey] = [
+                'item_group' => $baseItem->item_group,
+                'item_code' => $baseItem->item_code,
+                'item_description' => $baseItem->item_description,
+                'months' => array_fill(1, 12, 0),
+                'total' => 0,
+            ];
+            $itemKeyByCode[(string) $baseItem->item_code] = $itemKey;
+        }
+
+        foreach ($rows as $row) {
+            $code = (string) $row->item_code;
+            if (!isset($itemKeyByCode[$code])) {
+                continue;
+            }
+            $itemKey = $itemKeyByCode[$code];
+            $monthNo = (int) $row->month_no;
+            $qty = (float) $row->qty;
+            $items[$itemKey]['months'][$monthNo] += $qty;
+            $items[$itemKey]['total'] += $qty;
+            $monthTotals[$monthNo] += $qty;
+        }
+
+        $grandTotal = array_sum($monthTotals);
+        $groupedItems = collect($items)->groupBy('item_group');
+
+        return [
+            'months' => $months,
+            'groupedItems' => $groupedItems,
+            'monthTotals' => $monthTotals,
+            'grandTotal' => $grandTotal,
+            'year' => $year,
+        ];
+    }
+
+    private function buildGroupProductSalesByAgentData(array $filters): array
+    {
+        $fromDate = $filters['from_date'] ?? now()->startOfMonth()->toDateString();
+        $toDate = $filters['to_date'] ?? now()->toDateString();
+        $fromDateForQuery = strlen($fromDate) === 10 ? $fromDate . ' 00:00:00' : $fromDate;
+        $toDateForQuery = strlen($toDate) === 10 ? $toDate . ' 23:59:59' : $toDate;
+
+        // 1) Base list: include all products from master item table
+        $baseItemsQuery = DB::table('icitem as i')
+            ->selectRaw("
+                COALESCE(i.`GROUP` COLLATE utf8mb4_unicode_ci, '') as item_group,
+                i.ITEMNO COLLATE utf8mb4_unicode_ci as item_code,
+                COALESCE(NULLIF(i.DESP COLLATE utf8mb4_unicode_ci, ''), i.ITEMNO COLLATE utf8mb4_unicode_ci) as item_description
+            ")
+            ->whereNotNull('i.GROUP')
+            ->whereRaw("TRIM(i.`GROUP`) != ''");
+
+        if (!empty($filters['group'])) {
+            $baseItemsQuery->whereRaw(
+                "COALESCE(i.`GROUP` COLLATE utf8mb4_unicode_ci, '') = CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci",
+                [$filters['group']]
+            );
+        }
+        if (!empty($filters['product_search'])) {
+            $search = $filters['product_search'];
+            $baseItemsQuery->where(function ($q) use ($search) {
+                $q->whereRaw("i.ITEMNO COLLATE utf8mb4_unicode_ci LIKE CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci", ["%{$search}%"])
+                    ->orWhereRaw("COALESCE(i.DESP, '') COLLATE utf8mb4_unicode_ci LIKE CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci", ["%{$search}%"]);
+            });
+        }
+
+        $baseItems = $baseItemsQuery
+            ->orderByRaw("COALESCE(i.`GROUP`, '')")
+            ->orderBy('i.ITEMNO')
+            ->get();
+
+        // 2) Sales qty aggregated by product + agent
+        $aggQuery = DB::table('order_items as oi')
+            ->join('orders as o', 'o.reference_no', '=', 'oi.reference_no')
+            ->where('o.type', 'INV')
+            ->whereBetween('o.order_date', [$fromDateForQuery, $toDateForQuery]);
+
+        $rows = $aggQuery
+            ->selectRaw("
+                oi.product_no COLLATE utf8mb4_unicode_ci as item_code,
+                COALESCE(NULLIF(TRIM(o.agent_no) COLLATE utf8mb4_unicode_ci, ''), 'N/A') as agent_no,
+                SUM(COALESCE(oi.quantity, 0)) as qty
+            ")
+            ->groupByRaw("
+                oi.product_no COLLATE utf8mb4_unicode_ci,
+                COALESCE(NULLIF(TRIM(o.agent_no) COLLATE utf8mb4_unicode_ci, ''), 'N/A')
+            ")
+            ->get();
+
+        $agentColumns = $rows->pluck('agent_no')->unique()->sort()->values()->all();
+        $items = [];
+        $itemKeyByCode = [];
+        $agentTotals = [];
+        foreach ($agentColumns as $agent) {
+            $agentTotals[$agent] = 0;
+        }
+
+        foreach ($baseItems as $baseItem) {
+            $itemKey = $baseItem->item_group . '|' . $baseItem->item_code;
+            $items[$itemKey] = [
+                'item_group' => $baseItem->item_group,
+                'item_code' => $baseItem->item_code,
+                'item_description' => $baseItem->item_description,
+                'agents' => array_fill_keys($agentColumns, 0),
+                'total' => 0,
+            ];
+            $itemKeyByCode[(string) $baseItem->item_code] = $itemKey;
+        }
+
+        foreach ($rows as $row) {
+            $code = (string) $row->item_code;
+            if (!isset($itemKeyByCode[$code])) {
+                continue;
+            }
+            $itemKey = $itemKeyByCode[$code];
+            $agent = $row->agent_no;
+            $qty = (float) $row->qty;
+            if (!array_key_exists($agent, $items[$itemKey]['agents'])) {
+                $items[$itemKey]['agents'][$agent] = 0;
+                if (!isset($agentTotals[$agent])) {
+                    $agentTotals[$agent] = 0;
+                }
+            }
+            $items[$itemKey]['agents'][$agent] += $qty;
+            $items[$itemKey]['total'] += $qty;
+            $agentTotals[$agent] += $qty;
+        }
+
+        $grandTotal = array_sum($agentTotals);
+        $groupedItems = collect($items)->groupBy('item_group');
+
+        return [
+            'groupedItems' => $groupedItems,
+            'agentColumns' => $agentColumns,
+            'agentTotals' => $agentTotals,
+            'grandTotal' => $grandTotal,
+            'fromDate' => substr($fromDate, 0, 10),
+            'toDate' => substr($toDate, 0, 10),
+            'periodLabel' => $filters['period_label'] ?? 'CUSTOM',
+        ];
+    }
+
+    private function getItemGroups()
+    {
+        return DB::table('icitem')
+            ->selectRaw('DISTINCT COALESCE(`GROUP`, \'\') as group_name')
+            ->whereNotNull('GROUP')
+            ->whereRaw('TRIM(`GROUP`) != \'\'')
+            ->orderBy('group_name')
+            ->pluck('group_name');
+    }
+
+    private function renderGroupProductSalesByAgentPdfCells(\TCPDF $pdf, array $report, array $filters): void
+    {
+        $groupedItems = $report['groupedItems'];
+        $agentColumns = $report['agentColumns'];
+        $agentTotals = $report['agentTotals'];
+        $fromDate = $report['fromDate'];
+        $toDate = $report['toDate'];
+        $grandTotal = $report['grandTotal'];
+
+        $formatQty = function ($qty) {
+            $v = (float) $qty;
+            if (abs($v - round($v)) < 0.00001) {
+                return (string) (int) round($v);
+            }
+            return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+        };
+
+        $agentHeaderColors = [
+            [0, 255, 51],   // green
+            [255, 0, 255],  // magenta
+            [0, 229, 255],  // cyan
+            [255, 176, 0],  // orange
+            [95, 143, 220], // blue
+        ];
+
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colCode = 25.0;
+        $colDesc = 94.0;
+        $remaining = max(40, $pageWidth - $colCode - $colDesc);
+        $agentCount = max(1, count($agentColumns));
+        $colOther = $remaining / ($agentCount + 1); // +1 total column
+        $colTotal = $colOther;
+
+        $drawTableHeader = function () use (
+            $pdf,
+            $fromDate,
+            $toDate,
+            $agentColumns,
+            $agentTotals,
+            $grandTotal,
+            $report,
+            $formatQty,
+            $agentHeaderColors,
+            $colCode,
+            $colDesc,
+            $colOther,
+            $colTotal
+        ) {
+            $year = (int) date('Y', strtotime($fromDate));
+            $periodLabel = $report['periodLabel'] ?? 'CUSTOM';
+
+            $pdf->SetFont('helvetica', 'B', 11);
+            $pdf->Cell(0, 6, 'PERKHIDMATAN DAN JUALAN KANESAN BERSAUDARA', 0, 1, 'C');
+            $pdf->Cell(0, 6, 'GROUP PRODUCT SALES REPORT - YEAR ' . $year, 0, 1, 'C');
+            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->Cell(0, 6, date('d/m/Y', strtotime($fromDate)) . ' - ' . date('d/m/Y', strtotime($toDate)), 0, 1, 'C');
+            $pdf->Ln(1);
+
+            // Totals row with period badge at right
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->SetFillColor(255, 255, 255);
+            $pdf->Cell($colCode, 6, '', 0, 0, 'C', true);
+            $pdf->Cell($colDesc, 6, '', 0, 0, 'C', true);
+            foreach ($agentColumns as $agent) {
+                $pdf->Cell($colOther, 6, $formatQty($agentTotals[$agent] ?? 0), 0, 0, 'C', true);
+            }
+            $pdf->SetFillColor(0, 0, 0);
+            $pdf->SetTextColor(255, 255, 255);
+            $pdf->Cell($colTotal, 6, $periodLabel, 1, 1, 'C', true);
+            $pdf->SetTextColor(0, 0, 0);
+
+            // Row: CODE / ITEM DESCRIPTION / QTY SOLD span
+            $pdf->SetFont('helvetica', 'BI', 10);
+            $pdf->SetFillColor(245, 245, 245);
+            $pdf->Cell($colCode, 7, 'CODE', 1, 0, 'C', true);
+            $pdf->Cell($colDesc, 7, 'ITEM DESCRIPTION', 1, 0, 'C', true);
+            $pdf->Cell($colOther * count($agentColumns), 7, 'QTY SOLD', 1, 0, 'C', true);
+            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->Cell($colTotal, 7, '', 1, 1, 'C', true);
+
+            // Agent headers row
+            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->Cell($colCode, 10, '', 1, 0, 'C', true);
+            $pdf->Cell($colDesc, 10, '', 1, 0, 'C', true);
+            foreach ($agentColumns as $idx => $agent) {
+                $c = $agentHeaderColors[$idx % count($agentHeaderColors)];
+                $pdf->SetFillColor($c[0], $c[1], $c[2]);
+                $pdf->Cell($colOther, 10, $agent, 1, 0, 'C', true);
+            }
+            $pdf->SetFillColor(245, 245, 245);
+            $pdf->Cell($colTotal, 10, 'TOTAL', 1, 1, 'C', true);
+        };
+
+        $ensureSpace = function ($neededHeight) use ($pdf, $drawTableHeader) {
+            $bottomLimit = $pdf->getPageHeight() - $pdf->getMargins()['bottom'];
+            if (($pdf->GetY() + $neededHeight) > $bottomLimit) {
+                $pdf->AddPage();
+                $drawTableHeader();
+            }
+        };
+
+        $drawTableHeader();
+
+        foreach ($groupedItems as $groupName => $items) {
+            $ensureSpace(7);
+            $pdf->SetFont('helvetica', 'B', 12);
+            $pdf->SetFillColor(245, 245, 245);
+            $pdf->Cell($colCode + $colDesc + ($colOther * count($agentColumns)) + $colTotal, 7, 'Group :' . $groupName, 1, 1, 'L', true);
+
+            foreach ($items as $item) {
+                $ensureSpace(6);
+                $pdf->SetFont('helvetica', '', 10);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->Cell($colCode, 6, (string) $item['item_code'], 1, 0, 'L', true);
+                $pdf->Cell($colDesc, 6, (string) $item['item_description'], 1, 0, 'L', true);
+
+                foreach ($agentColumns as $agent) {
+                    $pdf->Cell($colOther, 6, $formatQty($item['agents'][$agent] ?? 0), 1, 0, 'C', true);
+                }
+
+                $pdf->SetFont('helvetica', 'B', 10);
+                $pdf->Cell($colTotal, 6, $formatQty($item['total'] ?? 0), 1, 1, 'C', true);
+            }
+
+            $ensureSpace(6);
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->SetFillColor(255, 255, 255);
+            $pdf->Cell($colCode + $colDesc + ($colOther * count($agentColumns)) + $colTotal, 6, '', 1, 1, 'L', true);
+        }
+
+        // Grand total footer row
+        $ensureSpace(7);
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetFillColor(245, 245, 245);
+        $pdf->Cell($colCode + $colDesc, 7, 'GRAND TOTAL', 1, 0, 'R', true);
+        foreach ($agentColumns as $agent) {
+            $pdf->Cell($colOther, 7, $formatQty($agentTotals[$agent] ?? 0), 1, 0, 'C', true);
+        }
+        $pdf->Cell($colTotal, 7, $formatQty($grandTotal), 1, 1, 'C', true);
+    }
+
+    private function resolveDateRangeByPreset(?string $preset, ?string $fromDate, ?string $toDate): array
+    {
+        $allowed = ['this_month', 'last_month', 'this_quarter', 'last_quarter', 'this_year', 'last_year', 'custom'];
+        $preset = in_array($preset, $allowed, true) ? $preset : 'this_month';
+        $now = Carbon::now();
+
+        switch ($preset) {
+            case 'this_month':
+                return [$now->copy()->startOfMonth()->toDateString(), $now->copy()->endOfMonth()->toDateString(), $preset];
+            case 'last_month':
+                $lastMonth = $now->copy()->subMonthNoOverflow();
+                return [$lastMonth->copy()->startOfMonth()->toDateString(), $lastMonth->copy()->endOfMonth()->toDateString(), $preset];
+            case 'this_quarter':
+                return [$now->copy()->startOfQuarter()->toDateString(), $now->copy()->endOfQuarter()->toDateString(), $preset];
+            case 'last_quarter':
+                $lastQuarter = $now->copy()->subQuarter();
+                return [$lastQuarter->copy()->startOfQuarter()->toDateString(), $lastQuarter->copy()->endOfQuarter()->toDateString(), $preset];
+            case 'this_year':
+                return [$now->copy()->startOfYear()->toDateString(), $now->copy()->endOfYear()->toDateString(), $preset];
+            case 'last_year':
+                $lastYear = $now->copy()->subYear();
+                return [$lastYear->copy()->startOfYear()->toDateString(), $lastYear->copy()->endOfYear()->toDateString(), $preset];
+            case 'custom':
+            default:
+                $from = $fromDate ?: $now->copy()->startOfMonth()->toDateString();
+                $to = $toDate ?: $now->copy()->toDateString();
+                return [$from, $to, 'custom'];
+        }
+    }
+
+    private function getAgentPeriodLabel(string $preset, string $fromDate, string $toDate): string
+    {
+        $from = Carbon::parse($fromDate);
+
+        return match ($preset) {
+            'this_month', 'last_month' => strtoupper($from->format('M')),
+            'this_quarter', 'last_quarter' => $from->format('Y') . 'Q' . $from->quarter,
+            'this_year', 'last_year' => $from->format('Y'),
+            default => 'CUSTOM',
+        };
+    }
+
+    private function renderGroupProductSalesByYearPdfCells(\TCPDF $pdf, array $report, array $filters): void
+    {
+        $groupedItems = $report['groupedItems'];
+        $months = $report['months'];
+        $monthTotals = $report['monthTotals'];
+        $grandTotal = $report['grandTotal'];
+        $year = $report['year'];
+
+        $formatQty = function ($qty) {
+            $v = (float) $qty;
+            if (abs($v - round($v)) < 0.00001) {
+                return (string) (int) round($v);
+            }
+            return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+        };
+
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colCode = 30.0;
+        $colDesc = 88.0;
+        $monthCount = 13; // Jan-Dec + Total
+        $colMonth = max(9.5, ($pageWidth - $colCode - $colDesc) / $monthCount);
+        $tableWidth = $colCode + $colDesc + ($colMonth * $monthCount);
+
+        $agentLabel = trim((string) ($filters['agent_no'] ?? ''));
+        $agentLabel = $agentLabel !== '' ? $agentLabel : 'ALL AGENTS';
+
+        $drawHeader = function () use (
+            $pdf,
+            $year,
+            $months,
+            $monthCount,
+            $monthTotals,
+            $grandTotal,
+            $formatQty,
+            $colCode,
+            $colDesc,
+            $colMonth,
+            $tableWidth,
+            $agentLabel
+        ) {
+            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->SetFillColor(245, 245, 245);
+            $pdf->Cell($tableWidth, 7, 'PERKHIDMATAN DAN JUALAN KANESAN BERSAUDARA', 1, 1, 'C', true);
+            $pdf->Cell($tableWidth, 7, 'GROUP PRODUCT SALES REPORT - YEAR ' . $year, 1, 1, 'C', true);
+
+            $pdf->SetFillColor(235, 0, 235);
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->Cell($tableWidth, 7, $agentLabel, 1, 1, 'C', true);
+
+            $pdf->SetFont('helvetica', '', 9);
+            $pdf->SetFillColor(255, 255, 255);
+            $pdf->Cell($colCode + $colDesc, 7, '', 1, 0, 'C', true);
+            foreach ($months as $monthNo => $monthLabel) {
+                $pdf->Cell($colMonth, 7, $formatQty($monthTotals[$monthNo] ?? 0), 1, 0, 'C', true);
+            }
+            $pdf->Cell($colMonth, 7, $formatQty($grandTotal), 1, 1, 'C', true);
+
+            // Row: CODE / ITEM DESCRIPTION / QTY SOLD span
+            $pdf->SetFont('helvetica', 'BI', 9);
+            $pdf->SetFillColor(245, 245, 245);
+            $pdf->Cell($colCode, 8, 'CODE', 1, 0, 'C', true);
+            $pdf->Cell($colDesc, 8, 'ITEM DESCRIPTION', 1, 0, 'C', true);
+            $pdf->Cell($colMonth * $monthCount, 8, 'QTY SOLD', 1, 1, 'C', true);
+
+            // Months header row
+            $pdf->SetFont('helvetica', 'B', 9);
+            $pdf->Cell($colCode + $colDesc, 8, '', 1, 0, 'C', true);
+            foreach ($months as $monthNo => $monthLabel) {
+                $pdf->Cell($colMonth, 8, $monthLabel, 1, 0, 'C', true);
+            }
+            $pdf->Cell($colMonth, 8, 'TOTAL', 1, 1, 'C', true);
+        };
+
+        $ensureSpace = function ($neededHeight) use ($pdf, $drawHeader) {
+            $bottomLimit = $pdf->getPageHeight() - $pdf->getMargins()['bottom'];
+            if (($pdf->GetY() + $neededHeight) > $bottomLimit) {
+                $pdf->AddPage();
+                $drawHeader();
+            }
+        };
+
+        $drawHeader();
+
+        foreach ($groupedItems as $groupName => $items) {
+            $ensureSpace(7);
+            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->SetFillColor(245, 245, 245);
+            $pdf->Cell($tableWidth, 7, 'Group :' . $groupName, 1, 1, 'L', true);
+
+            foreach ($items as $item) {
+                $ensureSpace(6.5);
+                $pdf->SetFont('helvetica', '', 8);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->Cell($colCode, 6.5, (string) $item['item_code'], 1, 0, 'L', true);
+                $pdf->Cell($colDesc, 6.5, (string) $item['item_description'], 1, 0, 'L', true);
+                foreach ($months as $monthNo => $monthLabel) {
+                    $pdf->Cell($colMonth, 6.5, $formatQty($item['months'][$monthNo] ?? 0), 1, 0, 'C', true);
+                }
+                $pdf->SetFont('helvetica', 'B', 8);
+                $pdf->Cell($colMonth, 6.5, $formatQty($item['total'] ?? 0), 1, 1, 'C', true);
+            }
+
+            $ensureSpace(6.5);
+            $pdf->SetFont('helvetica', '', 8);
+            $pdf->SetFillColor(255, 255, 255);
+            $pdf->Cell($tableWidth, 6.5, '', 1, 1, 'L', true);
+        }
     }
 
     /**

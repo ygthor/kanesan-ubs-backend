@@ -80,6 +80,12 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Period Management
     Route::resource('periods', \App\Http\Controllers\Admin\PeriodManagementController::class);
 
+    // Stock Request Management (KBS/admin only)
+    Route::get('stock-requests', [\App\Http\Controllers\Admin\StockRequestController::class, 'index'])->name('stock-requests.index');
+    Route::get('stock-requests/{id}', [\App\Http\Controllers\Admin\StockRequestController::class, 'show'])->name('stock-requests.show');
+    Route::post('stock-requests/{id}/approve', [\App\Http\Controllers\Admin\StockRequestController::class, 'approve'])->name('stock-requests.approve');
+    Route::post('stock-requests/{id}/reject', [\App\Http\Controllers\Admin\StockRequestController::class, 'reject'])->name('stock-requests.reject');
+
     // E-Invoice Request Management (KBS/admin only - checked in controller)
     Route::get('e-invoice-requests', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'index'])->name('e-invoice-requests.index');
     Route::get('e-invoice-requests/{id}/edit', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'edit'])->name('e-invoice-requests.edit');
@@ -97,6 +103,12 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\ReportController::class, 'index'])->name('index');
         Route::get('/sales', [\App\Http\Controllers\Admin\ReportController::class, 'salesReport'])->name('sales');
+        Route::get('/group-product-sales-year', [\App\Http\Controllers\Admin\ReportController::class, 'groupProductSalesByYearReport'])->name('group-product-sales-year');
+        Route::get('/group-product-sales-year/export/pdf', [\App\Http\Controllers\Admin\ReportController::class, 'exportGroupProductSalesByYearPdf'])->name('group-product-sales-year.export.pdf');
+        Route::get('/group-product-sales-year/export/excel', [\App\Http\Controllers\Admin\ReportController::class, 'exportGroupProductSalesByYearExcel'])->name('group-product-sales-year.export.excel');
+        Route::get('/group-product-sales-agent', [\App\Http\Controllers\Admin\ReportController::class, 'groupProductSalesByAgentReport'])->name('group-product-sales-agent');
+        Route::get('/group-product-sales-agent/export/pdf', [\App\Http\Controllers\Admin\ReportController::class, 'exportGroupProductSalesByAgentPdf'])->name('group-product-sales-agent.export.pdf');
+        Route::get('/group-product-sales-agent/export/excel', [\App\Http\Controllers\Admin\ReportController::class, 'exportGroupProductSalesByAgentExcel'])->name('group-product-sales-agent.export.excel');
         Route::get('/transactions', [\App\Http\Controllers\Admin\ReportController::class, 'transactionReport'])->name('transactions');
         Route::get('/transactions/{id}/detail', [\App\Http\Controllers\Admin\ReportController::class, 'getOrderDetail'])->name('transactions.detail');
         Route::get('/customers', [\App\Http\Controllers\Admin\ReportController::class, 'customerReport'])->name('customers');

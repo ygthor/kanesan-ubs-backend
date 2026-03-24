@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\InvoiceItemController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\TimeTestController;
+use App\Http\Controllers\Api\StockRequestController;
 // Removed: use App\Models\User; // Not directly used for routing definitions
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -192,6 +193,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Invoice items are just order items, use OrderItemController  
     Route::post('/invoices/create-with-items', [OrderController::class, 'createInvoiceWithItems'])->name('invoices.create-with-items');
     Route::apiResource('invoices-items', OrderItemController::class)->only(['index', 'store', 'update', 'show', 'destroy']);
+
+    // Stock Request routes (agent)
+    Route::get('/stock-requests', [StockRequestController::class, 'index'])->name('stock-requests.index');
+    Route::post('/stock-requests', [StockRequestController::class, 'store'])->name('stock-requests.store');
+    Route::get('/stock-requests/{id}', [StockRequestController::class, 'show'])->name('stock-requests.show');
 
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index')->middleware('filter.customer');
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
