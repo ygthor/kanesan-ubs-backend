@@ -28,6 +28,12 @@ Route::post('/e-invoice', [\App\Http\Controllers\EInvoiceController::class, 'sub
 // Test email route (for testing purposes)
 Route::get('/test/e-invoice-email', [\App\Http\Controllers\EInvoiceController::class, 'testEmail'])->name('test.e-invoice-email');
 
+// Test stock request create page (for manual web testing, no mobile app required)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/create-stock-requests', [\App\Http\Controllers\Web\TestStockRequestController::class, 'create'])->name('test.stock-requests.create');
+    Route::post('/create-stock-requests', [\App\Http\Controllers\Web\TestStockRequestController::class, 'store'])->name('test.stock-requests.store');
+});
+
 // Stock Management routes (requires authentication and admin/KBS access - checked in controller)
 Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'index'])->name('stock-management');

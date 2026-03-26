@@ -94,10 +94,74 @@
         <h6 class="mb-0">{{ \Carbon\Carbon::parse($fromDate)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($toDate)->format('d/m/Y') }}</h6>
     </div>
 
-    @include('admin.reports.partials.group-product-sales-agent-table')
+    <div class="row mb-3">
+        <div class="col-md-8 mb-3 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header py-2">
+                    <strong>Sales by Salesman</strong>
+                </div>
+                <div class="card-body" style="height: 320px;">
+                    <canvas id="agentBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header py-2">
+                    <strong>Sales Share by Salesman</strong>
+                </div>
+                <div class="card-body" style="height: 320px;">
+                    <canvas id="agentPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    @include('admin.reports.partials.group-product-sales-agent-table')
+@endsection
+
+@push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         (function () {
+            if (typeof Chart !== 'undefined' && !Chart.registry.plugins.get('valueOnBarPlugin')) {
+                Chart.register({
+                    id: 'valueOnBarPlugin',
+                    afterDatasetsDraw(chart, _args, pluginOptions) {
+                        if (chart.config.type !== 'bar' || pluginOptions?.enabled === false) {
+                            return;
+                        }
+                        const { ctx } = chart;
+                        const isHorizontal = chart.options?.indexAxis === 'y';
+                        const dataset = chart.data.datasets?.[0];
+                        const meta = chart.getDatasetMeta(0);
+                        if (!dataset || !meta?.data?.length) {
+                            return;
+                        }
+
+                        ctx.save();
+                        ctx.fillStyle = pluginOptions?.color || '#111827';
+                        ctx.font = pluginOptions?.font || '12px sans-serif';
+                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = isHorizontal ? 'left' : 'center';
+
+                        meta.data.forEach((bar, index) => {
+                            const rawValue = Number(dataset.data[index] || 0);
+                            if (!rawValue) {
+                                return;
+                            }
+                            const valueText = rawValue.toLocaleString(undefined, {
+                                maximumFractionDigits: 2
+                            });
+                            const x = isHorizontal ? bar.x + 6 : bar.x;
+                            const y = isHorizontal ? bar.y : bar.y - 8;
+                            ctx.fillText(valueText, x, y);
+                        });
+                        ctx.restore();
+                    }
+                });
+            }
+
             const preset = document.getElementById('date_preset');
             const from = document.getElementById('from_date');
             const to = document.getElementById('to_date');
@@ -110,6 +174,87 @@
 
             preset.addEventListener('change', toggleCustomDates);
             toggleCustomDates();
+
+            if (typeof Chart === 'undefined') {
+                return;
+            }
+
+            const agentLabels = @json($agentColumns);
+            const agentValues = @json(array_values($agentTotals));
+            const chartColors = [
+                '#4e79a7', '#f28e2b', '#e15759', '#76b7b2',
+                '#59a14f', '#edc948', '#b07aa1', '#ff9da7',
+                '#9c755f', '#bab0ab'
+            ];
+
+            const barCanvas = document.getElementById('agentBarChart');
+            if (barCanvas) {
+                const salesmanData = agentLabels.map((label, index) => ({
+                    label: label || 'N/A',
+                    value: Number(agentValues[index] || 0)
+                })).sort((a, b) => b.value - a.value);
+
+                new Chart(barCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: salesmanData.map(item => item.label),
+                        datasets: [{
+                            label: 'Total Sales',
+                            data: salesmanData.map(item => item.value),
+                            backgroundColor: '#007bff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: { display: false },
+                            valueOnBarPlugin: { enabled: true }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            const pieCanvas = document.getElementById('agentPieChart');
+            if (pieCanvas) {
+                const pieLabels = [];
+                const pieValues = [];
+
+                agentValues.forEach((value, index) => {
+                    if (Number(value) > 0) {
+                        pieLabels.push(agentLabels[index] || 'N/A');
+                        pieValues.push(value);
+                    }
+                });
+
+                if (!pieValues.length) {
+                    pieLabels.push('No Sales');
+                    pieValues.push(1);
+                }
+
+                new Chart(pieCanvas, {
+                    type: 'pie',
+                    data: {
+                        labels: pieLabels,
+                        datasets: [{
+                            data: pieValues,
+                            backgroundColor: pieLabels.length === 1 && pieLabels[0] === 'No Sales'
+                                ? ['#d1d5db']
+                                : pieValues.map((_, index) => chartColors[index % chartColors.length])
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
         })();
     </script>
-@endsection
+@endpush

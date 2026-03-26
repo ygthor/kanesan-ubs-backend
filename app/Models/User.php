@@ -109,6 +109,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get in-app notifications for this user.
+     */
+    public function appNotifications()
+    {
+        return $this->hasMany(AppNotification::class, 'user_id');
+    }
+
+    /**
      * Check if the user has a specific role.
      */
     public function hasRole($role)

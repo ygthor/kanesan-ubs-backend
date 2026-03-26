@@ -90,18 +90,26 @@
                                 (auth()->user()->hasRole('admin') ||
                                     auth()->user()->username === 'KBS' ||
                                     auth()->user()->email === 'KBS@kanesan.my'))
+                            @php
+                                $pendingStockRequestCount = \App\Models\StockRequest::where('status', 'pending')->count();
+                            @endphp
                             <li class="nav-item">
                                 <a href="/inventory/stock-management"
                                     class="nav-link {{ request()->is('inventory/stock-management*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-boxes"></i>
-                                    <p>Stock Management</p>
+                                    <p>Stock Mgmt.</p>
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a href="{{ route('admin.stock-requests.index') }}"
                                     class="nav-link {{ request()->is('admin/stock-requests*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-clipboard-list"></i>
-                                    <p>Stock Requests</p>
+                                    <p>
+                                        Stock Requests
+                                        @if ($pendingStockRequestCount > 0)
+                                            <span class="right badge badge-danger">{{ $pendingStockRequestCount }}</span>
+                                        @endif
+                                    </p>
                                 </a>
                             </li>
 
@@ -112,28 +120,28 @@
                                 <a href="/admin/users"
                                     class="nav-link {{ request()->is('admin/users*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-users"></i>
-                                    <p>User Management</p>
+                                    <p>User Mgmt.</p>
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a href="/admin/territories"
                                     class="nav-link {{ request()->is('admin/territories*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-map-marker-alt"></i>
-                                    <p>Territory Management</p>
+                                    <p>Territory Mgmt.</p>
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a href="/admin/announcements"
                                     class="nav-link {{ request()->is('admin/announcements*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-bullhorn"></i>
-                                    <p>Announcement Management</p>
+                                    <p>Announcement Mgmt.</p>
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a href="/admin/periods"
                                     class="nav-link {{ request()->is('admin/periods*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-calendar-alt"></i>
-                                    <p>Period Management</p>
+                                    <p>Period Mgmt.</p>
                                 </a>
                             </li>
                             <li class="nav-item">
