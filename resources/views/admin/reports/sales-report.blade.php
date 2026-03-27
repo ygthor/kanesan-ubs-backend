@@ -10,25 +10,157 @@
     <li class="breadcrumb-item active">Sales Report</li>
 @endsection
 
+@push('scripts')
+    <script>
+        (function () {
+            const preset = document.getElementById('date_preset');
+            const from = document.getElementById('from_date');
+            const to = document.getElementById('to_date');
+            if (!preset || !from || !to) {
+                return;
+            }
+
+            function toYmd(date) {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
+            function startOfMonth(date) {
+                return new Date(date.getFullYear(), date.getMonth(), 1);
+            }
+
+            function endOfMonth(date) {
+                return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+            }
+
+            function startOfQuarter(date) {
+                const qStartMonth = Math.floor(date.getMonth() / 3) * 3;
+                return new Date(date.getFullYear(), qStartMonth, 1);
+            }
+
+            function endOfQuarter(date) {
+                const qStartMonth = Math.floor(date.getMonth() / 3) * 3;
+                return new Date(date.getFullYear(), qStartMonth + 3, 0);
+            }
+
+            function applyPreset(selected) {
+                const now = new Date();
+                let start = null;
+                let end = null;
+
+                switch (selected) {
+                    case 'this_month':
+                        start = startOfMonth(now);
+                        end = endOfMonth(now);
+                        break;
+                    case 'last_month': {
+                        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                        start = startOfMonth(prevMonth);
+                        end = endOfMonth(prevMonth);
+                        break;
+                    }
+                    case 'this_quarter':
+                        start = startOfQuarter(now);
+                        end = endOfQuarter(now);
+                        break;
+                    case 'last_quarter': {
+                        const prevQuarterAnchor = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                        start = startOfQuarter(prevQuarterAnchor);
+                        end = endOfQuarter(prevQuarterAnchor);
+                        break;
+                    }
+                    case 'this_year':
+                        start = new Date(now.getFullYear(), 0, 1);
+                        end = new Date(now.getFullYear(), 11, 31);
+                        break;
+                    case 'last_year':
+                        start = new Date(now.getFullYear() - 1, 0, 1);
+                        end = new Date(now.getFullYear() - 1, 11, 31);
+                        break;
+                    case 'all':
+                        from.value = '';
+                        to.value = '';
+                        return;
+                    case 'custom':
+                    default:
+                        return;
+                }
+
+                from.value = toYmd(start);
+                to.value = toYmd(end);
+            }
+
+            function enforceDatesFromUrl() {
+                const params = new URLSearchParams(window.location.search);
+                const urlFrom = params.get('from_date');
+                const urlTo = params.get('to_date');
+
+                const validYmd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+
+                if (validYmd(urlFrom)) {
+                    from.value = urlFrom;
+                }
+                if (validYmd(urlTo)) {
+                    to.value = urlTo;
+                }
+
+                if (validYmd(urlFrom) || validYmd(urlTo)) {
+                    preset.value = 'custom';
+                }
+            }
+
+            preset.addEventListener('change', function () {
+                applyPreset(preset.value);
+            });
+
+            // Always sync visible date inputs with URL query if present.
+            enforceDatesFromUrl();
+            // Run once again after any late UI initializers.
+            setTimeout(enforceDatesFromUrl, 0);
+        })();
+    </script>
+@endpush
+
 @section('card-title', 'Sales Report (INV & CN Orders & Receipt)')
 
 @section('admin-content')
     <!-- Filters -->
     <form method="GET" action="{{ route('admin.reports.sales') }}" class="mb-4">
         <div class="row">
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label>Date Preset</label>
+                    @php
+                        $hasManualDateInQuery = request()->filled('from_date') || request()->filled('to_date');
+                        $selectedDatePreset = $hasManualDateInQuery ? 'custom' : (($datePreset ?? 'this_month'));
+                    @endphp
+                    <select id="date_preset" class="form-control">
+                        <option value="this_month" {{ $selectedDatePreset === 'this_month' ? 'selected' : '' }}>This Month</option>
+                        <option value="last_month" {{ $selectedDatePreset === 'last_month' ? 'selected' : '' }}>Last Month</option>
+                        <option value="this_quarter" {{ $selectedDatePreset === 'this_quarter' ? 'selected' : '' }}>This Quarter</option>
+                        <option value="last_quarter" {{ $selectedDatePreset === 'last_quarter' ? 'selected' : '' }}>Last Quarter</option>
+                        <option value="this_year" {{ $selectedDatePreset === 'this_year' ? 'selected' : '' }}>This Year</option>
+                        <option value="last_year" {{ $selectedDatePreset === 'last_year' ? 'selected' : '' }}>Last Year</option>
+                        <option value="all" {{ $selectedDatePreset === 'all' ? 'selected' : '' }}>Full Range (No Filter)</option>
+                        <option value="custom" {{ $selectedDatePreset === 'custom' ? 'selected' : '' }}>Custom</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
                 <div class="form-group">
                     <label>From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ $fromDate ?? '' }}">
+                    <input type="date" name="from_date" id="from_date" class="form-control" value="{{ $fromDate ?? '' }}">
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="form-group">
                     <label>To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ $toDate ?? '' }}">
+                    <input type="date" name="to_date" id="to_date" class="form-control" value="{{ $toDate ?? '' }}">
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="form-group">
                     <label>Agent</label>
                     <select name="agent_no" class="form-control">
@@ -41,7 +173,7 @@
                     </select>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="form-group">
                     <label>Customer Search</label>
                     <input type="text" name="customer_search" class="form-control" value="{{ $customerSearch ?? '' }}" placeholder="Code or Name">
@@ -168,6 +300,38 @@
             </div>
         </div>
 
+        <!-- Discount Summary -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header py-2 bg-warning text-dark">
+                    <h5 class="card-title mb-0" style="font-size: 0.9rem;">
+                        <i class="fas fa-percent"></i> Discount Summary
+                    </h5>
+                </div>
+                <div class="card-body p-1">
+                    <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
+                        <tbody>
+                            <tr>
+                                <td class="font-weight-bold py-1">Order-Level Discount</td>
+                                <td class="text-right py-1">RM {{ number_format($orderLevelDiscountTotal ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold py-1">Item-Level Discount</td>
+                                <td class="text-right py-1">RM {{ number_format($itemLevelDiscountTotal ?? 0, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" class="py-1"></td>
+                            </tr>
+                            <tr class="bg-warning">
+                                <td class="font-weight-bold py-1">Total Discount</td>
+                                <td class="text-right font-weight-bold py-1">RM {{ number_format($discountGrandTotal ?? 0, 2) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Collection by Payment Type (for verification) -->
         <div class="col-md-4">
             <div class="card">
@@ -287,7 +451,39 @@
         </div>
     </div>
 
-    <!-- Results Table -->
+    @php
+        // Combine orders and receipts, then sort by date
+        $combinedItems = collect();
+
+        foreach($orders ?? [] as $order) {
+            $combinedItems->push([
+                'type' => 'order',
+                'reference_no' => $order->reference_no,
+                'date' => $order->order_date,
+                'order_type' => $order->type,
+                'customer_code' => $order->customer_code,
+                'customer_name' => $order->customer_name,
+                'agent_no' => $order->agent_no ?? 'N/A',
+                'amount' => $order->net_amount ?? 0,
+            ]);
+        }
+
+        foreach($receipts ?? [] as $receipt) {
+            $combinedItems->push([
+                'type' => 'receipt',
+                'reference_no' => $receipt->receipt_no,
+                'date' => $receipt->receipt_date,
+                'order_type' => 'RC',
+                'customer_code' => $receipt->customer_code,
+                'customer_name' => $receipt->customer_name,
+                'agent_no' => ($receipt->customer && $receipt->customer->agent_no) ? $receipt->customer->agent_no : 'N/A',
+                'amount' => $receipt->paid_amount ?? 0,
+            ]);
+        }
+
+        $combinedItems = $combinedItems->sortByDesc('date');
+    @endphp
+
     <div class="table-responsive">
         <table class="table table-striped table-bordered table-hover">
             <thead class="thead-dark">
@@ -302,46 +498,6 @@
                 </tr>
             </thead>
             <tbody>
-                @php
-                    // Combine orders and receipts, then sort by date
-                    $combinedItems = collect();
-                    
-                    // Add orders
-                    foreach($orders ?? [] as $order) {
-                        $combinedItems->push([
-                            'type' => 'order',
-                            'reference_no' => $order->reference_no,
-                            'date' => $order->order_date,
-                            'order_type' => $order->type,
-                            'customer_code' => $order->customer_code,
-                            'customer_name' => $order->customer_name,
-                            'agent_no' => $order->agent_no ?? 'N/A',
-                            'amount' => $order->net_amount ?? 0,
-                            'status' => $order->status ?? 'N/A',
-                            'payment_type' => null,
-                        ]);
-                    }
-                    
-                    // Add receipts
-                    foreach($receipts ?? [] as $receipt) {
-                        $combinedItems->push([
-                            'type' => 'receipt',
-                            'reference_no' => $receipt->receipt_no,
-                            'date' => $receipt->receipt_date,
-                            'order_type' => 'RC',
-                            'customer_code' => $receipt->customer_code,
-                            'customer_name' => $receipt->customer_name,
-                            'agent_no' => ($receipt->customer && $receipt->customer->agent_no) ? $receipt->customer->agent_no : 'N/A',
-                            'amount' => $receipt->paid_amount ?? 0,
-                            'status' => 'completed',
-                            'payment_type' => $receipt->payment_type ?? 'N/A',
-                        ]);
-                    }
-                    
-                    // Sort by date descending
-                    $combinedItems = $combinedItems->sortByDesc('date');
-                @endphp
-                
                 @forelse($combinedItems as $item)
                     <tr>
                         <td>{{ $item['reference_no'] }}</td>

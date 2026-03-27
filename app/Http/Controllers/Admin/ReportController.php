@@ -117,11 +117,27 @@ class ReportController extends Controller
     {
         $this->checkAccess();
 
-        [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
-            $request->input('date_preset', 'this_month'),
-            $request->input('from_date'),
-            $request->input('to_date')
-        );
+        $fromInput = trim((string) $request->input('from_date', ''));
+        $toInput = trim((string) $request->input('to_date', ''));
+        $requestedPreset = trim((string) $request->input('date_preset', ''));
+
+        // Always prioritize explicit date inputs from URL/form.
+        if ($fromInput !== '' || $toInput !== '') {
+            $fromDate = $fromInput !== '' ? $fromInput : null;
+            $toDate = $toInput !== '' ? $toInput : null;
+            $datePreset = 'custom';
+        } elseif ($requestedPreset === 'all' || $requestedPreset === '') {
+            // No date filter
+            $fromDate = null;
+            $toDate = null;
+            $datePreset = 'all';
+        } else {
+            [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
+                $requestedPreset,
+                $request->input('from_date'),
+                $request->input('to_date')
+            );
+        }
 
         $filters = [
             'date_preset' => $datePreset,
@@ -296,8 +312,11 @@ class ReportController extends Controller
     {
         $this->checkAccess();
 
-        $fromDate = $request->input('from_date');
-        $toDate = $request->input('to_date');
+        [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
+            $request->input('date_preset', 'this_month'),
+            $request->input('from_date'),
+            $request->input('to_date')
+        );
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
@@ -629,16 +648,66 @@ class ReportController extends Controller
         // Account Balance = Nett Sales - Total Collection (by customer type)
         $accountBalance = $nettSales - $totalCollectionByCustomerType;
 
+        // Discount breakdown (order-level + item-level) by order
+        $discountRowsQuery = DB::table('orders as o')
+            ->leftJoin('order_items as oi', 'o.reference_no', '=', 'oi.reference_no')
+            ->whereIn('o.type', ['INV', 'CN']);
+
+        if ($calcFromDate && $calcToDate) {
+            $discountRowsQuery->whereBetween('o.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $discountRowsQuery->where('o.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $discountRowsQuery->where('o.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $discountRowsQuery->where(function ($q) use ($customerSearch) {
+                $q->where('o.customer_code', 'like', "%{$customerSearch}%")
+                    ->orWhere('o.customer_name', 'like', "%{$customerSearch}%");
+            });
+        }
+
+        $discountRows = $discountRowsQuery
+            ->selectRaw("
+                o.reference_no,
+                o.order_date,
+                o.type,
+                o.customer_code,
+                o.customer_name,
+                COALESCE(NULLIF(TRIM(o.agent_no), ''), 'N/A') as agent_no,
+                COALESCE(o.discount, 0) as order_discount,
+                SUM(COALESCE(oi.discount, 0)) as item_discount,
+                (COALESCE(o.discount, 0) + SUM(COALESCE(oi.discount, 0))) as total_discount
+            ")
+            ->groupBy(
+                'o.reference_no',
+                'o.order_date',
+                'o.type',
+                'o.customer_code',
+                'o.customer_name',
+                'o.agent_no',
+                'o.discount'
+            )
+            ->orderByDesc('o.order_date')
+            ->get();
+
+        $orderLevelDiscountTotal = (float) $discountRows->sum('order_discount');
+        $itemLevelDiscountTotal = (float) $discountRows->sum('item_discount');
+        $discountGrandTotal = (float) $discountRows->sum('total_discount');
+
         // Get agents for filter dropdown
         $agents = $this->getAgents();
         request()->flash();
 
         return view('admin.reports.sales-report', compact(
-            'orders', 'receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents',
+            'orders', 'receipts', 'fromDate', 'toDate', 'datePreset', 'customerId', 'agentNo', 'customerSearch', 'agents',
             'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'returnsGood', 'returnsBad', 'totalSales', 'nettSales',
             'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
             'caCollection', 'crCollection', 'caReturns', 'crReturns', 'totalNegativeCashOrder', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
-            'accountBalance','returnsInfo'
+            'accountBalance', 'returnsInfo',
+            'discountRows', 'orderLevelDiscountTotal', 'itemLevelDiscountTotal', 'discountGrandTotal'
         ));
     }
 
