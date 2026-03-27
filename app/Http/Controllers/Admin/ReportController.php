@@ -702,6 +702,29 @@ class ReportController extends Controller
         $itemLevelDiscountTotal = (float) $discountRows->sum('item_discount');
         $discountGrandTotal = (float) $discountRows->sum('total_discount');
 
+        // Comparable metric for Group Product Sales Year "Month Discount (RM)"
+        // That report uses item-level discount from INV orders only.
+        $itemLevelInvDiscountQuery = DB::table('orders as o')
+            ->join('order_items as oi', 'o.reference_no', '=', 'oi.reference_no')
+            ->where('o.type', 'INV');
+
+        if ($calcFromDate && $calcToDate) {
+            $itemLevelInvDiscountQuery->whereBetween('o.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $itemLevelInvDiscountQuery->where('o.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $itemLevelInvDiscountQuery->where('o.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $itemLevelInvDiscountQuery->where(function ($q) use ($customerSearch) {
+                $q->where('o.customer_code', 'like', "%{$customerSearch}%")
+                    ->orWhere('o.customer_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $itemLevelInvDiscountTotal = (float) ($itemLevelInvDiscountQuery->sum(DB::raw('COALESCE(oi.discount, 0)')) ?? 0);
+
         // Get agents for filter dropdown
         $agents = $this->getAgents();
         request()->flash();
@@ -712,7 +735,7 @@ class ReportController extends Controller
             'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
             'caCollection', 'crCollection', 'caReturns', 'crReturns', 'totalNegativeCashOrder', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
             'accountBalance', 'returnsInfo',
-            'discountRows', 'orderLevelDiscountTotal', 'itemLevelDiscountTotal', 'discountGrandTotal'
+            'discountRows', 'orderLevelDiscountTotal', 'itemLevelDiscountTotal', 'discountGrandTotal', 'itemLevelInvDiscountTotal'
         ));
     }
 
