@@ -84,6 +84,11 @@
     <div class="mb-2 text-center">
         <h4 class="mb-1">PERKHIDMATAN DAN JUALAN KANESAN BERSAUDARA</h4>
         <h5 class="mb-0">GROUP PRODUCT SALES REPORT - YEAR {{ $year }}</h5>
+        <div class="small text-muted mt-1">
+            Total Qty: {{ rtrim(rtrim(number_format((float) ($grandTotal ?? 0), 2, '.', ''), '0'), '.') }}
+            |
+            Total Discount: RM {{ number_format((float) ($yearDiscountTotal ?? 0), 2) }}
+        </div>
     </div>
 
     <div class="row mb-3">
@@ -104,6 +109,29 @@
                 </div>
                 <div class="card-body" style="height: 320px;">
                     <canvas id="yearMonthlyPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header py-2">
+                    <strong>Month Discount (RM)</strong>
+                </div>
+                <div class="card-body" style="height: 320px;">
+                    <canvas id="yearMonthlyDiscountBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header py-2">
+                    <strong>Discount by Product Group</strong>
+                </div>
+                <div class="card-body" style="height: 320px;">
+                    <canvas id="yearGroupDiscountBarChart"></canvas>
                 </div>
             </div>
         </div>
@@ -232,6 +260,7 @@
             const groupedItems = @json($groupedItems->toArray());
             const monthLabels = @json(array_values($months));
             const monthValues = @json(array_values($monthTotals));
+            const monthDiscountValues = @json(array_values($monthDiscountTotals ?? []));
             const chartColors = [
                 '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
                 '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
@@ -245,9 +274,41 @@
                     data: {
                         labels: monthLabels,
                         datasets: [{
-                            label: 'Sales',
+                            label: 'Qty Sold',
                             data: monthValues,
                             backgroundColor: '#36a2eb'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true },
+                            valueOnBarPlugin: { enabled: true }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Qty'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const monthDiscountCanvas = document.getElementById('yearMonthlyDiscountBarChart');
+            if (monthDiscountCanvas) {
+                new Chart(monthDiscountCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: monthLabels,
+                        datasets: [{
+                            label: 'Discount (RM)',
+                            data: monthDiscountValues,
+                            backgroundColor: '#f59e0b'
                         }]
                     },
                     options: {
@@ -359,6 +420,46 @@
                         }
                     }
                 });
+            }
+
+            const groupDiscountTotalsData = Object.entries(groupedItems).map(([groupName, items]) => {
+                const totalDiscount = (items || []).reduce((sum, item) => sum + Number(item.discount_total || 0), 0);
+                return {
+                    group: groupName || 'N/A',
+                    totalDiscount
+                };
+            }).filter(row => row.totalDiscount > 0).sort((a, b) => b.totalDiscount - a.totalDiscount);
+
+            const groupDiscountBarCanvas = document.getElementById('yearGroupDiscountBarChart');
+            if (groupDiscountBarCanvas) {
+                if (!groupDiscountTotalsData.length) {
+                    groupDiscountBarCanvas.parentElement.innerHTML = '<div class="text-muted">No discount data for selected filters.</div>';
+                } else {
+                    new Chart(groupDiscountBarCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: groupDiscountTotalsData.map(row => row.group),
+                            datasets: [{
+                                label: 'Discount (RM)',
+                                data: groupDiscountTotalsData.map(row => row.totalDiscount),
+                                backgroundColor: '#fb8c00'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                valueOnBarPlugin: { enabled: true }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
             }
 
             const itemTotalsData = Object.values(groupedItems).flatMap(items => (items || []).map(item => ({

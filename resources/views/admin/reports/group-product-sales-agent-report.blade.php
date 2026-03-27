@@ -92,6 +92,11 @@
         <h4 class="mb-1">PERKHIDMATAN DAN JUALAN KANESAN BERSAUDARA</h4>
         <h5 class="mb-0">GROUP PRODUCT SALES REPORT</h5>
         <h6 class="mb-0">{{ \Carbon\Carbon::parse($fromDate)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($toDate)->format('d/m/Y') }}</h6>
+        <div class="small text-muted mt-1">
+            Total Qty: {{ rtrim(rtrim(number_format((float) ($grandTotal ?? 0), 2, '.', ''), '0'), '.') }}
+            |
+            Total Discount: RM {{ number_format((float) ($grandDiscountTotal ?? 0), 2) }}
+        </div>
     </div>
 
     <div class="row mb-3">
@@ -112,6 +117,19 @@
                 </div>
                 <div class="card-body" style="height: 320px;">
                     <canvas id="agentPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card h-100">
+                <div class="card-header py-2">
+                    <strong>Group Discount by Agent</strong>
+                </div>
+                <div class="card-body" style="height: 320px;">
+                    <canvas id="agentDiscountBarChart"></canvas>
                 </div>
             </div>
         </div>
@@ -181,6 +199,7 @@
 
             const agentLabels = @json($agentColumns);
             const agentValues = @json(array_values($agentTotals));
+            const agentDiscountValues = @json(array_values($agentDiscountTotals ?? []));
             const chartColors = [
                 '#4e79a7', '#f28e2b', '#e15759', '#76b7b2',
                 '#59a14f', '#edc948', '#b07aa1', '#ff9da7',
@@ -254,6 +273,44 @@
                         maintainAspectRatio: false
                     }
                 });
+            }
+
+            const discountBarCanvas = document.getElementById('agentDiscountBarChart');
+            if (discountBarCanvas) {
+                const discountBySalesmanData = agentLabels.map((label, index) => ({
+                    label: label || 'N/A',
+                    value: Number(agentDiscountValues[index] || 0)
+                })).sort((a, b) => b.value - a.value);
+
+                if (!discountBySalesmanData.length || discountBySalesmanData.every(item => item.value <= 0)) {
+                    discountBarCanvas.parentElement.innerHTML = '<div class="text-muted">No discount data for selected filters.</div>';
+                } else {
+                    new Chart(discountBarCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: discountBySalesmanData.map(item => item.label),
+                            datasets: [{
+                                label: 'Discount (RM)',
+                                data: discountBySalesmanData.map(item => item.value),
+                                backgroundColor: '#fb8c00'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            indexAxis: 'y',
+                            plugins: {
+                                legend: { display: false },
+                                valueOnBarPlugin: { enabled: true }
+                            },
+                            scales: {
+                                x: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
             }
         })();
     </script>

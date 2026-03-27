@@ -1143,7 +1143,8 @@ class ReportController extends Controller
             ->selectRaw("
                 oi.product_no as item_code,
                 MONTH(o.order_date) as month_no,
-                SUM(COALESCE(oi.quantity, 0)) as qty
+                SUM(COALESCE(oi.quantity, 0)) as qty,
+                SUM(COALESCE(oi.discount, 0)) as discount
             ")
             ->groupBy('oi.product_no')
             ->groupByRaw('MONTH(o.order_date)')
@@ -1157,6 +1158,7 @@ class ReportController extends Controller
         $items = [];
         $itemKeyByCode = [];
         $monthTotals = array_fill(1, 12, 0);
+        $monthDiscountTotals = array_fill(1, 12, 0);
 
         foreach ($baseItems as $baseItem) {
             $itemKey = $baseItem->item_group . '|' . $baseItem->item_code;
@@ -1166,6 +1168,7 @@ class ReportController extends Controller
                 'item_description' => $baseItem->item_description,
                 'months' => array_fill(1, 12, 0),
                 'total' => 0,
+                'discount_total' => 0,
             ];
             $itemKeyByCode[(string) $baseItem->item_code] = $itemKey;
         }
@@ -1178,19 +1181,25 @@ class ReportController extends Controller
             $itemKey = $itemKeyByCode[$code];
             $monthNo = (int) $row->month_no;
             $qty = (float) $row->qty;
+            $discount = (float) ($row->discount ?? 0);
             $items[$itemKey]['months'][$monthNo] += $qty;
             $items[$itemKey]['total'] += $qty;
+            $items[$itemKey]['discount_total'] += $discount;
             $monthTotals[$monthNo] += $qty;
+            $monthDiscountTotals[$monthNo] += $discount;
         }
 
         $grandTotal = array_sum($monthTotals);
+        $yearDiscountTotal = array_sum($monthDiscountTotals);
         $groupedItems = collect($items)->groupBy('item_group');
 
         return [
             'months' => $months,
             'groupedItems' => $groupedItems,
             'monthTotals' => $monthTotals,
+            'monthDiscountTotals' => $monthDiscountTotals,
             'grandTotal' => $grandTotal,
+            'yearDiscountTotal' => $yearDiscountTotal,
             'year' => $year,
         ];
     }
@@ -1241,7 +1250,8 @@ class ReportController extends Controller
             ->selectRaw("
                 oi.product_no as item_code,
                 COALESCE(NULLIF(TRIM(o.agent_no), ''), 'N/A') as agent_no,
-                SUM(COALESCE(oi.quantity, 0)) as qty
+                SUM(COALESCE(oi.quantity, 0)) as qty,
+                SUM(COALESCE(oi.discount, 0)) as discount
             ")
             ->groupBy('oi.product_no')
             ->groupBy('o.agent_no')
@@ -1251,8 +1261,10 @@ class ReportController extends Controller
         $items = [];
         $itemKeyByCode = [];
         $agentTotals = [];
+        $agentDiscountTotals = [];
         foreach ($agentColumns as $agent) {
             $agentTotals[$agent] = 0;
+            $agentDiscountTotals[$agent] = 0;
         }
 
         foreach ($baseItems as $baseItem) {
@@ -1263,6 +1275,8 @@ class ReportController extends Controller
                 'item_description' => $baseItem->item_description,
                 'agents' => array_fill_keys($agentColumns, 0),
                 'total' => 0,
+                'agent_discounts' => array_fill_keys($agentColumns, 0),
+                'discount_total' => 0,
             ];
             $itemKeyByCode[(string) $baseItem->item_code] = $itemKey;
         }
@@ -1275,25 +1289,36 @@ class ReportController extends Controller
             $itemKey = $itemKeyByCode[$code];
             $agent = $row->agent_no;
             $qty = (float) $row->qty;
+            $discount = (float) ($row->discount ?? 0);
             if (!array_key_exists($agent, $items[$itemKey]['agents'])) {
                 $items[$itemKey]['agents'][$agent] = 0;
+                $items[$itemKey]['agent_discounts'][$agent] = 0;
                 if (!isset($agentTotals[$agent])) {
                     $agentTotals[$agent] = 0;
+                }
+                if (!isset($agentDiscountTotals[$agent])) {
+                    $agentDiscountTotals[$agent] = 0;
                 }
             }
             $items[$itemKey]['agents'][$agent] += $qty;
             $items[$itemKey]['total'] += $qty;
+            $items[$itemKey]['agent_discounts'][$agent] += $discount;
+            $items[$itemKey]['discount_total'] += $discount;
             $agentTotals[$agent] += $qty;
+            $agentDiscountTotals[$agent] += $discount;
         }
 
         $grandTotal = array_sum($agentTotals);
+        $grandDiscountTotal = array_sum($agentDiscountTotals);
         $groupedItems = collect($items)->groupBy('item_group');
 
         return [
             'groupedItems' => $groupedItems,
             'agentColumns' => $agentColumns,
             'agentTotals' => $agentTotals,
+            'agentDiscountTotals' => $agentDiscountTotals,
             'grandTotal' => $grandTotal,
+            'grandDiscountTotal' => $grandDiscountTotal,
             'fromDate' => substr($fromDate, 0, 10),
             'toDate' => substr($toDate, 0, 10),
             'periodLabel' => $filters['period_label'] ?? 'CUSTOM',
