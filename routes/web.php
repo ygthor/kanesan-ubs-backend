@@ -97,6 +97,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('e-invoice-requests/{id}/edit', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'edit'])->name('e-invoice-requests.edit');
     Route::put('e-invoice-requests/{id}', [\App\Http\Controllers\Admin\EInvoiceRequestController::class, 'update'])->name('e-invoice-requests.update');
 
+    // Configuration Management (KBS/admin only - checked in controller)
+    Route::get('configurations', [\App\Http\Controllers\Admin\ConfigurationController::class, 'index'])->name('configurations.index');
+    Route::put('configurations', [\App\Http\Controllers\Admin\ConfigurationController::class, 'update'])->name('configurations.update');
+
     // Invoices Management (KBS/admin only - checked in controller)
     Route::get('invoices', [\App\Http\Controllers\Admin\InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{id}', [\App\Http\Controllers\Admin\InvoiceController::class, 'show'])->name('invoices.show');

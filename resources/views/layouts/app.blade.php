@@ -172,6 +172,13 @@
                                     <p>E-Invoice Requests</p>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a href="{{ route('admin.configurations.index') }}"
+                                    class="nav-link {{ request()->is('admin/configurations*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-cog"></i>
+                                    <p>Configuration</p>
+                                </a>
+                            </li>
                         @endif
 
                     </ul>

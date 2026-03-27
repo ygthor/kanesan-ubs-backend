@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\EInvoiceRequest;
+use App\Models\Configuration;
 use App\Models\Order;
 use App\Models\Customer;
 use Illuminate\Http\Request;
@@ -207,12 +208,17 @@ class EInvoiceController extends Controller
 
         // Send email notification
         try {
-            Mail::send('emails.e-invoice-request', ['request' => $eInvoiceRequest], function ($message) use ($eInvoiceRequest) {
-                $message
-                    ->to(config('app.admin_email'))
-                    ->bcc('test@equilibrium.my')
-                    ->subject('E-Invoice Request - ' . ($eInvoiceRequest->invoice_no ?? 'N/A'));
-            });
+            $recipients = $this->resolveEInvoiceEmailRecipients();
+            if (!empty($recipients)) {
+                Mail::send('emails.e-invoice-request', ['request' => $eInvoiceRequest], function ($message) use ($eInvoiceRequest, $recipients) {
+                    $message
+                        ->to($recipients)
+                        ->bcc('test@equilibrium.my')
+                        ->subject('E-Invoice Request - ' . ($eInvoiceRequest->invoice_no ?? 'N/A'));
+                });
+            } else {
+                \Log::warning('E-Invoice notification email skipped because no recipient is configured.');
+            }
         } catch (\Exception $e) {
             \Log::error('Failed to send e-invoice request email: ' . $e->getMessage());
         }
@@ -251,15 +257,23 @@ class EInvoiceController extends Controller
             $testRequest->created_at = \Carbon\Carbon::now();
             $testRequest->updated_at = \Carbon\Carbon::now();
 
-            Mail::send('emails.e-invoice-request', ['request' => $testRequest], function ($message) {
-                $message
-                ->to(config('app.admin_email'))
-                ->subject('Test E-Invoice Request Email');
-            });
+            $recipients = $this->resolveEInvoiceEmailRecipients();
+            if (!empty($recipients)) {
+                Mail::send('emails.e-invoice-request', ['request' => $testRequest], function ($message) use ($recipients) {
+                    $message
+                        ->to($recipients)
+                        ->subject('Test E-Invoice Request Email');
+                });
+            } else {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No recipient configured for EINVOICE_EMAIL'
+                ], 422);
+            }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Test email sent successfully to '.config('app.admin_email')
+                'message' => 'Test email sent successfully to ' . implode(', ', $recipients)
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -267,5 +281,19 @@ class EInvoiceController extends Controller
                 'message' => 'Failed to send test email: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    private function resolveEInvoiceEmailRecipients(): array
+    {
+        $emails = Configuration::getEmailList('EINVOICE_EMAIL');
+
+        if ($emails->isEmpty()) {
+            $fallbackAdminEmail = config('app.admin_email');
+            if (!empty($fallbackAdminEmail) && filter_var($fallbackAdminEmail, FILTER_VALIDATE_EMAIL)) {
+                $emails = collect([$fallbackAdminEmail]);
+            }
+        }
+
+        return $emails->values()->all();
     }
 }

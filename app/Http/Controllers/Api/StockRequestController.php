@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppNotification;
+use App\Models\Configuration;
 use App\Models\StockRequest;
 use App\Models\StockRequestItem;
 use App\Models\User;
@@ -112,11 +113,17 @@ class StockRequestController extends Controller
 
     private function sendStockRequestSubmittedEmails($recipients, StockRequest $stockRequest, User $submittedBy): void
     {
-        $emails = $recipients->pluck('email')->filter()->unique()->values();
-        $fallbackAdminEmail = config('app.admin_email');
-        if (!empty($fallbackAdminEmail)) {
-            $emails->push($fallbackAdminEmail);
-            $emails = $emails->unique()->values();
+        $configuredEmails = Configuration::getEmailList('STOCK_REQUEST_EMAIL');
+
+        if ($configuredEmails->isNotEmpty()) {
+            $emails = $configuredEmails;
+        } else {
+            $emails = $recipients->pluck('email')->filter()->unique()->values();
+            $fallbackAdminEmail = config('app.admin_email');
+            if (!empty($fallbackAdminEmail)) {
+                $emails->push($fallbackAdminEmail);
+                $emails = $emails->unique()->values();
+            }
         }
 
         if ($emails->isEmpty()) {
