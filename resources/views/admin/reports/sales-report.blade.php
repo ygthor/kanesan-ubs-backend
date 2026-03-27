@@ -325,23 +325,12 @@
                     <table class="table table-bordered table-sm mb-0" style="font-size: 0.85rem;">
                         <tbody>
                             <tr>
-                                <td class="font-weight-bold py-1">Order-Level Discount</td>
-                                <td class="text-right py-1">RM {{ number_format($orderLevelDiscountTotal ?? 0, 2) }}</td>
-                            </tr>
-                            <tr>
-                                <td class="font-weight-bold py-1">Item-Level Discount (INV+CN)</td>
-                                <td class="text-right py-1">RM {{ number_format($itemLevelDiscountTotal ?? 0, 2) }}</td>
-                            </tr>
-                            <tr>
-                                <td class="font-weight-bold py-1">Item Discount (INV Only)</td>
+                                <td class="font-weight-bold py-1">Discount INV</td>
                                 <td class="text-right py-1">RM {{ number_format($itemLevelInvDiscountTotal ?? 0, 2) }}</td>
                             </tr>
                             <tr>
-                                <td colspan="2" class="py-1"></td>
-                            </tr>
-                            <tr class="bg-warning">
-                                <td class="font-weight-bold py-1">Total Discount (Order + Item)</td>
-                                <td class="text-right font-weight-bold py-1">RM {{ number_format($discountGrandTotal ?? 0, 2) }}</td>
+                                <td class="font-weight-bold py-1">Discount CN</td>
+                                <td class="text-right py-1">RM {{ number_format($itemLevelCnDiscountTotal ?? 0, 2) }}</td>
                             </tr>
                         </tbody>
                     </table>

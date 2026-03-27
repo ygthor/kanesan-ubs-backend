@@ -725,6 +725,27 @@ class ReportController extends Controller
         }
         $itemLevelInvDiscountTotal = (float) ($itemLevelInvDiscountQuery->sum(DB::raw('COALESCE(oi.discount, 0)')) ?? 0);
 
+        $itemLevelCnDiscountQuery = DB::table('orders as o')
+            ->join('order_items as oi', 'o.reference_no', '=', 'oi.reference_no')
+            ->where('o.type', 'CN');
+
+        if ($calcFromDate && $calcToDate) {
+            $itemLevelCnDiscountQuery->whereBetween('o.order_date', [$calcFromDate, $calcToDate]);
+        }
+        if ($customerId) {
+            $itemLevelCnDiscountQuery->where('o.customer_id', $customerId);
+        }
+        if ($agentNo) {
+            $itemLevelCnDiscountQuery->where('o.agent_no', $agentNo);
+        }
+        if ($customerSearch) {
+            $itemLevelCnDiscountQuery->where(function ($q) use ($customerSearch) {
+                $q->where('o.customer_code', 'like', "%{$customerSearch}%")
+                    ->orWhere('o.customer_name', 'like', "%{$customerSearch}%");
+            });
+        }
+        $itemLevelCnDiscountTotal = (float) ($itemLevelCnDiscountQuery->sum(DB::raw('COALESCE(oi.discount, 0)')) ?? 0);
+
         // Get agents for filter dropdown
         $agents = $this->getAgents();
         request()->flash();
@@ -735,7 +756,7 @@ class ReportController extends Controller
             'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
             'caCollection', 'crCollection', 'caReturns', 'crReturns', 'totalNegativeCashOrder', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
             'accountBalance', 'returnsInfo',
-            'discountRows', 'orderLevelDiscountTotal', 'itemLevelDiscountTotal', 'discountGrandTotal', 'itemLevelInvDiscountTotal'
+            'discountRows', 'orderLevelDiscountTotal', 'itemLevelDiscountTotal', 'discountGrandTotal', 'itemLevelInvDiscountTotal', 'itemLevelCnDiscountTotal'
         ));
     }
 
