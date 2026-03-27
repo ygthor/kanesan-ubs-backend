@@ -96,6 +96,7 @@
                 const params = new URLSearchParams(window.location.search);
                 const urlFrom = params.get('from_date');
                 const urlTo = params.get('to_date');
+                const urlPreset = params.get('date_preset');
 
                 const validYmd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 
@@ -106,13 +107,23 @@
                     to.value = urlTo;
                 }
 
-                if (validYmd(urlFrom) || validYmd(urlTo)) {
+                if ((validYmd(urlFrom) || validYmd(urlTo)) && !urlPreset) {
                     preset.value = 'custom';
                 }
             }
 
             preset.addEventListener('change', function () {
                 applyPreset(preset.value);
+            });
+            from.addEventListener('change', function () {
+                if (preset.value !== 'custom') {
+                    preset.value = 'custom';
+                }
+            });
+            to.addEventListener('change', function () {
+                if (preset.value !== 'custom') {
+                    preset.value = 'custom';
+                }
             });
 
             // Always sync visible date inputs with URL query if present.
@@ -133,10 +144,12 @@
                 <div class="form-group">
                     <label>Date Preset</label>
                     @php
-                        $hasManualDateInQuery = request()->filled('from_date') || request()->filled('to_date');
-                        $selectedDatePreset = $hasManualDateInQuery ? 'custom' : (($datePreset ?? 'this_month'));
+                        $selectedDatePreset = (string) request()->input('date_preset', ($datePreset ?? 'this_month'));
+                        if ($selectedDatePreset === '' && (request()->filled('from_date') || request()->filled('to_date'))) {
+                            $selectedDatePreset = 'custom';
+                        }
                     @endphp
-                    <select id="date_preset" class="form-control">
+                    <select id="date_preset" name="date_preset" class="form-control">
                         <option value="this_month" {{ $selectedDatePreset === 'this_month' ? 'selected' : '' }}>This Month</option>
                         <option value="last_month" {{ $selectedDatePreset === 'last_month' ? 'selected' : '' }}>Last Month</option>
                         <option value="this_quarter" {{ $selectedDatePreset === 'this_quarter' ? 'selected' : '' }}>This Quarter</option>

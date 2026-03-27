@@ -119,18 +119,23 @@ class ReportController extends Controller
 
         $fromInput = trim((string) $request->input('from_date', ''));
         $toInput = trim((string) $request->input('to_date', ''));
-        $requestedPreset = trim((string) $request->input('date_preset', ''));
+        $hasPresetParam = $request->has('date_preset');
+        $requestedPreset = trim((string) $request->input('date_preset', 'this_month'));
 
-        // Always prioritize explicit date inputs from URL/form.
-        if ($fromInput !== '' || $toInput !== '') {
+        // Backward compatibility: old links without date_preset but with explicit dates.
+        if (!$hasPresetParam && ($fromInput !== '' || $toInput !== '')) {
             $fromDate = $fromInput !== '' ? $fromInput : null;
             $toDate = $toInput !== '' ? $toInput : null;
             $datePreset = 'custom';
-        } elseif ($requestedPreset === 'all' || $requestedPreset === '') {
+        } elseif ($requestedPreset === 'all') {
             // No date filter
             $fromDate = null;
             $toDate = null;
             $datePreset = 'all';
+        } elseif ($requestedPreset === 'custom') {
+            $fromDate = $fromInput !== '' ? $fromInput : null;
+            $toDate = $toInput !== '' ? $toInput : null;
+            $datePreset = 'custom';
         } else {
             [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
                 $requestedPreset,
