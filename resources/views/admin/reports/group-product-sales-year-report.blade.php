@@ -15,10 +15,49 @@
 @section('admin-content')
     <form method="GET" action="{{ route('admin.reports.group-product-sales-year') }}" class="mb-3">
         <div class="row">
-            <div class="col-md-2">
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label>Date Preset</label>
+                    <select name="date_preset" id="date_preset" class="form-control">
+                        <option value="this_month" {{ ($filters['date_preset'] ?? 'this_month') === 'this_month' ? 'selected' : '' }}>This Month</option>
+                        <option value="last_month" {{ ($filters['date_preset'] ?? '') === 'last_month' ? 'selected' : '' }}>Last Month</option>
+                        <option value="this_quarter" {{ ($filters['date_preset'] ?? '') === 'this_quarter' ? 'selected' : '' }}>This Quarter</option>
+                        <option value="last_quarter" {{ ($filters['date_preset'] ?? '') === 'last_quarter' ? 'selected' : '' }}>Last Quarter</option>
+                        <option value="this_year" {{ ($filters['date_preset'] ?? '') === 'this_year' ? 'selected' : '' }}>This Year</option>
+                        <option value="last_year" {{ ($filters['date_preset'] ?? '') === 'last_year' ? 'selected' : '' }}>Last Year</option>
+                        <option value="year_month" {{ ($filters['date_preset'] ?? '') === 'year_month' ? 'selected' : '' }}>Year Month</option>
+                        <option value="custom" {{ ($filters['date_preset'] ?? '') === 'custom' ? 'selected' : '' }}>Custom</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3" id="from_date_wrap">
+                <div class="form-group">
+                    <label>From Date</label>
+                    <input type="date" name="from_date" id="from_date" class="form-control" value="{{ $filters['from_date'] ?? '' }}">
+                </div>
+            </div>
+            <div class="col-md-3" id="to_date_wrap">
+                <div class="form-group">
+                    <label>To Date</label>
+                    <input type="date" name="to_date" id="to_date" class="form-control" value="{{ $filters['to_date'] ?? '' }}">
+                </div>
+            </div>
+            <div class="col-md-3" id="year_wrap">
                 <div class="form-group">
                     <label>Year</label>
-                    <input type="number" min="2000" max="2100" name="year" class="form-control" value="{{ $filters['year'] ?? now()->year }}">
+                    <input type="number" min="2000" max="2100" name="year" id="year" class="form-control" value="{{ $filters['year'] ?? now()->year }}">
+                </div>
+            </div>
+            <div class="col-md-3" id="month_wrap">
+                <div class="form-group">
+                    <label>Month</label>
+                    <select name="month" id="month" class="form-control">
+                        @foreach([1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'] as $m => $monthName)
+                            <option value="{{ $m }}" {{ (int) ($filters['month'] ?? now()->month) === $m ? 'selected' : '' }}>
+                                {{ $monthName }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
             <div class="col-md-3">
@@ -34,6 +73,8 @@
                     </select>
                 </div>
             </div>
+        </div>
+        <div class="row">
             <div class="col-md-3">
                 <div class="form-group">
                     <label>Group</label>
@@ -47,7 +88,7 @@
                     </select>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="form-group">
                     <label>Product Search</label>
                     <input type="text" name="product_search" class="form-control" value="{{ $filters['product_search'] ?? '' }}" placeholder="Code or Description">
@@ -83,7 +124,7 @@
 
     <div class="mb-2 text-center">
         <h4 class="mb-1">PERKHIDMATAN DAN JUALAN KANESAN BERSAUDARA</h4>
-        <h5 class="mb-0">GROUP PRODUCT SALES REPORT - YEAR {{ $year }}</h5>
+        <h5 class="mb-0">GROUP PRODUCT SALES REPORT - {{ $periodTitle ?? ('YEAR ' . $year) }}</h5>
         <div class="small text-muted mt-1">
             Total Qty: {{ rtrim(rtrim(number_format((float) ($grandTotal ?? 0), 2, '.', ''), '0'), '.') }}
             |
@@ -114,7 +155,7 @@
         </div>
     </div>
 
-    <div class="row mb-3">
+    <div class="row mb-3 d-none">
         <div class="col-md-6 mb-3 mb-md-0">
             <div class="card h-100">
                 <div class="card-header py-2">
@@ -212,6 +253,52 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         (function () {
+            const preset = document.getElementById('date_preset');
+            const from = document.getElementById('from_date');
+            const to = document.getElementById('to_date');
+            const year = document.getElementById('year');
+            const month = document.getElementById('month');
+            const fromWrap = document.getElementById('from_date_wrap');
+            const toWrap = document.getElementById('to_date_wrap');
+            const yearWrap = document.getElementById('year_wrap');
+            const monthWrap = document.getElementById('month_wrap');
+
+            function togglePresetFields() {
+                if (!preset) {
+                    return;
+                }
+                const isCustom = preset.value === 'custom';
+                const isYearMonth = preset.value === 'year_month';
+
+                if (from) from.readOnly = !isCustom;
+                if (to) to.readOnly = !isCustom;
+                if (year) year.disabled = !isYearMonth;
+                if (month) month.disabled = !isYearMonth;
+                if (fromWrap) fromWrap.style.display = isYearMonth ? 'none' : '';
+                if (toWrap) toWrap.style.display = isYearMonth ? 'none' : '';
+                if (yearWrap) yearWrap.style.display = isYearMonth ? '' : 'none';
+                if (monthWrap) monthWrap.style.display = isYearMonth ? '' : 'none';
+            }
+
+            if (preset) {
+                preset.addEventListener('change', togglePresetFields);
+                togglePresetFields();
+            }
+
+            if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                    const existing = bootstrap.Tooltip.getInstance(el);
+                    if (existing) {
+                        existing.dispose();
+                    }
+                    new bootstrap.Tooltip(el, {
+                        container: 'body',
+                        trigger: 'hover focus',
+                        delay: { show: 0, hide: 0 },
+                    });
+                });
+            }
+
             if (typeof Chart === 'undefined') {
                 return;
             }
@@ -255,6 +342,71 @@
 
             if (!Chart.registry.plugins.get('valueOnBarPlugin')) {
                 Chart.register(valueOnBarPlugin);
+            }
+            if (!Chart.registry.plugins.get('piePercentageLabelPlugin')) {
+                Chart.register({
+                    id: 'piePercentageLabelPlugin',
+                    afterDatasetsDraw(chart, _args, pluginOptions) {
+                        if ((chart.config.type !== 'pie' && chart.config.type !== 'doughnut') || pluginOptions?.enabled === false) {
+                            return;
+                        }
+                        const labels = chart.data.labels || [];
+                        if (labels.length === 1 && labels[0] === 'No Sales') {
+                            return;
+                        }
+
+                        const dataset = chart.data.datasets?.[0];
+                        const meta = chart.getDatasetMeta(0);
+                        if (!dataset || !meta?.data?.length) {
+                            return;
+                        }
+
+                        const total = (dataset.data || []).reduce((sum, value) => sum + Number(value || 0), 0);
+                        if (!total) {
+                            return;
+                        }
+
+                        const minPercent = Number(pluginOptions?.minPercent ?? 4);
+                        const { ctx } = chart;
+                        ctx.save();
+                        ctx.fillStyle = pluginOptions?.color || '#ffffff';
+                        ctx.font = pluginOptions?.font || 'bold 11px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+
+                        meta.data.forEach((arc, index) => {
+                            const value = Number(dataset.data[index] || 0);
+                            if (!value) return;
+                            const percent = (value / total) * 100;
+                            if (percent < minPercent) return;
+
+                            const angle = (arc.startAngle + arc.endAngle) / 2;
+                            const radius = arc.innerRadius + (arc.outerRadius - arc.innerRadius) * 0.62;
+                            const x = arc.x + Math.cos(angle) * radius;
+                            const y = arc.y + Math.sin(angle) * radius;
+                            ctx.fillText(`${percent.toFixed(1)}%`, x, y);
+                        });
+
+                        ctx.restore();
+                    }
+                });
+            }
+
+            function getPercentage(value, values) {
+                const total = (values || []).reduce((sum, v) => sum + Number(v || 0), 0);
+                if (!total) return 0;
+                return (Number(value || 0) / total) * 100;
+            }
+
+            function getPieTooltipCallbacks(values) {
+                return {
+                    label(context) {
+                        const label = context.label || '';
+                        const value = Number(context.parsed || 0);
+                        const percent = getPercentage(value, values);
+                        return `${label}: ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${percent.toFixed(1)}%)`;
+                    }
+                };
             }
 
             const groupedItems = @json($groupedItems->toArray());
@@ -357,7 +509,13 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false
+                        maintainAspectRatio: false,
+                        plugins: {
+                            piePercentageLabelPlugin: { enabled: true },
+                            tooltip: {
+                                callbacks: getPieTooltipCallbacks(pieValues)
+                            }
+                        }
                     }
                 });
             }
@@ -388,7 +546,13 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false
+                        maintainAspectRatio: false,
+                        plugins: {
+                            piePercentageLabelPlugin: { enabled: true },
+                            tooltip: {
+                                callbacks: getPieTooltipCallbacks(pieValues)
+                            }
+                        }
                     }
                 });
             }

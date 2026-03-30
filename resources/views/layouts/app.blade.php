@@ -146,14 +146,14 @@
                             </li>
                             <li class="nav-item">
                                 <a href="/admin/reports"
-                                    class="nav-link {{ request()->is('admin/reports*') ? 'active' : '' }}">
+                                    class="nav-link {{ request()->routeIs('admin.reports.index') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-file"></i>
                                     <p>Report</p>
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a href="{{ route('admin.reports.customers') }}"
-                                    class="nav-link {{ request()->is('admin/reports/customers*') ? 'active' : '' }}">
+                                    class="nav-link {{ request()->routeIs('admin.reports.customers*') ? 'active' : '' }}">
                                     <i class="nav-icon fas fa-user-friends"></i>
                                     <p>Customers</p>
                                 </a>

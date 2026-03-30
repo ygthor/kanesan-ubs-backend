@@ -13,12 +13,25 @@
 @section('card-title', 'Stock Request #' . $stockRequest->id)
 
 @section('card-tools')
+    <a href="{{ route('admin.stock-requests.export.pdf', $stockRequest->id) }}" target="_blank" class="btn btn-danger btn-sm mr-2">
+        <i class="fas fa-file-pdf"></i> Print PDF
+    </a>
     <a href="{{ route('admin.stock-requests.index') }}" class="btn btn-secondary btn-sm">
         <i class="fas fa-arrow-left"></i> Back
     </a>
 @endsection
 
 @section('admin-content')
+    @php
+        $formatQty = function ($qty) {
+            $v = (float) $qty;
+            if (abs($v - round($v)) < 0.00001) {
+                return (string) (int) round($v);
+            }
+            return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
+        };
+    @endphp
+
     {{-- Request Summary --}}
     <div class="row mb-3">
         <div class="col-md-6">
@@ -87,23 +100,30 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($stockRequest->items as $item)
+                        @php $itemIndex = 0; @endphp
+                        @foreach($groupedItems as $groupName => $items)
                             <tr>
-                                <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $item->id }}">
-                                <td>{{ $item->item_no }}</td>
-                                <td>{{ $item->description ?? '-' }}</td>
-                                <td>{{ $item->unit ?? '-' }}</td>
-                                <td class="text-right">{{ number_format($item->requested_qty, 0) }}</td>
-                                <td>
-                                    <input type="number"
-                                           name="items[{{ $loop->index }}][approved_qty]"
-                                           class="form-control form-control-sm"
-                                           value="{{ $item->requested_qty }}"
-                                           min="0"
-                                           step="1"
-                                           required>
-                                </td>
+                                <td colspan="5" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
                             </tr>
+                            @foreach($items as $item)
+                                <tr>
+                                    <input type="hidden" name="items[{{ $itemIndex }}][id]" value="{{ $item->id }}">
+                                    <td>{{ $item->item_no }}</td>
+                                    <td>{{ $item->description ?? '-' }}</td>
+                                    <td>{{ $item->unit ?? '-' }}</td>
+                                    <td class="text-right">{{ $formatQty($item->requested_qty) }}</td>
+                                    <td>
+                                        <input type="number"
+                                               name="items[{{ $itemIndex }}][approved_qty]"
+                                               class="form-control form-control-sm"
+                                               value="{{ $item->requested_qty }}"
+                                               min="0"
+                                               step="1"
+                                               required>
+                                    </td>
+                                </tr>
+                                @php $itemIndex++; @endphp
+                            @endforeach
                         @endforeach
                     </tbody>
                 </table>
@@ -150,20 +170,25 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($stockRequest->items as $item)
+                    @foreach($groupedItems as $groupName => $items)
                         <tr>
-                            <td>{{ $item->item_no }}</td>
-                            <td>{{ $item->description ?? '-' }}</td>
-                            <td>{{ $item->unit ?? '-' }}</td>
-                            <td class="text-right">{{ number_format($item->requested_qty, 0) }}</td>
-                            <td class="text-right">
-                                @if($item->approved_qty !== null)
-                                    {{ number_format($item->approved_qty, 0) }}
-                                @else
-                                    <span class="text-muted">—</span>
-                                @endif
-                            </td>
+                            <td colspan="5" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
                         </tr>
+                        @foreach($items as $item)
+                            <tr>
+                                <td>{{ $item->item_no }}</td>
+                                <td>{{ $item->description ?? '-' }}</td>
+                                <td>{{ $item->unit ?? '-' }}</td>
+                                <td class="text-right">{{ $formatQty($item->requested_qty) }}</td>
+                                <td class="text-right">
+                                    @if($item->approved_qty !== null)
+                                        {{ $formatQty($item->approved_qty) }}
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
                     @endforeach
                 </tbody>
             </table>

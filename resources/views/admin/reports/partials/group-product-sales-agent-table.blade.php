@@ -2,6 +2,9 @@
     $formatQty = function ($qty) {
         return rtrim(rtrim(number_format((float) $qty, 2, '.', ''), '0'), '.');
     };
+    $tooltipQty = function ($inv, $cn) use ($formatQty) {
+        return 'INV: ' . $formatQty($inv) . ' | CN: ' . $formatQty($cn);
+    };
     $colspan = 3 + count($agentColumns);
 @endphp
 
@@ -23,9 +26,19 @@
                 <th style="width: 120px;">CODE</th>
                 <th>ITEM DESCRIPTION</th>
                 @foreach($agentColumns as $agent)
-                    <th class="text-right">{{ $formatQty($agentTotals[$agent] ?? 0) }}</th>
+                    <th
+                        class="text-right"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="{{ $tooltipQty($agentTotalsBreakdown[$agent]['inv'] ?? 0, $agentTotalsBreakdown[$agent]['cn'] ?? 0) }}"
+                    >{{ $formatQty($agentTotals[$agent] ?? 0) }}</th>
                 @endforeach
-                <th class="text-right">{{ $formatQty($grandTotal ?? 0) }}</th>
+                <th
+                    class="text-right"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="{{ $tooltipQty($grandTotalsBreakdown['inv'] ?? 0, $grandTotalsBreakdown['cn'] ?? 0) }}"
+                >{{ $formatQty($grandTotal ?? 0) }}</th>
             </tr>
         </thead>
         <tbody>
@@ -38,9 +51,19 @@
                         <td>{{ $item['item_code'] }}</td>
                         <td>{{ $item['item_description'] }}</td>
                         @foreach($agentColumns as $agent)
-                            <td class="text-right">{{ $formatQty($item['agents'][$agent] ?? 0) }}</td>
+                            <td
+                                class="text-right"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="{{ $tooltipQty($item['agent_breakdown'][$agent]['inv'] ?? 0, $item['agent_breakdown'][$agent]['cn'] ?? 0) }}"
+                            >{{ $formatQty($item['agents'][$agent] ?? 0) }}</td>
                         @endforeach
-                        <td class="text-center font-weight-bold">{{ $formatQty($item['total'] ?? 0) }}</td>
+                        <td
+                            class="text-center font-weight-bold"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="{{ $tooltipQty(collect($item['agent_breakdown'] ?? [])->sum('inv'), collect($item['agent_breakdown'] ?? [])->sum('cn')) }}"
+                        >{{ $formatQty($item['total'] ?? 0) }}</td>
                     </tr>
                 @endforeach
             @empty

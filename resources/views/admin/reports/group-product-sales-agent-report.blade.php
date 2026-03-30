@@ -122,7 +122,7 @@
         </div>
     </div>
 
-    <div class="row mb-3">
+    <div class="row mb-3 d-none">
         <div class="col-12">
             <div class="card h-100">
                 <div class="card-header py-2">
@@ -179,10 +179,75 @@
                     }
                 });
             }
+            if (typeof Chart !== 'undefined' && !Chart.registry.plugins.get('piePercentageLabelPlugin')) {
+                Chart.register({
+                    id: 'piePercentageLabelPlugin',
+                    afterDatasetsDraw(chart, _args, pluginOptions) {
+                        if ((chart.config.type !== 'pie' && chart.config.type !== 'doughnut') || pluginOptions?.enabled === false) {
+                            return;
+                        }
+                        const labels = chart.data.labels || [];
+                        if (labels.length === 1 && labels[0] === 'No Sales') {
+                            return;
+                        }
+
+                        const dataset = chart.data.datasets?.[0];
+                        const meta = chart.getDatasetMeta(0);
+                        if (!dataset || !meta?.data?.length) {
+                            return;
+                        }
+
+                        const total = (dataset.data || []).reduce((sum, value) => sum + Number(value || 0), 0);
+                        if (!total) {
+                            return;
+                        }
+
+                        const minPercent = Number(pluginOptions?.minPercent ?? 4);
+                        const { ctx } = chart;
+                        ctx.save();
+                        ctx.fillStyle = pluginOptions?.color || '#ffffff';
+                        ctx.font = pluginOptions?.font || 'bold 11px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+
+                        meta.data.forEach((arc, index) => {
+                            const value = Number(dataset.data[index] || 0);
+                            if (!value) return;
+                            const percent = (value / total) * 100;
+                            if (percent < minPercent) return;
+
+                            const angle = (arc.startAngle + arc.endAngle) / 2;
+                            const radius = arc.innerRadius + (arc.outerRadius - arc.innerRadius) * 0.62;
+                            const x = arc.x + Math.cos(angle) * radius;
+                            const y = arc.y + Math.sin(angle) * radius;
+                            ctx.fillText(`${percent.toFixed(1)}%`, x, y);
+                        });
+
+                        ctx.restore();
+                    }
+                });
+            }
 
             const preset = document.getElementById('date_preset');
             const from = document.getElementById('from_date');
             const to = document.getElementById('to_date');
+
+            function getPercentage(value, values) {
+                const total = (values || []).reduce((sum, v) => sum + Number(v || 0), 0);
+                if (!total) return 0;
+                return (Number(value || 0) / total) * 100;
+            }
+
+            function getPieTooltipCallbacks(values) {
+                return {
+                    label(context) {
+                        const label = context.label || '';
+                        const value = Number(context.parsed || 0);
+                        const percent = getPercentage(value, values);
+                        return `${label}: ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${percent.toFixed(1)}%)`;
+                    }
+                };
+            }
 
             function toggleCustomDates() {
                 const isCustom = preset.value === 'custom';
@@ -192,6 +257,20 @@
 
             preset.addEventListener('change', toggleCustomDates);
             toggleCustomDates();
+
+            if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                    const existing = bootstrap.Tooltip.getInstance(el);
+                    if (existing) {
+                        existing.dispose();
+                    }
+                    new bootstrap.Tooltip(el, {
+                        container: 'body',
+                        trigger: 'hover focus',
+                        delay: { show: 0, hide: 0 },
+                    });
+                });
+            }
 
             if (typeof Chart === 'undefined') {
                 return;
@@ -270,7 +349,13 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false
+                        maintainAspectRatio: false,
+                        plugins: {
+                            piePercentageLabelPlugin: { enabled: true },
+                            tooltip: {
+                                callbacks: getPieTooltipCallbacks(pieValues)
+                            }
+                        }
                     }
                 });
             }

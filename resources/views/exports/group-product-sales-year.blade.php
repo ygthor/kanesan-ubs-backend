@@ -1,6 +1,10 @@
+@php
+    $colspan = count($months) + 3;
+@endphp
+
 <table>
     <tr>
-        <th colspan="15">GROUP PRODUCT SALES REPORT - YEAR {{ $year }}</th>
+        <th colspan="{{ $colspan }}">GROUP PRODUCT SALES REPORT - {{ $periodTitle ?? ('YEAR ' . $year) }}</th>
     </tr>
     <tr>
         <th>CODE</th>
@@ -20,7 +24,7 @@
     </tr>
     @foreach($groupedItems as $groupName => $items)
         <tr>
-            <td colspan="15"><strong>Group :{{ $groupName }}</strong></td>
+            <td colspan="{{ $colspan }}"><strong>Group :{{ $groupName }}</strong></td>
         </tr>
         @foreach($items as $item)
             <tr>
@@ -34,4 +38,3 @@
         @endforeach
     @endforeach
 </table>
-

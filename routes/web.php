@@ -89,6 +89,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Stock Request Management (KBS/admin only)
     Route::get('stock-requests', [\App\Http\Controllers\Admin\StockRequestController::class, 'index'])->name('stock-requests.index');
     Route::get('stock-requests/{id}', [\App\Http\Controllers\Admin\StockRequestController::class, 'show'])->name('stock-requests.show');
+    Route::get('stock-requests/{id}/print-pdf', [\App\Http\Controllers\Admin\StockRequestController::class, 'exportPdf'])->name('stock-requests.export.pdf');
     Route::post('stock-requests/{id}/approve', [\App\Http\Controllers\Admin\StockRequestController::class, 'approve'])->name('stock-requests.approve');
     Route::post('stock-requests/{id}/reject', [\App\Http\Controllers\Admin\StockRequestController::class, 'reject'])->name('stock-requests.reject');
 

@@ -92,12 +92,10 @@ class ReportController extends Controller
     {
         $this->checkAccess();
 
-        $filters = [
-            'year' => (int) $request->input('year', now()->year),
-            'agent_no' => $request->input('agent_no'),
-            'product_search' => trim((string) $request->input('product_search', '')),
-            'group' => trim((string) $request->input('group', '')),
-        ];
+        $filters = $this->resolveYearMonthFilters($request);
+        $filters['agent_no'] = $request->input('agent_no');
+        $filters['product_search'] = trim((string) $request->input('product_search', ''));
+        $filters['group'] = trim((string) $request->input('group', ''));
 
         $report = $this->buildGroupProductSalesByYearData($filters);
         $agents = $this->getAgents();
@@ -169,17 +167,15 @@ class ReportController extends Controller
     {
         $this->checkAccess();
 
-        $filters = [
-            'year' => (int) $request->input('year', now()->year),
-            'agent_no' => $request->input('agent_no'),
-            'product_search' => trim((string) $request->input('product_search', '')),
-            'group' => trim((string) $request->input('group', '')),
-        ];
+        $filters = $this->resolveYearMonthFilters($request);
+        $filters['agent_no'] = $request->input('agent_no');
+        $filters['product_search'] = trim((string) $request->input('product_search', ''));
+        $filters['group'] = trim((string) $request->input('group', ''));
 
         $report = $this->buildGroupProductSalesByYearData($filters);
 
         $printedAt = now()->format('Y-m-d H:i:s');
-        $filename = 'group_product_sales_by_year_' . $filters['year'] . '_' . now()->format('Ymd_His') . '.pdf';
+        $filename = 'group_product_sales_by_year_' . ($filters['period_key'] ?? $filters['year']) . '_' . now()->format('Ymd_His') . '.pdf';
         $pdf = new class('L', 'mm', 'A4', true, 'UTF-8', false) extends \TCPDF {
             public string $printedAt = '';
 
@@ -215,15 +211,13 @@ class ReportController extends Controller
     {
         $this->checkAccess();
 
-        $filters = [
-            'year' => (int) $request->input('year', now()->year),
-            'agent_no' => $request->input('agent_no'),
-            'product_search' => trim((string) $request->input('product_search', '')),
-            'group' => trim((string) $request->input('group', '')),
-        ];
+        $filters = $this->resolveYearMonthFilters($request);
+        $filters['agent_no'] = $request->input('agent_no');
+        $filters['product_search'] = trim((string) $request->input('product_search', ''));
+        $filters['group'] = trim((string) $request->input('group', ''));
 
         $report = $this->buildGroupProductSalesByYearData($filters);
-        $filename = 'group_product_sales_by_year_' . $filters['year'] . '_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'group_product_sales_by_year_' . ($filters['period_key'] ?? $filters['year']) . '_' . now()->format('Ymd_His') . '.xlsx';
 
         return Excel::download(new GroupProductSalesByYearExport(array_merge($report, ['filters' => $filters])), $filename);
     }
@@ -1214,9 +1208,12 @@ class ReportController extends Controller
 
     private function buildGroupProductSalesByYearData(array $filters): array
     {
-        $year = max(2000, (int) ($filters['year'] ?? now()->year));
-        $startDate = sprintf('%04d-01-01 00:00:00', $year);
-        $endDate = sprintf('%04d-12-31 23:59:59', $year);
+        $fromDate = (string) ($filters['from_date'] ?? now()->startOfMonth()->toDateString());
+        $toDate = (string) ($filters['to_date'] ?? now()->toDateString());
+        $startDate = strlen($fromDate) === 10 ? $fromDate . ' 00:00:00' : $fromDate;
+        $endDate = strlen($toDate) === 10 ? $toDate . ' 23:59:59' : $toDate;
+        $periodStart = Carbon::parse($fromDate)->startOfMonth();
+        $periodEnd = Carbon::parse($toDate)->startOfMonth();
 
         // 1) Base list: include all products from master item table
         $baseItemsQuery = DB::table('icitem as i')
@@ -1250,7 +1247,7 @@ class ReportController extends Controller
         // 2) Sales qty aggregated by product + month
         $aggQuery = DB::table('order_items as oi')
             ->join('orders as o', 'o.reference_no', '=', 'oi.reference_no')
-            ->where('o.type', 'INV')
+            ->whereIn('o.type', ['INV', 'CN'])
             ->whereBetween('o.order_date', [$startDate, $endDate]);
 
         if (!empty($filters['agent_no'])) {
@@ -1260,23 +1257,33 @@ class ReportController extends Controller
         $rows = $aggQuery
             ->selectRaw("
                 oi.product_no as item_code,
-                MONTH(o.order_date) as month_no,
+                DATE_FORMAT(o.order_date, '%Y-%m') as month_key,
+                o.type as order_type,
                 SUM(COALESCE(oi.quantity, 0)) as qty,
                 SUM(COALESCE(oi.discount, 0)) as discount
             ")
             ->groupBy('oi.product_no')
-            ->groupByRaw('MONTH(o.order_date)')
+            ->groupByRaw("DATE_FORMAT(o.order_date, '%Y-%m')")
+            ->groupBy('o.type')
             ->get();
 
-        $months = [
-            1 => 'JAN', 2 => 'FEB', 3 => 'MAR', 4 => 'APR', 5 => 'MAY', 6 => 'JUN',
-            7 => 'JUL', 8 => 'AUG', 9 => 'SEP', 10 => 'OCT', 11 => 'NOV', 12 => 'DEC',
-        ];
+        $months = [];
+        $cursor = $periodStart->copy();
+        while ($cursor->lte($periodEnd)) {
+            $monthKey = $cursor->format('Y-m');
+            $monthLabel = $periodStart->year === $periodEnd->year
+                ? strtoupper($cursor->format('M'))
+                : strtoupper($cursor->format('M y'));
+            $months[$monthKey] = $monthLabel;
+            $cursor->addMonthNoOverflow();
+        }
+        $monthKeys = array_keys($months);
 
         $items = [];
         $itemKeyByCode = [];
-        $monthTotals = array_fill(1, 12, 0);
-        $monthDiscountTotals = array_fill(1, 12, 0);
+        $monthTotals = array_fill_keys($monthKeys, 0);
+        $monthDiscountTotals = array_fill_keys($monthKeys, 0);
+        $monthTotalsBreakdown = array_fill_keys($monthKeys, ['inv' => 0.0, 'cn' => 0.0]);
 
         foreach ($baseItems as $baseItem) {
             $itemKey = $baseItem->item_group . '|' . $baseItem->item_code;
@@ -1284,7 +1291,8 @@ class ReportController extends Controller
                 'item_group' => $baseItem->item_group,
                 'item_code' => $baseItem->item_code,
                 'item_description' => $baseItem->item_description,
-                'months' => array_fill(1, 12, 0),
+                'months' => array_fill_keys($monthKeys, 0),
+                'month_breakdown' => array_fill_keys($monthKeys, ['inv' => 0.0, 'cn' => 0.0]),
                 'total' => 0,
                 'discount_total' => 0,
             ];
@@ -1297,28 +1305,47 @@ class ReportController extends Controller
                 continue;
             }
             $itemKey = $itemKeyByCode[$code];
-            $monthNo = (int) $row->month_no;
+            $monthKey = (string) $row->month_key;
+            if (!isset($months[$monthKey])) {
+                continue;
+            }
             $qty = (float) $row->qty;
             $discount = (float) ($row->discount ?? 0);
-            $items[$itemKey]['months'][$monthNo] += $qty;
-            $items[$itemKey]['total'] += $qty;
-            $items[$itemKey]['discount_total'] += $discount;
-            $monthTotals[$monthNo] += $qty;
-            $monthDiscountTotals[$monthNo] += $discount;
+            $type = strtoupper((string) ($row->order_type ?? 'INV'));
+            if ($type === 'CN') {
+                $items[$itemKey]['month_breakdown'][$monthKey]['cn'] += $qty;
+                $items[$itemKey]['months'][$monthKey] -= $qty;
+                $items[$itemKey]['total'] -= $qty;
+                $items[$itemKey]['discount_total'] -= $discount;
+                $monthTotalsBreakdown[$monthKey]['cn'] += $qty;
+                $monthTotals[$monthKey] -= $qty;
+                $monthDiscountTotals[$monthKey] -= $discount;
+            } else {
+                $items[$itemKey]['month_breakdown'][$monthKey]['inv'] += $qty;
+                $items[$itemKey]['months'][$monthKey] += $qty;
+                $items[$itemKey]['total'] += $qty;
+                $items[$itemKey]['discount_total'] += $discount;
+                $monthTotalsBreakdown[$monthKey]['inv'] += $qty;
+                $monthTotals[$monthKey] += $qty;
+                $monthDiscountTotals[$monthKey] += $discount;
+            }
         }
 
         $grandTotal = array_sum($monthTotals);
         $yearDiscountTotal = array_sum($monthDiscountTotals);
         $groupedItems = collect($items)->groupBy('item_group');
+        $year = (int) $periodStart->format('Y');
 
         return [
             'months' => $months,
             'groupedItems' => $groupedItems,
             'monthTotals' => $monthTotals,
+            'monthTotalsBreakdown' => $monthTotalsBreakdown,
             'monthDiscountTotals' => $monthDiscountTotals,
             'grandTotal' => $grandTotal,
             'yearDiscountTotal' => $yearDiscountTotal,
             'year' => $year,
+            'periodTitle' => (string) ($filters['period_title'] ?? ('YEAR ' . $year)),
         ];
     }
 
@@ -1361,18 +1388,20 @@ class ReportController extends Controller
         // 2) Sales qty aggregated by product + agent
         $aggQuery = DB::table('order_items as oi')
             ->join('orders as o', 'o.reference_no', '=', 'oi.reference_no')
-            ->where('o.type', 'INV')
+            ->whereIn('o.type', ['INV', 'CN'])
             ->whereBetween('o.order_date', [$fromDateForQuery, $toDateForQuery]);
 
         $rows = $aggQuery
             ->selectRaw("
                 oi.product_no as item_code,
                 COALESCE(NULLIF(TRIM(o.agent_no), ''), 'N/A') as agent_no,
+                o.type as order_type,
                 SUM(COALESCE(oi.quantity, 0)) as qty,
                 SUM(COALESCE(oi.discount, 0)) as discount
             ")
             ->groupBy('oi.product_no')
             ->groupBy('o.agent_no')
+            ->groupBy('o.type')
             ->get();
 
         $agentColumns = $rows->pluck('agent_no')->unique()->sort()->values()->all();
@@ -1380,9 +1409,11 @@ class ReportController extends Controller
         $itemKeyByCode = [];
         $agentTotals = [];
         $agentDiscountTotals = [];
+        $agentTotalsBreakdown = [];
         foreach ($agentColumns as $agent) {
             $agentTotals[$agent] = 0;
             $agentDiscountTotals[$agent] = 0;
+            $agentTotalsBreakdown[$agent] = ['inv' => 0.0, 'cn' => 0.0];
         }
 
         foreach ($baseItems as $baseItem) {
@@ -1392,6 +1423,7 @@ class ReportController extends Controller
                 'item_code' => $baseItem->item_code,
                 'item_description' => $baseItem->item_description,
                 'agents' => array_fill_keys($agentColumns, 0),
+                'agent_breakdown' => array_fill_keys($agentColumns, ['inv' => 0.0, 'cn' => 0.0]),
                 'total' => 0,
                 'agent_discounts' => array_fill_keys($agentColumns, 0),
                 'discount_total' => 0,
@@ -1417,23 +1449,46 @@ class ReportController extends Controller
                 if (!isset($agentDiscountTotals[$agent])) {
                     $agentDiscountTotals[$agent] = 0;
                 }
+                if (!isset($agentTotalsBreakdown[$agent])) {
+                    $agentTotalsBreakdown[$agent] = ['inv' => 0.0, 'cn' => 0.0];
+                }
             }
-            $items[$itemKey]['agents'][$agent] += $qty;
-            $items[$itemKey]['total'] += $qty;
-            $items[$itemKey]['agent_discounts'][$agent] += $discount;
-            $items[$itemKey]['discount_total'] += $discount;
-            $agentTotals[$agent] += $qty;
-            $agentDiscountTotals[$agent] += $discount;
+            $type = strtoupper((string) ($row->order_type ?? 'INV'));
+            if ($type === 'CN') {
+                $items[$itemKey]['agent_breakdown'][$agent]['cn'] += $qty;
+                $items[$itemKey]['agents'][$agent] -= $qty;
+                $items[$itemKey]['total'] -= $qty;
+                $items[$itemKey]['agent_discounts'][$agent] -= $discount;
+                $items[$itemKey]['discount_total'] -= $discount;
+                $agentTotalsBreakdown[$agent]['cn'] += $qty;
+                $agentTotals[$agent] -= $qty;
+                $agentDiscountTotals[$agent] -= $discount;
+            } else {
+                $items[$itemKey]['agent_breakdown'][$agent]['inv'] += $qty;
+                $items[$itemKey]['agents'][$agent] += $qty;
+                $items[$itemKey]['total'] += $qty;
+                $items[$itemKey]['agent_discounts'][$agent] += $discount;
+                $items[$itemKey]['discount_total'] += $discount;
+                $agentTotalsBreakdown[$agent]['inv'] += $qty;
+                $agentTotals[$agent] += $qty;
+                $agentDiscountTotals[$agent] += $discount;
+            }
         }
 
         $grandTotal = array_sum($agentTotals);
         $grandDiscountTotal = array_sum($agentDiscountTotals);
+        $grandTotalsBreakdown = [
+            'inv' => array_sum(array_map(fn ($v) => (float) ($v['inv'] ?? 0), $agentTotalsBreakdown)),
+            'cn' => array_sum(array_map(fn ($v) => (float) ($v['cn'] ?? 0), $agentTotalsBreakdown)),
+        ];
         $groupedItems = collect($items)->groupBy('item_group');
 
         return [
             'groupedItems' => $groupedItems,
             'agentColumns' => $agentColumns,
             'agentTotals' => $agentTotals,
+            'agentTotalsBreakdown' => $agentTotalsBreakdown,
+            'grandTotalsBreakdown' => $grandTotalsBreakdown,
             'agentDiscountTotals' => $agentDiscountTotals,
             'grandTotal' => $grandTotal,
             'grandDiscountTotal' => $grandDiscountTotal,
@@ -1627,6 +1682,84 @@ class ReportController extends Controller
         }
     }
 
+    private function resolveYearMonthFilters(Request $request): array
+    {
+        $allowedPresets = ['this_month', 'last_month', 'this_quarter', 'last_quarter', 'this_year', 'last_year', 'custom', 'year_month'];
+        $fromInput = trim((string) $request->input('from_date', ''));
+        $toInput = trim((string) $request->input('to_date', ''));
+        $hasPresetParam = $request->has('date_preset');
+        $requestedPreset = trim((string) $request->input('date_preset', 'this_month'));
+        $requestedPreset = in_array($requestedPreset, $allowedPresets, true) ? $requestedPreset : 'this_month';
+
+        $year = (int) $request->input('year', now()->year);
+        if ($year < 2000 || $year > 2100) {
+            $year = (int) now()->year;
+        }
+
+        $month = (int) $request->input('month', now()->month);
+        if ($month < 1 || $month > 12) {
+            $month = (int) now()->month;
+        }
+
+        if (!$hasPresetParam && ($fromInput !== '' || $toInput !== '')) {
+            $datePreset = 'custom';
+            $fromDate = $fromInput !== '' ? $fromInput : null;
+            $toDate = $toInput !== '' ? $toInput : null;
+        } elseif ($requestedPreset === 'custom') {
+            $datePreset = 'custom';
+            $fromDate = $fromInput !== '' ? $fromInput : null;
+            $toDate = $toInput !== '' ? $toInput : null;
+        } elseif ($requestedPreset === 'year_month') {
+            $datePreset = 'year_month';
+            $start = Carbon::create($year, $month, 1)->startOfMonth();
+            $end = $start->copy()->endOfMonth();
+            $fromDate = $start->toDateString();
+            $toDate = $end->toDateString();
+        } else {
+            [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
+                $requestedPreset,
+                $request->input('from_date'),
+                $request->input('to_date')
+            );
+        }
+
+        if ($datePreset === 'custom') {
+            if (empty($fromDate) || empty($toDate)) {
+                [$defaultFrom, $defaultTo] = $this->resolveDateRangeByPreset('custom', null, null);
+                $fromDate = $fromDate ?: $defaultFrom;
+                $toDate = $toDate ?: $defaultTo;
+            }
+        }
+
+        $periodStart = Carbon::parse((string) $fromDate);
+        $periodEnd = Carbon::parse((string) $toDate);
+        $resolvedYear = (int) $periodStart->format('Y');
+        $resolvedMonth = (int) $periodStart->format('n');
+
+        $periodTitle = match ($datePreset) {
+            'this_month', 'last_month', 'year_month' => 'MONTH ' . strtoupper($periodStart->format('M Y')),
+            'this_quarter', 'last_quarter' => 'QUARTER ' . $periodStart->format('Y') . ' Q' . $periodStart->quarter,
+            'this_year', 'last_year' => 'YEAR ' . $periodStart->format('Y'),
+            default => 'CUSTOM ' . $periodStart->format('d/m/Y') . ' - ' . $periodEnd->format('d/m/Y'),
+        };
+
+        if ($datePreset === 'year_month') {
+            $periodKey = $periodStart->format('Y_m');
+        } else {
+            $periodKey = $periodStart->format('Ymd') . '_to_' . $periodEnd->format('Ymd');
+        }
+
+        return [
+            'date_preset' => $datePreset,
+            'year' => $resolvedYear,
+            'month' => $resolvedMonth,
+            'from_date' => (string) $fromDate,
+            'to_date' => (string) $toDate,
+            'period_title' => $periodTitle,
+            'period_key' => $periodKey,
+        ];
+    }
+
     private function getAgentPeriodLabel(string $preset, string $fromDate, string $toDate): string
     {
         $from = Carbon::parse($fromDate);
@@ -1645,7 +1778,7 @@ class ReportController extends Controller
         $months = $report['months'];
         $monthTotals = $report['monthTotals'];
         $grandTotal = $report['grandTotal'];
-        $year = $report['year'];
+        $periodTitle = (string) ($report['periodTitle'] ?? ('YEAR ' . $report['year']));
 
         $formatQty = function ($qty) {
             $v = (float) $qty;
@@ -1658,18 +1791,18 @@ class ReportController extends Controller
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
         $colCode = 30.0;
         $colDesc = 88.0;
-        $monthCount = 13; // Jan-Dec + Total
-        $colMonth = max(9.5, ($pageWidth - $colCode - $colDesc) / $monthCount);
-        $tableWidth = $colCode + $colDesc + ($colMonth * $monthCount);
+        $monthColumnCount = count($months) + 1; // Selected month columns + Total
+        $colMonth = max(9.5, ($pageWidth - $colCode - $colDesc) / $monthColumnCount);
+        $tableWidth = $colCode + $colDesc + ($colMonth * $monthColumnCount);
 
         $agentLabel = trim((string) ($filters['agent_no'] ?? ''));
         $agentLabel = $agentLabel !== '' ? $agentLabel : 'ALL AGENTS';
 
         $drawHeader = function () use (
             $pdf,
-            $year,
+            $periodTitle,
             $months,
-            $monthCount,
+            $monthColumnCount,
             $monthTotals,
             $grandTotal,
             $formatQty,
@@ -1682,7 +1815,7 @@ class ReportController extends Controller
             $pdf->SetFont('helvetica', 'B', 10);
             $pdf->SetFillColor(245, 245, 245);
             $pdf->Cell($tableWidth, 7, 'PERKHIDMATAN DAN JUALAN KANESAN BERSAUDARA', 1, 1, 'C', true);
-            $pdf->Cell($tableWidth, 7, 'GROUP PRODUCT SALES REPORT - YEAR ' . $year, 1, 1, 'C', true);
+            $pdf->Cell($tableWidth, 7, 'GROUP PRODUCT SALES REPORT - ' . $periodTitle, 1, 1, 'C', true);
 
             $pdf->SetFillColor(235, 0, 235);
             $pdf->SetTextColor(0, 0, 0);
@@ -1701,7 +1834,7 @@ class ReportController extends Controller
             $pdf->SetFillColor(245, 245, 245);
             $pdf->Cell($colCode, 8, 'CODE', 1, 0, 'C', true);
             $pdf->Cell($colDesc, 8, 'ITEM DESCRIPTION', 1, 0, 'C', true);
-            $pdf->Cell($colMonth * $monthCount, 8, 'QTY SOLD', 1, 1, 'C', true);
+            $pdf->Cell($colMonth * $monthColumnCount, 8, 'QTY SOLD', 1, 1, 'C', true);
 
             // Months header row
             $pdf->SetFont('helvetica', 'B', 9);
