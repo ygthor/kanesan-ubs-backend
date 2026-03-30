@@ -1389,6 +1389,13 @@ class ReportController extends Controller
         $aggQuery = DB::table('order_items as oi')
             ->join('orders as o', 'o.reference_no', '=', 'oi.reference_no')
             ->whereIn('o.type', ['INV', 'CN'])
+            ->where(function ($q) {
+                $q->where('o.type', 'INV')
+                    ->orWhere(function ($q2) {
+                        $q2->where('o.type', 'CN')
+                            ->where('o.created_at', '>', '2025-12-14 23:59:59');
+                    });
+            })
             ->whereBetween('o.order_date', [$fromDateForQuery, $toDateForQuery]);
 
         $rows = $aggQuery
