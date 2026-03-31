@@ -523,9 +523,16 @@ class StockManagementController extends Controller
             $filters['date_to'] = $request->date_to;
         }
 
+        // Per-page selection (supports "all")
+        $perPageInput = strtolower((string) $request->input('per_page', '50'));
+        $allowedPerPage = ['25', '50', '100', '200', 'all'];
+        if (!in_array($perPageInput, $allowedPerPage, true)) {
+            $perPageInput = '50';
+        }
+
         // Get paginated stock movements using shared StockService method
         $page = $request->get('page', 1);
-        $perPage = 50;
+        $perPage = $perPageInput === 'all' ? 0 : (int) $perPageInput;
 
         $transactions = $stockService->getStockMovementsPaginated(
             $agentNo,
@@ -537,7 +544,29 @@ class StockManagementController extends Controller
             $request->query()
         );
 
-        return view('inventory.item-transactions', compact('item', 'currentStock', 'transactions', 'agentNo'));
+        // Total quantity should be based on all filtered rows, not current page
+        $allFilteredTransactions = $stockService->getStockMovements($agentNo, $itemno, $filters);
+        $totalQuantity = $allFilteredTransactions->sum(function ($trans) {
+            $type = is_array($trans) ? ($trans['type'] ?? null) : ($trans->transaction_type ?? null);
+            $quantity = (float) (is_array($trans) ? ($trans['quantity'] ?? 0) : ($trans->quantity ?? 0));
+
+            if ($type === 'out' || $type === 'invoice_sale') {
+                return -abs($quantity);
+            }
+            if ($type === 'adjustment') {
+                return $quantity;
+            }
+            return abs($quantity);
+        });
+
+        return view('inventory.item-transactions', compact(
+            'item',
+            'currentStock',
+            'transactions',
+            'agentNo',
+            'perPageInput',
+            'totalQuantity'
+        ));
     }
 
     /**

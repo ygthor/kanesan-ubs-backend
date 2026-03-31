@@ -305,6 +305,14 @@ class StockService
         $allTransactions = $this->getStockMovements($agentNo, $itemNo, $filters);
 
         $total = $allTransactions->count();
+        $page = max(1, $page);
+
+        // perPage <= 0 means "show all"
+        if ($perPage <= 0) {
+            $perPage = max(1, $total);
+            $page = 1;
+        }
+
         $items = $allTransactions->slice(($page - 1) * $perPage, $perPage)->values();
 
         return new \Illuminate\Pagination\LengthAwarePaginator(

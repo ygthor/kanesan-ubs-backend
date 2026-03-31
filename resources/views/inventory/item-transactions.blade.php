@@ -122,11 +122,21 @@
                                 Adjustment</option>
                         </select>
                     </div>
-                    <div class="col-md-3 d-flex align-items-end">
+                    <div class="col-md-2">
+                        <label for="perPage">Show</label>
+                        <select class="form-control" name="per_page" id="perPage">
+                            <option value="25" {{ ($perPageInput ?? '50') === '25' ? 'selected' : '' }}>25</option>
+                            <option value="50" {{ ($perPageInput ?? '50') === '50' ? 'selected' : '' }}>50</option>
+                            <option value="100" {{ ($perPageInput ?? '50') === '100' ? 'selected' : '' }}>100</option>
+                            <option value="200" {{ ($perPageInput ?? '50') === '200' ? 'selected' : '' }}>200</option>
+                            <option value="all" {{ ($perPageInput ?? '50') === 'all' ? 'selected' : '' }}>All</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary mr-2">
                             <i class="fas fa-filter"></i> Apply Filter
                         </button>
-                        <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}{{ $agentNo ? '?agent_no=' . urlencode($agentNo) : '' }}"
+                        <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}?{{ http_build_query(array_filter(['agent_no' => $agentNo, 'per_page' => $perPageInput ?? '50'])) }}"
                             class="btn btn-secondary">
                             <i class="fas fa-times"></i> Clear
                         </a>
@@ -149,7 +159,6 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <?php $tota_qty = 0; ?>
                             @forelse($transactions as $trans)
                                 @php
                                     // Handle both array and object formats
@@ -172,12 +181,6 @@
                                     $source = is_array($trans)
                                         ? $trans['source'] ?? 'item_transaction'
                                         : 'item_transaction';
-
-                                    if ($type == 'in' || $type == 'adjustment') {
-                                        $tota_qty += $quantity;
-                                    } else {
-                                        $tota_qty -= abs($quantity);
-                                    }
 
                                 @endphp
                                 <tr>
@@ -223,11 +226,11 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">
+                                    <td colspan="7" class="text-center text-muted py-4">
                                         <i class="fas fa-inbox fa-2x mb-2"></i>
                                         <p class="mb-0">No transactions found</p>
                                         @if (request('transaction_type') || request('date_from') || request('date_to'))
-                                            <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}{{ $agentNo ? '?agent_no=' . urlencode($agentNo) : '' }}"
+                                            <a href="{{ route('inventory.stock-management.item.transactions', $item->ITEMNO) }}?{{ http_build_query(array_filter(['agent_no' => $agentNo, 'per_page' => $perPageInput ?? '50'])) }}"
                                                 class="btn btn-sm btn-secondary mt-2">Clear Filters</a>
                                         @endif
                                     </td>
@@ -235,7 +238,7 @@
                             @endforelse
                             <tr>
                                 <td colspan="2">Total Quantity</td>
-                                <td><strong>{{ number_format($tota_qty, 2) }}</strong></td>
+                                <td><strong>{{ number_format($totalQuantity ?? 0, 2) }}</strong></td>
                             </tr>
                         </tbody>
                     </table>
@@ -273,6 +276,11 @@
 
             // Auto-submit form when transaction type changes
             $('#transactionTypeFilter').on('change', function() {
+                $('#filterForm').submit();
+            });
+
+            // Auto-submit form when per-page changes
+            $('#perPage').on('change', function() {
                 $('#filterForm').submit();
             });
 
