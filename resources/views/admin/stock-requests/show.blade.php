@@ -118,7 +118,6 @@
                                                class="form-control form-control-sm"
                                                value="{{ $item->requested_qty }}"
                                                min="0"
-                                               step="1"
                                                required>
                                     </td>
                                 </tr>
