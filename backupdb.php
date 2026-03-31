@@ -81,6 +81,7 @@ try {
         }
 
         $dumpFile = "{$backupDir}/{$prefix}.sql";
+        $zipFile = "{$backupDir}/{$prefix}.zip";
         $binaries = ['mysqldump', 'mariadb-dump'];
         $dumpBinary = null;
 
@@ -123,18 +124,48 @@ try {
         }
 
         @unlink("{$dumpFile}.err");
-        println("Backup created: {$dumpFile}");
+
+        if (!class_exists('ZipArchive')) {
+            throw new RuntimeException('ZipArchive extension is required for ZIP backups.');
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException("Unable to create ZIP file: {$zipFile}");
+        }
+
+        if (!$zip->addFile($dumpFile, basename($dumpFile))) {
+            $zip->close();
+            throw new RuntimeException('Unable to add SQL dump to ZIP.');
+        }
+
+        $zip->close();
+        @unlink($dumpFile);
+
+        println("Backup created: {$zipFile}");
     } elseif ($driver === 'sqlite') {
         $sqlitePath = (string) ($connection['database'] ?? '');
         if ($sqlitePath === '' || !is_file($sqlitePath)) {
             throw new RuntimeException("SQLite database file not found: {$sqlitePath}");
         }
 
-        $backupFile = "{$backupDir}/{$prefix}.sqlite";
-        if (!copy($sqlitePath, $backupFile)) {
-            throw new RuntimeException('Unable to copy SQLite database file.');
+        if (!class_exists('ZipArchive')) {
+            throw new RuntimeException('ZipArchive extension is required for ZIP backups.');
         }
-        println("SQLite backup created: {$backupFile}");
+
+        $zipFile = "{$backupDir}/{$prefix}.zip";
+        $zip = new ZipArchive();
+        if ($zip->open($zipFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException("Unable to create ZIP file: {$zipFile}");
+        }
+
+        if (!$zip->addFile($sqlitePath, basename($sqlitePath))) {
+            $zip->close();
+            throw new RuntimeException('Unable to add SQLite DB to ZIP.');
+        }
+
+        $zip->close();
+        println("SQLite backup created: {$zipFile}");
     } else {
         throw new RuntimeException("Unsupported DB driver: {$driver}");
     }
