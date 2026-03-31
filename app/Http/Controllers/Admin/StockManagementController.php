@@ -311,24 +311,17 @@ class StockManagementController extends Controller
             'ITEMNO' => 'required|string|exists:icitem,ITEMNO',
             'transaction_type' => 'required|string|in:in,out,adjustment,invoice_sale,invoice_return',
             'quantity' => $quantityRules,
-            'notes' => 'nullable|string',
+            'notes' => 'required|string',
             'reference_type' => 'nullable|string',
         ]);
 
-        // Additional validation for adjustment
-        if ($request->transaction_type === 'adjustment' && empty($request->notes)) {
-            return redirect()->route('inventory.stock-management.create', [
-                'agent_no' => $request->agent_no,
-                'group' => $request->group,
-                'item_search' => $request->item_search,
-                'item_code' => $request->ITEMNO, // Add selected item to maintain form state
-            ])
-                ->with('error', 'Notes are required for stock adjustments.')
-                ->withInput();
-        }
-
         try {
             $agentNo = $request->agent_no;
+            // Normalize agent_no: if username is passed (e.g. S03), store/query by user name consistently.
+            $agentUser = User::where('username', $agentNo)->first();
+            if ($agentUser && $agentUser->name) {
+                $agentNo = $agentUser->name;
+            }
             $itemno = $request->ITEMNO;
             $transactionType = $request->transaction_type;
             $quantity = (float)$request->quantity;

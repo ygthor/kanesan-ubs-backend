@@ -1265,13 +1265,13 @@ class ReportController extends Controller
             ->selectRaw("
                 oi.product_no as item_code,
                 DATE_FORMAT(o.order_date, '%Y-%m') as month_key,
-                o.type as order_type,
-                SUM(COALESCE(oi.quantity, 0)) as qty,
-                SUM(COALESCE(oi.discount, 0)) as discount
+                SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) as sales_qty,
+                SUM(IF(o.type = 'INV', COALESCE(oi.discount, 0), 0)) as sales_discount,
+                SUM(IF(o.type = 'CN' AND COALESCE(oi.trade_return_is_good, 1) = 1, COALESCE(oi.quantity, 0), 0)) as rg_qty,
+                SUM(IF(o.type = 'CN' AND COALESCE(oi.trade_return_is_good, 1) = 0, COALESCE(oi.quantity, 0), 0)) as rb_qty
             ")
             ->groupBy('oi.product_no')
             ->groupByRaw("DATE_FORMAT(o.order_date, '%Y-%m')")
-            ->groupBy('o.type')
             ->get();
 
         $months = [];
@@ -1290,7 +1290,7 @@ class ReportController extends Controller
         $itemKeyByCode = [];
         $monthTotals = array_fill_keys($monthKeys, 0);
         $monthDiscountTotals = array_fill_keys($monthKeys, 0);
-        $monthTotalsBreakdown = array_fill_keys($monthKeys, ['inv' => 0.0, 'cn' => 0.0]);
+        $monthTotalsBreakdown = array_fill_keys($monthKeys, ['sales' => 0.0, 'rg' => 0.0, 'rb' => 0.0]);
 
         foreach ($baseItems as $baseItem) {
             $itemKey = $baseItem->item_group . '|' . $baseItem->item_code;
@@ -1299,8 +1299,11 @@ class ReportController extends Controller
                 'item_code' => $baseItem->item_code,
                 'item_description' => $baseItem->item_description,
                 'months' => array_fill_keys($monthKeys, 0),
-                'month_breakdown' => array_fill_keys($monthKeys, ['inv' => 0.0, 'cn' => 0.0]),
+                'month_breakdown' => array_fill_keys($monthKeys, ['sales' => 0.0, 'rg' => 0.0, 'rb' => 0.0]),
                 'total' => 0,
+                'total_sales' => 0,
+                'total_rg' => 0,
+                'total_rb' => 0,
                 'discount_total' => 0,
             ];
             $itemKeyByCode[(string) $baseItem->item_code] = $itemKey;
@@ -1316,26 +1319,26 @@ class ReportController extends Controller
             if (!isset($months[$monthKey])) {
                 continue;
             }
-            $qty = (float) $row->qty;
-            $discount = (float) ($row->discount ?? 0);
-            $type = strtoupper((string) ($row->order_type ?? 'INV'));
-            if ($type === 'CN') {
-                $items[$itemKey]['month_breakdown'][$monthKey]['cn'] += $qty;
-                $items[$itemKey]['months'][$monthKey] -= $qty;
-                $items[$itemKey]['total'] -= $qty;
-                $items[$itemKey]['discount_total'] -= $discount;
-                $monthTotalsBreakdown[$monthKey]['cn'] += $qty;
-                $monthTotals[$monthKey] -= $qty;
-                $monthDiscountTotals[$monthKey] -= $discount;
-            } else {
-                $items[$itemKey]['month_breakdown'][$monthKey]['inv'] += $qty;
-                $items[$itemKey]['months'][$monthKey] += $qty;
-                $items[$itemKey]['total'] += $qty;
-                $items[$itemKey]['discount_total'] += $discount;
-                $monthTotalsBreakdown[$monthKey]['inv'] += $qty;
-                $monthTotals[$monthKey] += $qty;
-                $monthDiscountTotals[$monthKey] += $discount;
-            }
+            $salesQty = (float) ($row->sales_qty ?? 0);
+            $salesDiscount = (float) ($row->sales_discount ?? 0);
+            $rgQty = (float) ($row->rg_qty ?? 0);
+            $rbQty = (float) ($row->rb_qty ?? 0);
+
+            $items[$itemKey]['month_breakdown'][$monthKey]['sales'] += $salesQty;
+            $items[$itemKey]['month_breakdown'][$monthKey]['rg'] += $rgQty;
+            $items[$itemKey]['month_breakdown'][$monthKey]['rb'] += $rbQty;
+            $items[$itemKey]['months'][$monthKey] += $salesQty;
+            $items[$itemKey]['total'] += $salesQty;
+            $items[$itemKey]['total_sales'] += $salesQty;
+            $items[$itemKey]['total_rg'] += $rgQty;
+            $items[$itemKey]['total_rb'] += $rbQty;
+            $items[$itemKey]['discount_total'] += $salesDiscount;
+
+            $monthTotalsBreakdown[$monthKey]['sales'] += $salesQty;
+            $monthTotalsBreakdown[$monthKey]['rg'] += $rgQty;
+            $monthTotalsBreakdown[$monthKey]['rb'] += $rbQty;
+            $monthTotals[$monthKey] += $salesQty;
+            $monthDiscountTotals[$monthKey] += $salesDiscount;
         }
 
         $grandTotal = array_sum($monthTotals);

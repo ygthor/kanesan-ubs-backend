@@ -11,6 +11,15 @@ use Illuminate\Support\Facades\Log;
 class StockService
 {
     /**
+     * Reference types that should be counted as standalone stock transactions.
+     * These are non-order transactions entered manually by users/admin.
+     */
+    private const STANDALONE_REFERENCE_TYPES = [
+        'adjustment',
+        'opening balance',
+    ];
+
+    /**
      * Calculate stock totals for an agent and item from orders AND item_transactions
      *
      * IMPORTANT: Return Bad Logic
@@ -77,12 +86,14 @@ class StockService
             }
         }
 
-        // 2. Calculate from item_transactions - ONLY standalone transactions (no reference_type)
-        // IMPORTANT: Exclude transactions with reference_type to avoid double counting orders
-        // Standalone transactions include: opening balance, manual adjustments, etc.
+        // 2. Calculate from item_transactions - standalone/manual transactions only
+        // IMPORTANT: Exclude order/invoice-linked rows to avoid double counting.
         $transactions = ItemTransaction::where('agent_no', $agentNo)
             ->where('ITEMNO', $itemNo)
-            ->whereNull('reference_type') // Only standalone transactions
+            ->where(function ($query) {
+                $query->whereNull('reference_type')
+                    ->orWhereIn('reference_type', self::STANDALONE_REFERENCE_TYPES);
+            })
             ->get();
 
         foreach ($transactions as $transaction) {
@@ -134,10 +145,13 @@ class StockService
     {
         $allTransactions = collect([]);
 
-        // 1. Get transactions from item_transactions table (standalone only)
+        // 1. Get transactions from item_transactions table (standalone/manual only)
         $itemTransactionsQuery = ItemTransaction::where('ITEMNO', $itemNo)
             ->where('agent_no', $agentNo)
-            ->whereNull('reference_type'); // Only standalone transactions
+            ->where(function ($query) {
+                $query->whereNull('reference_type')
+                    ->orWhereIn('reference_type', self::STANDALONE_REFERENCE_TYPES);
+            });
 
         // Filter by transaction type if provided
         if (!empty($filters['transaction_type'])) {
@@ -257,16 +271,19 @@ class StockService
 
         foreach ($sortedAsc as $trans) {
             $type = $trans['type'];
-            $quantity = abs($trans['quantity']);
+            $quantity = (float) $trans['quantity'];
 
             $stockBefore = $runningStock;
 
             // Calculate stock change
-            if ($type === 'in' || $type === 'adjustment') {
+            if ($type === 'adjustment') {
+                // Adjustment quantity is signed (+/-), apply as-is.
                 $runningStock += $quantity;
+            } elseif ($type === 'in') {
+                $runningStock += abs($quantity);
             } else {
                 // 'out' type
-                $runningStock -= $quantity;
+                $runningStock -= abs($quantity);
             }
 
             $stockAfter = $runningStock;
@@ -637,12 +654,14 @@ class StockService
             }
         }
 
-        // Also include item_transactions - ONLY standalone transactions (no reference_type)
-        // IMPORTANT: Exclude transactions with reference_type to avoid double counting orders
-        // Standalone transactions include: opening balance, manual adjustments, etc.
+        // Also include item_transactions - standalone/manual transactions only
+        // IMPORTANT: Exclude order/invoice-linked rows to avoid double counting.
         try {
             $transactions = ItemTransaction::where('agent_no', $agentNo)
-                ->whereNull('reference_type') // Only standalone transactions
+                ->where(function ($query) {
+                    $query->whereNull('reference_type')
+                        ->orWhereIn('reference_type', self::STANDALONE_REFERENCE_TYPES);
+                })
                 ->get();
 
             foreach ($transactions as $transaction) {

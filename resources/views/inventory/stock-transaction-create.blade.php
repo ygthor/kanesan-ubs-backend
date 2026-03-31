@@ -180,15 +180,15 @@
                     <div class="form-group">
                         <label for="transactionNotes">
                             Notes
-                            <span id="notesRequired" style="display:none;" class="text-danger">*</span>
+                            <span id="notesRequired" class="text-danger">*</span>
                         </label>
                         <textarea class="form-control @error('notes') is-invalid @enderror" id="transactionNotes" name="notes"
-                            rows="4">{{ old('notes') }}</textarea>
+                            rows="4" required>{{ old('notes') }}</textarea>
                         @error('notes')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                         <small class="form-text text-muted" id="notesHelp">
-                            Optional notes for this transaction
+                            Notes are required for this transaction
                         </small>
                     </div>
                 </div>
@@ -495,17 +495,17 @@
             if (type === 'in') {
                 quantityInput.attr('min', '0.01');
                 quantityHelp.text('Enter quantity to add to stock');
-                notesInput.prop('required', false);
-                notesRequired.hide();
-                notesHelp.text('Optional notes for this transaction');
+                notesInput.prop('required', true);
+                notesRequired.show();
+                notesHelp.text('Notes are required for this transaction');
                 submitButton.removeClass('btn-warning btn-info').addClass('btn-success').html(
                     '<i class="fas fa-plus"></i> Add Stock');
             } else if (type === 'out') {
                 quantityInput.attr('min', '0.01');
                 quantityHelp.text('Enter quantity to remove from stock (positive values only)');
-                notesInput.prop('required', false);
-                notesRequired.hide();
-                notesHelp.text('Optional notes for this transaction');
+                notesInput.prop('required', true);
+                notesRequired.show();
+                notesHelp.text('Notes are required for this transaction');
                 submitButton.removeClass('btn-success btn-info').addClass('btn-warning').html(
                     '<i class="fas fa-minus"></i> Remove Stock');
                 // Hide negative alert when switching to out type (will show if user enters negative)
@@ -515,14 +515,14 @@
                 quantityHelp.text('Enter positive value to increase, negative to decrease stock');
                 notesInput.prop('required', true);
                 notesRequired.show();
-                notesHelp.text('Reason for adjustment is required');
+                notesHelp.text('Notes are required for this transaction');
                 submitButton.removeClass('btn-success btn-warning').addClass('btn-info').html(
                     '<i class="fas fa-edit"></i> Adjust Stock');
             } else {
                 quantityHelp.text('Enter quantity to add/remove');
-                notesInput.prop('required', false);
-                notesRequired.hide();
-                notesHelp.text('Optional notes for this transaction');
+                notesInput.prop('required', true);
+                notesRequired.show();
+                notesHelp.text('Notes are required for this transaction');
                 submitButton.removeClass('btn-success btn-warning btn-info').addClass('btn-primary').html(
                     '<i class="fas fa-save"></i> Create Transaction');
             }
