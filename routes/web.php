@@ -114,6 +114,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\ReportController::class, 'index'])->name('index');
         Route::get('/sales', [\App\Http\Controllers\Admin\ReportController::class, 'salesReport'])->name('sales');
+        Route::get('/item-sales', [\App\Http\Controllers\Admin\ReportController::class, 'itemSalesReport'])->name('item-sales');
         Route::get('/group-product-sales-year', [\App\Http\Controllers\Admin\ReportController::class, 'groupProductSalesByYearReport'])->name('group-product-sales-year');
         Route::get('/group-product-sales-year/export/pdf', [\App\Http\Controllers\Admin\ReportController::class, 'exportGroupProductSalesByYearPdf'])->name('group-product-sales-year.export.pdf');
         Route::get('/group-product-sales-year/export/excel', [\App\Http\Controllers\Admin\ReportController::class, 'exportGroupProductSalesByYearExcel'])->name('group-product-sales-year.export.excel');

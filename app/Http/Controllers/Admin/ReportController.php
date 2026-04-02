@@ -45,6 +45,12 @@ class ReportController extends Controller
                 'icon' => 'fas fa-chart-line',
             ],
             [
+                'name' => 'Item Sales Report',
+                'description' => 'Display sales and return details for a single product',
+                'route' => route('admin.reports.item-sales'),
+                'icon' => 'fas fa-box',
+            ],
+            [
                 'name' => 'Transaction Report',
                 'description' => 'Display all orders (INV, DO, CN) with transaction details',
                 'route' => route('admin.reports.transactions'),
@@ -751,6 +757,158 @@ class ReportController extends Controller
             'caCollection', 'crCollection', 'caReturns', 'crReturns', 'totalNegativeCashOrder', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
             'accountBalance', 'returnsInfo',
             'discountRows', 'orderLevelDiscountTotal', 'itemLevelDiscountTotal', 'discountGrandTotal', 'itemLevelInvDiscountTotal', 'itemLevelCnDiscountTotal'
+        ));
+    }
+
+    /**
+     * Item Sales Report - Single product sales and returns
+     */
+    public function itemSalesReport(Request $request)
+    {
+        $this->checkAccess();
+
+        [$fromDate, $toDate, $datePreset] = $this->resolveDateRangeByPreset(
+            $request->input('date_preset', 'this_month'),
+            $request->input('from_date'),
+            $request->input('to_date')
+        );
+
+        $productNo = trim((string) $request->input('product_no', ''));
+        $agentNo = trim((string) $request->input('agent_no', ''));
+        $sortBy = trim((string) $request->input('sort_by', 'product_no'));
+        $sortDir = strtolower(trim((string) $request->input('sort_dir', 'asc'))) === 'desc' ? 'desc' : 'asc';
+        $agents = $this->getAgents();
+
+        $selectedProduct = null;
+        if ($productNo !== '') {
+            $selectedProduct = DB::table('icitem as i')
+                ->selectRaw("
+                    i.ITEMNO as item_code,
+                    COALESCE(NULLIF(i.DESP, ''), i.ITEMNO) as item_description,
+                    COALESCE(i.`GROUP`, '') as item_group
+                ")
+                ->where('i.ITEMNO', $productNo)
+                ->first();
+        }
+
+        $fromDateTime = strlen($fromDate) === 10 ? $fromDate . ' 00:00:00' : $fromDate;
+        $toDateTime = strlen($toDate) === 10 ? $toDate . ' 23:59:59' : $toDate;
+
+        $query = DB::table('order_items as oi')
+            ->join('orders as o', 'o.reference_no', '=', 'oi.reference_no')
+            ->leftJoin('icitem as i', function ($join) {
+                $join->whereRaw('i.ITEMNO COLLATE utf8mb4_unicode_ci = oi.product_no COLLATE utf8mb4_unicode_ci');
+            })
+            ->whereIn('o.type', ['INV', 'CN'])
+            ->where(function ($q) {
+                $q->where('o.type', 'INV')
+                    ->orWhere(function ($q2) {
+                        $q2->where('o.type', 'CN')
+                            ->where('o.created_at', '>', '2025-12-14 23:59:59');
+                    });
+            })
+            ->whereBetween('o.order_date', [$fromDateTime, $toDateTime]);
+
+        if ($productNo !== '') {
+            $query->whereRaw(
+                'oi.product_no COLLATE utf8mb4_unicode_ci = CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci',
+                [$productNo]
+            );
+        }
+
+        if ($agentNo !== '') {
+            $query->where('o.agent_no', $agentNo);
+        }
+
+        $rows = $query
+            ->selectRaw("
+                oi.product_no as product_no,
+                COALESCE(NULLIF(i.DESP, ''), NULLIF(oi.product_name, ''), oi.product_no) as product_description,
+                SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) as inv_qty,
+                SUM(IF(o.type = 'CN', COALESCE(oi.quantity, 0), 0)) as cn_qty,
+                SUM(IF(o.type = 'INV', COALESCE(oi.amount, 0), 0)) as inv_amount,
+                SUM(IF(o.type = 'CN', COALESCE(oi.amount, 0), 0)) as cn_amount,
+                SUM(COALESCE(oi.discount, 0)) as discount_total
+            ")
+            ->groupBy('oi.product_no')
+            ->groupByRaw("COALESCE(NULLIF(i.DESP, ''), NULLIF(oi.product_name, ''), oi.product_no)");
+
+        $allowedSort = [
+            'product_no',
+            'product_description',
+            'inv_qty',
+            'cn_qty',
+            'net_qty',
+            'inv_amount',
+            'cn_amount',
+            'discount_total',
+            'net_amount',
+        ];
+        if (!in_array($sortBy, $allowedSort, true)) {
+            $sortBy = 'product_no';
+        }
+
+        switch ($sortBy) {
+            case 'product_description':
+                $rows->orderByRaw("COALESCE(NULLIF(i.DESP, ''), NULLIF(oi.product_name, ''), oi.product_no) {$sortDir}");
+                break;
+            case 'inv_qty':
+                $rows->orderByRaw("SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) {$sortDir}");
+                break;
+            case 'cn_qty':
+                $rows->orderByRaw("SUM(IF(o.type = 'CN', COALESCE(oi.quantity, 0), 0)) {$sortDir}");
+                break;
+            case 'net_qty':
+                $rows->orderByRaw("(SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) - SUM(IF(o.type = 'CN', COALESCE(oi.quantity, 0), 0))) {$sortDir}");
+                break;
+            case 'inv_amount':
+                $rows->orderByRaw("SUM(IF(o.type = 'INV', COALESCE(oi.amount, 0), 0)) {$sortDir}");
+                break;
+            case 'cn_amount':
+                $rows->orderByRaw("SUM(IF(o.type = 'CN', COALESCE(oi.amount, 0), 0)) {$sortDir}");
+                break;
+            case 'discount_total':
+                $rows->orderByRaw("SUM(COALESCE(oi.discount, 0)) {$sortDir}");
+                break;
+            case 'net_amount':
+                $rows->orderByRaw("(SUM(IF(o.type = 'INV', COALESCE(oi.amount, 0), 0)) - SUM(IF(o.type = 'CN', COALESCE(oi.amount, 0), 0))) {$sortDir}");
+                break;
+            case 'product_no':
+            default:
+                $rows->orderBy("oi.product_no", $sortDir);
+                break;
+        }
+
+        $rows = $rows->get();
+
+        $invQty = (float) $rows->sum('inv_qty');
+        $cnQty = (float) $rows->sum('cn_qty');
+        $invAmount = (float) $rows->sum('inv_amount');
+        $cnAmount = (float) $rows->sum('cn_amount');
+        $discountTotal = (float) $rows->sum('discount_total');
+
+        $summary = [
+            'inv_qty' => $invQty,
+            'cn_qty' => $cnQty,
+            'net_qty' => $invQty - $cnQty,
+            'inv_amount' => $invAmount,
+            'cn_amount' => $cnAmount,
+            'net_amount' => $invAmount - $cnAmount,
+            'discount_total' => $discountTotal,
+        ];
+
+        return view('admin.reports.item-sales-report', compact(
+            'rows',
+            'summary',
+            'fromDate',
+            'toDate',
+            'datePreset',
+            'productNo',
+            'selectedProduct',
+            'agentNo',
+            'agents',
+            'sortBy',
+            'sortDir'
         ));
     }
 
