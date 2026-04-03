@@ -334,19 +334,9 @@ class InventoryController extends Controller
             'group_name' => 'nullable|string',
         ]);
 
-        // Get all items from icitem table (actual inventory data)
-        $query = Icitem::query();
-
-        // Filter by product group if provided (use GROUP field from icitem)
-        if ($request->has('group_name') && $request->input('group_name')) {
-            $query->where('GROUP', $request->input('group_name'));
-        }
-
-        $items = $query->orderBy('ITEMNO')->get();
-
         // agent_no is now required by validation
         $agentNo = $request->input('agent_no');
-        
+
         // Normalize agent_no: if it's a username, convert to user's name
         // (because orders store agent_no as user's name, not username)
         if ($agentNo) {
@@ -357,43 +347,65 @@ class InventoryController extends Controller
             // If not found by username, assume agent_no is already the name
         }
 
+        // Get distinct item numbers that have appeared in order_items for this agent
+        $orderItemNoQuery = DB::table('orders')
+            ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
+            ->where('orders.agent_no', $agentNo)
+            ->whereNotNull('order_items.product_no')
+            ->distinct()
+            ->pluck('order_items.product_no');
+
+        // Also include items from standalone item_transactions for this agent
+        $transactionItemNos = \App\Models\ItemTransaction::where('agent_no', $agentNo)
+            ->whereNotNull('ITEMNO')
+            ->distinct()
+            ->pluck('ITEMNO');
+
+        $allItemNos = $orderItemNoQuery->merge($transactionItemNos)->unique()->sort()->values();
+
+        // Load icitem details for those items
+        $icitemQuery = Icitem::whereIn('ITEMNO', $allItemNos);
+
+        // Filter by product group if provided (use GROUP field from icitem)
+        if ($request->has('group_name') && $request->input('group_name')) {
+            $icitemQuery->where('GROUP', $request->input('group_name'));
+        }
+
+        $icitemMap = $icitemQuery->get()->keyBy('ITEMNO');
+
         $stockService = new StockService();
 
-        $inventory = $items->map(function ($item) use ($agentNo, $stockService) {
-            // Calculate stock totals for this agent (required)
-            $totals = $stockService->calculateStockTotals($agentNo, $item->ITEMNO);
+        // Pre-fetch all stock totals for this agent in one batch
+        $keyedSummary = $stockService->getAgentStockSummaryKeyed($agentNo);
+
+        $inventory = $allItemNos->map(function ($itemNo) use ($agentNo, $stockService, $icitemMap, $keyedSummary) {
+            $item = $icitemMap->get($itemNo);
+            $totals = $stockService->getStockFromKeyedSummary($keyedSummary, $itemNo);
+
             $currentStock = $totals['available'];
-            $stockIn = $totals['stockIn'];
-            $stockOut = $totals['stockOut'];
-            $returnGood = $totals['returnGood'];
-            $returnBad = $totals['returnBad'];
 
             return [
-                'ITEMNO' => $item->ITEMNO,
+                'ITEMNO' => $itemNo,
                 'DESP' => $item->DESP ?? 'Unknown Product',
                 'current_stock' => $currentStock,
-                'QTY' => $currentStock, // Use calculated stock as QTY
-                'stockIn' => $stockIn,
-                'stockOut' => $stockOut,
-                'returnGood' => $returnGood,
-                'returnBad' => $returnBad,
-                'UNIT' => $item->UNIT, // Unit from icitem table
-                'PRICE' => $item->PRICE ? (float)$item->PRICE : null, // Price from icitem table
-                'code' => $item->ITEMNO, // Map ITEMNO to code for backward compatibility
-                'description' => $item->DESP ?? 'Unknown Product', // Map DESP to description
-                'group_name' => $item->GROUP ?? '', // Include group name from GROUP field
-                'agent_no' => $agentNo, // Include agent_no in response
+                'QTY' => $currentStock,
+                'stockIn' => $totals['stockIn'],
+                'stockOut' => $totals['stockOut'],
+                'returnGood' => $totals['returnGood'],
+                'returnBad' => $totals['returnBad'],
+                'UNIT' => $item->UNIT ?? null,
+                'PRICE' => $item && $item->PRICE ? (float)$item->PRICE : null,
+                'code' => $itemNo,
+                'description' => $item->DESP ?? 'Unknown Product',
+                'group_name' => $item->GROUP ?? '',
+                'agent_no' => $agentNo,
             ];
         })
-        ->filter(function ($item) {
-            // Hide items with no transactions (all zeros)
-            // Show only items that have at least one transaction (stockIn, stockOut, returnGood, or returnBad > 0)
-            return $item['stockIn'] > 0 || 
-                   $item['stockOut'] > 0 || 
-                   $item['returnGood'] > 0 || 
-                   $item['returnBad'] > 0;
+        ->filter(function ($item) use ($icitemMap) {
+            // Only include items that exist in icitem (valid items)
+            return $icitemMap->has($item['ITEMNO']);
         })
-        ->values(); // Re-index the array after filtering
+        ->values();
 
         return makeResponse(200, 'Inventory summary retrieved successfully.', $inventory);
     }
