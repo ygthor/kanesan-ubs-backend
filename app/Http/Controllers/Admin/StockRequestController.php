@@ -170,6 +170,9 @@ class StockRequestController extends Controller
 
         $drawTableHeader();
 
+        $grandRequested = 0.0;
+        $grandApproved = 0.0;
+
         foreach ($groupedItems as $groupName => $items) {
             $ensureSpace(7);
             $pdf->SetFont('helvetica', 'B', 9);
@@ -192,8 +195,21 @@ class StockRequestController extends Controller
                 $approvedText = $item->approved_qty !== null ? $formatQty($item->approved_qty) : '-';
                 $pdf->Cell($colApp, $rowHeight, $approvedText, 1, 0, 'R');
                 $pdf->SetXY($x, $y + $rowHeight);
+
+                $requestedQty = (float) $item->requested_qty;
+                $approvedQty = $item->approved_qty !== null ? (float) $item->approved_qty : 0.0;
+                $grandRequested += $requestedQty;
+                $grandApproved += $approvedQty;
             }
         }
+
+        $ensureSpace(8);
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFillColor(230, 230, 230);
+        $pdf->Cell($colCode + $colDesc + $colUnit, 8, 'Grand Total', 1, 0, 'R', true);
+        $pdf->Cell($colReq, 8, $formatQty($grandRequested), 1, 0, 'R', true);
+        $pdf->Cell($colApp, 8, $formatQty($grandApproved), 1, 1, 'R', true);
 
         return response($pdf->Output($filename, 'S'), 200, [
             'Content-Type' => 'application/pdf',

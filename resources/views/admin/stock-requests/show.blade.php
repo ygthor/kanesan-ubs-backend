@@ -100,12 +100,22 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @php $itemIndex = 0; @endphp
+                        @php
+                            $itemIndex = 0;
+                            $grandRequested = 0.0;
+                            $grandApproved = 0.0;
+                        @endphp
                         @foreach($groupedItems as $groupName => $items)
                             <tr>
                                 <td colspan="5" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
                             </tr>
                             @foreach($items as $item)
+                                @php
+                                    $requestedQty = (float) $item->requested_qty;
+                                    $approvedQty = $item->approved_qty !== null ? (float) $item->approved_qty : $requestedQty;
+                                    $grandRequested += $requestedQty;
+                                    $grandApproved += $approvedQty;
+                                @endphp
                                 <tr>
                                     <input type="hidden" name="items[{{ $itemIndex }}][id]" value="{{ $item->id }}">
                                     <td>{{ $item->item_no }}</td>
@@ -124,6 +134,11 @@
                                 @php $itemIndex++; @endphp
                             @endforeach
                         @endforeach
+                        <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
+                            <td colspan="3" class="text-right">Grand Total</td>
+                            <td class="text-right">{{ $formatQty($grandRequested) }}</td>
+                            <td class="text-right">{{ $formatQty($grandApproved) }}</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -169,11 +184,21 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @php
+                        $grandRequested = 0.0;
+                        $grandApproved = 0.0;
+                    @endphp
                     @foreach($groupedItems as $groupName => $items)
                         <tr>
                             <td colspan="5" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
                         </tr>
                         @foreach($items as $item)
+                            @php
+                                $requestedQty = (float) $item->requested_qty;
+                                $approvedQty = $item->approved_qty !== null ? (float) $item->approved_qty : 0.0;
+                                $grandRequested += $requestedQty;
+                                $grandApproved += $approvedQty;
+                            @endphp
                             <tr>
                                 <td>{{ $item->item_no }}</td>
                                 <td>{{ $item->description ?? '-' }}</td>
@@ -189,6 +214,11 @@
                             </tr>
                         @endforeach
                     @endforeach
+                    <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
+                        <td colspan="3" class="text-right">Grand Total</td>
+                        <td class="text-right">{{ $formatQty($grandRequested) }}</td>
+                        <td class="text-right">{{ $formatQty($grandApproved) }}</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
