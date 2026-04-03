@@ -347,39 +347,24 @@ class InventoryController extends Controller
             // If not found by username, assume agent_no is already the name
         }
 
-        // Get distinct item numbers that have appeared in order_items for this agent
-        $orderItemNoQuery = DB::table('orders')
-            ->join('order_items', 'orders.reference_no', '=', 'order_items.reference_no')
-            ->where('orders.agent_no', $agentNo)
-            ->whereNotNull('order_items.product_no')
-            ->distinct()
-            ->pluck('order_items.product_no');
-
-        // Also include items from standalone item_transactions for this agent
-        $transactionItemNos = \App\Models\ItemTransaction::where('agent_no', $agentNo)
-            ->whereNotNull('ITEMNO')
-            ->distinct()
-            ->pluck('ITEMNO');
-
-        $allItemNos = $orderItemNoQuery->merge($transactionItemNos)->unique()->sort()->values();
-
-        // Load icitem details for those items
-        $icitemQuery = Icitem::whereIn('ITEMNO', $allItemNos);
+        // Load inventory from icitem directly so all products are included,
+        // even if agent has no transaction/order history for the item yet.
+        $icitemQuery = Icitem::query();
 
         // Filter by product group if provided (use GROUP field from icitem)
         if ($request->has('group_name') && $request->input('group_name')) {
             $icitemQuery->where('GROUP', $request->input('group_name'));
         }
 
-        $icitemMap = $icitemQuery->get()->keyBy('ITEMNO');
+        $items = $icitemQuery->orderBy('ITEMNO')->get();
 
         $stockService = new StockService();
 
         // Pre-fetch all stock totals for this agent in one batch
         $keyedSummary = $stockService->getAgentStockSummaryKeyed($agentNo);
 
-        $inventory = $allItemNos->map(function ($itemNo) use ($agentNo, $stockService, $icitemMap, $keyedSummary) {
-            $item = $icitemMap->get($itemNo);
+        $inventory = $items->map(function ($item) use ($agentNo, $stockService, $keyedSummary) {
+            $itemNo = $item->ITEMNO;
             $totals = $stockService->getStockFromKeyedSummary($keyedSummary, $itemNo);
 
             $currentStock = $totals['available'];
@@ -400,10 +385,6 @@ class InventoryController extends Controller
                 'group_name' => $item->GROUP ?? '',
                 'agent_no' => $agentNo,
             ];
-        })
-        ->filter(function ($item) use ($icitemMap) {
-            // Only include items that exist in icitem (valid items)
-            return $icitemMap->has($item['ITEMNO']);
         })
         ->values();
 
