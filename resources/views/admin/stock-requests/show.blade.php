@@ -56,6 +56,10 @@
                         @endif
                     </td>
                 </tr>
+                <tr>
+                    <th>Items</th>
+                    <td>{{ $stockRequest->items->count() }} item(s)</td>
+                </tr>
                 @if($stockRequest->notes)
                 <tr>
                     <th>Agent Notes</th>

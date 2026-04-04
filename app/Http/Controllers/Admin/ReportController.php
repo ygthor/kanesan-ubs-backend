@@ -152,16 +152,19 @@ class ReportController extends Controller
             'date_preset' => $datePreset,
             'from_date' => $fromDate,
             'to_date' => $toDate,
+            'agent_no' => trim((string) $request->input('agent_no', '')),
             'product_search' => trim((string) $request->input('product_search', '')),
             'group' => trim((string) $request->input('group', '')),
             'period_label' => $this->getAgentPeriodLabel($datePreset, $fromDate, $toDate),
         ];
 
         $report = $this->buildGroupProductSalesByAgentData($filters);
+        $agents = $this->getAgents();
         $groups = $this->getItemGroups();
 
         return view('admin.reports.group-product-sales-agent-report', array_merge($report, [
             'filters' => $filters,
+            'agents' => $agents,
             'groups' => $groups,
         ]));
     }
@@ -245,6 +248,7 @@ class ReportController extends Controller
             'date_preset' => $datePreset,
             'from_date' => $fromDate,
             'to_date' => $toDate,
+            'agent_no' => trim((string) $request->input('agent_no', '')),
             'product_search' => trim((string) $request->input('product_search', '')),
             'group' => trim((string) $request->input('group', '')),
             'period_label' => $this->getAgentPeriodLabel($datePreset, $fromDate, $toDate),
@@ -299,6 +303,7 @@ class ReportController extends Controller
             'date_preset' => $datePreset,
             'from_date' => $fromDate,
             'to_date' => $toDate,
+            'agent_no' => trim((string) $request->input('agent_no', '')),
             'product_search' => trim((string) $request->input('product_search', '')),
             'group' => trim((string) $request->input('group', '')),
             'period_label' => $this->getAgentPeriodLabel($datePreset, $fromDate, $toDate),
@@ -1566,6 +1571,10 @@ class ReportController extends Controller
             })
             ->whereBetween('o.order_date', [$fromDateForQuery, $toDateForQuery]);
 
+        if (!empty($filters['agent_no'])) {
+            $aggQuery->where('o.agent_no', $filters['agent_no']);
+        }
+
         $rows = $aggQuery
             ->selectRaw("
                 oi.product_no as item_code,
@@ -1951,7 +1960,7 @@ class ReportController extends Controller
     {
         $groupedItems = $report['groupedItems'];
         $months = $report['months'];
-        $monthTotals = $report['monthTotals'];
+        $monthTotalsBreakdown = $report['monthTotalsBreakdown'] ?? [];
         $grandTotal = $report['grandTotal'];
         $periodTitle = (string) ($report['periodTitle'] ?? ('YEAR ' . $report['year']));
 
@@ -1966,8 +1975,8 @@ class ReportController extends Controller
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
         $colCode = 30.0;
         $colDesc = 88.0;
-        $monthColumnCount = count($months) + 1; // Selected month columns + Total
-        $colMonth = max(9.5, ($pageWidth - $colCode - $colDesc) / $monthColumnCount);
+        $monthColumnCount = (count($months) * 3) + 3; // Per month RG/RB/Sales + Total RG/RB/Sales
+        $colMonth = ($pageWidth - $colCode - $colDesc) / max(1, $monthColumnCount);
         $tableWidth = $colCode + $colDesc + ($colMonth * $monthColumnCount);
 
         $agentLabel = trim((string) ($filters['agent_no'] ?? ''));
@@ -1977,8 +1986,7 @@ class ReportController extends Controller
             $pdf,
             $periodTitle,
             $months,
-            $monthColumnCount,
-            $monthTotals,
+            $monthTotalsBreakdown,
             $grandTotal,
             $formatQty,
             $colCode,
@@ -2000,24 +2008,35 @@ class ReportController extends Controller
             $pdf->SetFillColor(255, 255, 255);
             $pdf->Cell($colCode + $colDesc, 7, '', 1, 0, 'C', true);
             foreach ($months as $monthNo => $monthLabel) {
-                $pdf->Cell($colMonth, 7, $formatQty($monthTotals[$monthNo] ?? 0), 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['rg'] ?? 0), 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['rb'] ?? 0), 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['sales'] ?? 0), 1, 0, 'C', true);
             }
+            $pdf->Cell($colMonth, 7, $formatQty(collect($monthTotalsBreakdown)->sum('rg')), 1, 0, 'C', true);
+            $pdf->Cell($colMonth, 7, $formatQty(collect($monthTotalsBreakdown)->sum('rb')), 1, 0, 'C', true);
             $pdf->Cell($colMonth, 7, $formatQty($grandTotal), 1, 1, 'C', true);
 
             // Row: CODE / ITEM DESCRIPTION / QTY SOLD span
             $pdf->SetFont('helvetica', 'BI', 9);
             $pdf->SetFillColor(245, 245, 245);
-            $pdf->Cell($colCode, 8, 'CODE', 1, 0, 'C', true);
-            $pdf->Cell($colDesc, 8, 'ITEM DESCRIPTION', 1, 0, 'C', true);
-            $pdf->Cell($colMonth * $monthColumnCount, 8, 'QTY SOLD', 1, 1, 'C', true);
+            $pdf->Cell($colCode, 6, 'CODE', 1, 0, 'C', true);
+            $pdf->Cell($colDesc, 6, 'ITEM DESCRIPTION', 1, 0, 'C', true);
+            foreach ($months as $monthNo => $monthLabel) {
+                $pdf->Cell($colMonth * 3, 6, $monthLabel, 1, 0, 'C', true);
+            }
+            $pdf->Cell($colMonth * 3, 6, 'TOTAL', 1, 1, 'C', true);
 
             // Months header row
             $pdf->SetFont('helvetica', 'B', 9);
-            $pdf->Cell($colCode + $colDesc, 8, '', 1, 0, 'C', true);
+            $pdf->Cell($colCode + $colDesc, 6, '', 1, 0, 'C', true);
             foreach ($months as $monthNo => $monthLabel) {
-                $pdf->Cell($colMonth, 8, $monthLabel, 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 6, 'RG', 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 6, 'RB', 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 6, 'Sales', 1, 0, 'C', true);
             }
-            $pdf->Cell($colMonth, 8, 'TOTAL', 1, 1, 'C', true);
+            $pdf->Cell($colMonth, 6, 'RG', 1, 0, 'C', true);
+            $pdf->Cell($colMonth, 6, 'RB', 1, 0, 'C', true);
+            $pdf->Cell($colMonth, 6, 'Sales', 1, 1, 'C', true);
         };
 
         $ensureSpace = function ($neededHeight) use ($pdf, $drawHeader) {
@@ -2043,10 +2062,14 @@ class ReportController extends Controller
                 $pdf->Cell($colCode, 6.5, (string) $item['item_code'], 1, 0, 'L', true);
                 $pdf->Cell($colDesc, 6.5, (string) $item['item_description'], 1, 0, 'L', true);
                 foreach ($months as $monthNo => $monthLabel) {
-                    $pdf->Cell($colMonth, 6.5, $formatQty($item['months'][$monthNo] ?? 0), 1, 0, 'C', true);
+                    $pdf->Cell($colMonth, 6.5, $formatQty($item['month_breakdown'][$monthNo]['rg'] ?? 0), 1, 0, 'C', true);
+                    $pdf->Cell($colMonth, 6.5, $formatQty($item['month_breakdown'][$monthNo]['rb'] ?? 0), 1, 0, 'C', true);
+                    $pdf->Cell($colMonth, 6.5, $formatQty($item['month_breakdown'][$monthNo]['sales'] ?? 0), 1, 0, 'C', true);
                 }
                 $pdf->SetFont('helvetica', 'B', 8);
-                $pdf->Cell($colMonth, 6.5, $formatQty($item['total'] ?? 0), 1, 1, 'C', true);
+                $pdf->Cell($colMonth, 6.5, $formatQty($item['total_rg'] ?? 0), 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 6.5, $formatQty($item['total_rb'] ?? 0), 1, 0, 'C', true);
+                $pdf->Cell($colMonth, 6.5, $formatQty($item['total_sales'] ?? ($item['total'] ?? 0)), 1, 1, 'C', true);
             }
 
             $ensureSpace(6.5);

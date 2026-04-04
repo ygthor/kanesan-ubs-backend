@@ -27,6 +27,12 @@
             <td><strong>Printed</strong></td>
             <td>{{ $printedAt }}</td>
         </tr>
+        <tr>
+            <td><strong>Items</strong></td>
+            <td>{{ $stockRequest->items->count() }} item(s)</td>
+            <td></td>
+            <td></td>
+        </tr>
     </table>
 </div>
 
@@ -37,13 +43,12 @@
             <th>Description</th>
             <th style="width: 10%;">Unit</th>
             <th style="width: 14%;" class="text-right">Requested Qty</th>
-            <th style="width: 14%;" class="text-right">Approved Qty</th>
         </tr>
     </thead>
     <tbody>
         @foreach($groupedItems as $groupName => $items)
             <tr class="group-row">
-                <td colspan="5">Group :{{ $groupName }}</td>
+                <td colspan="4">Group :{{ $groupName }}</td>
             </tr>
             @foreach($items as $item)
                 <tr>
@@ -51,13 +56,6 @@
                     <td>{{ $item->description ?? '-' }}</td>
                     <td>{{ $item->unit ?? '-' }}</td>
                     <td class="text-right">{{ number_format((float) $item->requested_qty, 0) }}</td>
-                    <td class="text-right">
-                        @if($item->approved_qty !== null)
-                            {{ number_format((float) $item->approved_qty, 0) }}
-                        @else
-                            -
-                        @endif
-                    </td>
                 </tr>
             @endforeach
         @endforeach

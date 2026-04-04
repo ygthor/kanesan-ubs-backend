@@ -15,7 +15,7 @@
 @section('admin-content')
     <form method="GET" action="{{ route('admin.reports.group-product-sales-agent') }}" class="mb-3">
         <div class="row">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="form-group">
                     <label>Date Preset</label>
                     <select name="date_preset" id="date_preset" class="form-control">
@@ -54,7 +54,20 @@
                     </select>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label>Agent</label>
+                    <select name="agent_no" class="form-control">
+                        <option value="">All Agents</option>
+                        @foreach(($agents ?? []) as $agent)
+                            <option value="{{ $agent->name }}" {{ ($filters['agent_no'] ?? '') === $agent->name ? 'selected' : '' }}>
+                                {{ $agent->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
                 <div class="form-group">
                     <label>Product Search</label>
                     <input type="text" name="product_search" class="form-control" value="{{ $filters['product_search'] ?? '' }}" placeholder="Code or Description">

@@ -112,19 +112,18 @@ class StockRequestController extends Controller
         $right = $pdf->getMargins()['right'];
         $pageWidth = $pdf->getPageWidth() - $left - $right;
         $colCode = 24.0;
-        $colDesc = 88.0;
+        $colDesc = 109.0;
         $colUnit = 18.0;
-        $colReq = 25.0;
-        $colApp = $pageWidth - ($colCode + $colDesc + $colUnit + $colReq);
+        $colReq = $pageWidth - ($colCode + $colDesc + $colUnit);
+        $itemCount = $stockRequest->items->count();
 
-        $drawTableHeader = function () use ($pdf, $pageWidth, $colCode, $colDesc, $colUnit, $colReq, $colApp) {
+        $drawTableHeader = function () use ($pdf, $pageWidth, $colCode, $colDesc, $colUnit, $colReq) {
             $pdf->SetFont('helvetica', 'B', 9);
             $pdf->SetFillColor(243, 244, 246);
             $pdf->Cell($colCode, 8, 'ITEM CODE', 1, 0, 'L', true);
             $pdf->Cell($colDesc, 8, 'DESCRIPTION', 1, 0, 'L', true);
             $pdf->Cell($colUnit, 8, 'UNIT', 1, 0, 'L', true);
-            $pdf->Cell($colReq, 8, 'REQUESTED', 1, 0, 'R', true);
-            $pdf->Cell($colApp, 8, 'APPROVED', 1, 1, 'R', true);
+            $pdf->Cell($colReq, 8, 'REQUESTED', 1, 1, 'R', true);
             $pdf->SetFont('helvetica', '', 9);
             $pdf->SetX(($pdf->getPageWidth() - $pageWidth) / 2);
         };
@@ -156,22 +155,19 @@ class StockRequestController extends Controller
         $pdf->SetFont('helvetica', '', 9);
         $pdf->Cell(66, 6, $stockRequest->created_at?->format('d M Y H:i') ?? 'N/A', 0, 0, 'L');
         $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->Cell(24, 6, 'Items:', 0, 0, 'L');
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Cell(0, 6, $itemCount . ' item(s)', 0, 1, 'L');
+
+        $pdf->SetFont('helvetica', 'B', 9);
         $pdf->Cell(24, 6, 'Handled By:', 0, 0, 'L');
         $pdf->SetFont('helvetica', '', 9);
-        $pdf->Cell(
-            0,
-            6,
-            $stockRequest->approvedBy?->name ?? $stockRequest->approvedBy?->username ?? '-',
-            0,
-            1,
-            'L'
-        );
+        $pdf->Cell(0, 6, $stockRequest->approvedBy?->name ?? $stockRequest->approvedBy?->username ?? '-', 0, 1, 'L');
         $pdf->Ln(2);
 
         $drawTableHeader();
 
         $grandRequested = 0.0;
-        $grandApproved = 0.0;
 
         foreach ($groupedItems as $groupName => $items) {
             $ensureSpace(7);
@@ -192,14 +188,10 @@ class StockRequestController extends Controller
                 $pdf->MultiCell($colDesc, $rowHeight, $desc, 1, 'L', false, 0);
                 $pdf->Cell($colUnit, $rowHeight, (string) ($item->unit ?? '-'), 1, 0, 'L');
                 $pdf->Cell($colReq, $rowHeight, $formatQty($item->requested_qty), 1, 0, 'R');
-                $approvedText = $item->approved_qty !== null ? $formatQty($item->approved_qty) : '-';
-                $pdf->Cell($colApp, $rowHeight, $approvedText, 1, 0, 'R');
                 $pdf->SetXY($x, $y + $rowHeight);
 
                 $requestedQty = (float) $item->requested_qty;
-                $approvedQty = $item->approved_qty !== null ? (float) $item->approved_qty : 0.0;
                 $grandRequested += $requestedQty;
-                $grandApproved += $approvedQty;
             }
         }
 
@@ -208,8 +200,7 @@ class StockRequestController extends Controller
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFillColor(230, 230, 230);
         $pdf->Cell($colCode + $colDesc + $colUnit, 8, 'Grand Total', 1, 0, 'R', true);
-        $pdf->Cell($colReq, 8, $formatQty($grandRequested), 1, 0, 'R', true);
-        $pdf->Cell($colApp, 8, $formatQty($grandApproved), 1, 1, 'R', true);
+        $pdf->Cell($colReq, 8, $formatQty($grandRequested), 1, 1, 'R', true);
 
         return response($pdf->Output($filename, 'S'), 200, [
             'Content-Type' => 'application/pdf',
