@@ -30,8 +30,8 @@ class ReportPDF extends TCPDF
         string $calign = 'T',
         string $valign = 'M',
         bool $fitcell = false,
-        int $maxChars = 6,
-        float $reducedFontSize = 6.0
+        int $maxChars = 10,
+        float $reducedFontSize = 8.0
     ) {
         $currentSize = (float) $this->getFontSizePt();
         if ($currentSize <= 0) {

@@ -186,7 +186,7 @@ class ReportController extends Controller
 
         $printedAt = now()->format('Y-m-d H:i:s');
         $filename = 'group_product_sales_by_year_' . ($filters['period_key'] ?? $filters['year']) . '_' . now()->format('Ymd_His') . '.pdf';
-        $pdf = new ReportPDF('L', 'mm', 'A3', true, 'UTF-8', false);
+        $pdf = new ReportPDF('L', 'mm', 'A1', true, 'UTF-8', false);
         $pdf->printedAt = $printedAt;
         $pdf->SetCreator('KBS System');
         $pdf->SetAuthor(auth()->user()->name ?? 'System');
