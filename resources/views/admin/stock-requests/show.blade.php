@@ -138,11 +138,11 @@
                                 @php $itemIndex++; @endphp
                             @endforeach
                         @endforeach
-                        <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
+                        {{-- <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
                             <td colspan="3" class="text-right">Grand Total</td>
                             <td class="text-right">{{ $formatQty($grandRequested) }}</td>
                             <td class="text-right">{{ $formatQty($grandApproved) }}</td>
-                        </tr>
+                        </tr> --}}
                     </tbody>
                 </table>
             </div>
@@ -218,11 +218,11 @@
                             </tr>
                         @endforeach
                     @endforeach
-                    <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
+                    {{-- <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
                         <td colspan="3" class="text-right">Grand Total</td>
                         <td class="text-right">{{ $formatQty($grandRequested) }}</td>
                         <td class="text-right">{{ $formatQty($grandApproved) }}</td>
-                    </tr>
+                    </tr> --}}
                 </tbody>
             </table>
         </div>
