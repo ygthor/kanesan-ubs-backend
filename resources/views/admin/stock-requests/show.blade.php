@@ -96,6 +96,7 @@
                 <table class="table table-sm table-bordered">
                     <thead class="thead-light">
                         <tr>
+                            <th style="width:60px" class="text-center">No.</th>
                             <th>Item Code</th>
                             <th>Description</th>
                             <th>Unit</th>
@@ -106,12 +107,13 @@
                     <tbody>
                         @php
                             $itemIndex = 0;
+                            $rowNo = 1;
                             $grandRequested = 0.0;
                             $grandApproved = 0.0;
                         @endphp
                         @foreach($groupedItems as $groupName => $items)
                             <tr>
-                                <td colspan="5" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
+                                <td colspan="6" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
                             </tr>
                             @foreach($items as $item)
                                 @php
@@ -122,6 +124,7 @@
                                 @endphp
                                 <tr>
                                     <input type="hidden" name="items[{{ $itemIndex }}][id]" value="{{ $item->id }}">
+                                    <td class="text-center">{{ $rowNo }}</td>
                                     <td>{{ $item->item_no }}</td>
                                     <td>{{ $item->description ?? '-' }}</td>
                                     <td>{{ $item->unit ?? '-' }}</td>
@@ -135,7 +138,10 @@
                                                required>
                                     </td>
                                 </tr>
-                                @php $itemIndex++; @endphp
+                                @php
+                                    $itemIndex++;
+                                    $rowNo++;
+                                @endphp
                             @endforeach
                         @endforeach
                         {{-- <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
@@ -180,6 +186,7 @@
             <table class="table table-sm table-bordered">
                 <thead class="thead-light">
                     <tr>
+                        <th style="width:60px" class="text-center">No.</th>
                         <th>Item Code</th>
                         <th>Description</th>
                         <th>Unit</th>
@@ -189,12 +196,13 @@
                 </thead>
                 <tbody>
                     @php
+                        $rowNo = 1;
                         $grandRequested = 0.0;
                         $grandApproved = 0.0;
                     @endphp
                     @foreach($groupedItems as $groupName => $items)
                         <tr>
-                            <td colspan="5" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
+                            <td colspan="6" class="bg-light font-weight-bold">Group :{{ $groupName }}</td>
                         </tr>
                         @foreach($items as $item)
                             @php
@@ -204,6 +212,7 @@
                                 $grandApproved += $approvedQty;
                             @endphp
                             <tr>
+                                <td class="text-center">{{ $rowNo }}</td>
                                 <td>{{ $item->item_no }}</td>
                                 <td>{{ $item->description ?? '-' }}</td>
                                 <td>{{ $item->unit ?? '-' }}</td>
@@ -216,6 +225,7 @@
                                     @endif
                                 </td>
                             </tr>
+                            @php $rowNo++; @endphp
                         @endforeach
                     @endforeach
                     {{-- <tr class="font-weight-bold text-dark" style="background-color:#e9ecef;">
