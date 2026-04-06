@@ -111,15 +111,17 @@ class StockRequestController extends Controller
         $left = $pdf->getMargins()['left'];
         $right = $pdf->getMargins()['right'];
         $pageWidth = $pdf->getPageWidth() - $left - $right;
+        $colNo = 10.0;
         $colCode = 24.0;
-        $colDesc = 109.0;
+        $colDesc = 99.0;
         $colUnit = 18.0;
-        $colReq = $pageWidth - ($colCode + $colDesc + $colUnit);
+        $colReq = $pageWidth - ($colNo + $colCode + $colDesc + $colUnit);
         $itemCount = $stockRequest->items->count();
 
-        $drawTableHeader = function () use ($pdf, $pageWidth, $colCode, $colDesc, $colUnit, $colReq) {
+        $drawTableHeader = function () use ($pdf, $pageWidth, $colNo, $colCode, $colDesc, $colUnit, $colReq) {
             $pdf->SetFont('helvetica', 'B', 9);
             $pdf->SetFillColor(243, 244, 246);
+            $pdf->Cell($colNo, 8, 'No.', 1, 0, 'C', true);
             $pdf->Cell($colCode, 8, 'ITEM CODE', 1, 0, 'L', true);
             $pdf->Cell($colDesc, 8, 'DESCRIPTION', 1, 0, 'L', true);
             $pdf->Cell($colUnit, 8, 'UNIT', 1, 0, 'L', true);
@@ -168,6 +170,7 @@ class StockRequestController extends Controller
         $drawTableHeader();
 
         $grandRequested = 0.0;
+        $rowNo = 1;
 
         foreach ($groupedItems as $groupName => $items) {
             $ensureSpace(7);
@@ -184,6 +187,7 @@ class StockRequestController extends Controller
                 $x = $pdf->GetX();
                 $y = $pdf->GetY();
                 $pdf->SetFont('helvetica', '', 8.5);
+                $pdf->Cell($colNo, $rowHeight, (string) $rowNo, 1, 0, 'C');
                 $pdf->Cell($colCode, $rowHeight, (string) $item->item_no, 1, 0, 'L');
                 $pdf->MultiCell($colDesc, $rowHeight, $desc, 1, 'L', false, 0);
                 $pdf->Cell($colUnit, $rowHeight, (string) ($item->unit ?? '-'), 1, 0, 'L');
@@ -192,6 +196,7 @@ class StockRequestController extends Controller
 
                 $requestedQty = (float) $item->requested_qty;
                 $grandRequested += $requestedQty;
+                $rowNo++;
             }
         }
 

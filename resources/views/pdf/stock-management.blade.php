@@ -82,8 +82,9 @@
         <table>
             <thead>
                 <tr>
+                    <th width="30px">No.</th>
                     <th width="50px">Item Code</th>
-                    <th width="160px">Description</th>
+                    <th width="130px">Description</th>
                     <th width="40px">Group</th>
                     <th width="70px" class="text-center">Current Stock</th>
                     <th width="70px" class="text-center">Stock In</th>
@@ -101,6 +102,7 @@
 
                 @foreach ($groupItems as $item)
                     @php
+                        $rowNo = $loop->iteration;
                         $groupCurrentStock += $item['current_stock'];
                         $groupStockIn += $item['stockIn'];
                         $groupStockOut += $item['stockOut'];
@@ -112,8 +114,9 @@
                     @endphp
 
                     <tr>
+                        <td width="30px" class="text-center">{{ $rowNo }}</td>
                         <td width="50px"><strong>{{ $item['ITEMNO'] }}</strong></td>
-                        <td width="160px">{{ $item['DESP'] }}</td>
+                        <td width="130px">{{ $item['DESP'] }}</td>
                         <td width="40px">{{ $item['GROUP'] }}</td>
                         <td width="70px" class="numeric-column">{{ number_format($item['current_stock'], 2) }}</td>
                         <td width="70px" class="numeric-column">{{ number_format($item['stockIn'], 2) }}</td>
@@ -124,7 +127,7 @@
                 @endforeach
 
                 <tr class="summary-row">
-                    <td colspan="3"><strong>SUBTOTAL - {{ $groupName }}</strong></td>
+                    <td colspan="4"><strong>SUBTOTAL - {{ $groupName }}</strong></td>
                     <td class="numeric-column"><strong>{{ number_format($groupCurrentStock, 2) }}</strong></td>
                     <td class="numeric-column"><strong>{{ number_format($groupStockIn, 2) }}</strong></td>
                     <td class="numeric-column"><strong>{{ number_format($groupStockOut, 2) }}</strong></td>
