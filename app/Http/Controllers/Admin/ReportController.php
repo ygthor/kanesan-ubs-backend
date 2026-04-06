@@ -10,6 +10,7 @@ use App\Models\Receipt;
 use App\Models\User;
 use App\Models\Territory;
 use App\Services\BusinessReportService;
+use App\Services\PDF\ReportPDF;
 use App\Exports\GroupProductSalesByYearExport;
 use App\Exports\GroupProductSalesByAgentExport;
 use Carbon\Carbon;
@@ -185,17 +186,7 @@ class ReportController extends Controller
 
         $printedAt = now()->format('Y-m-d H:i:s');
         $filename = 'group_product_sales_by_year_' . ($filters['period_key'] ?? $filters['year']) . '_' . now()->format('Ymd_His') . '.pdf';
-        $pdf = new class('L', 'mm', 'A4', true, 'UTF-8', false) extends \TCPDF {
-            public string $printedAt = '';
-
-            public function Footer()
-            {
-                $this->SetY(-7);
-                $this->SetFont('helvetica', '', 8);
-                $this->Cell(0, 4, 'Printed at ' . $this->printedAt, 0, 0, 'L');
-                $this->Cell(0, 4, 'Page ' . $this->getAliasNumPage() . ' of ' . $this->getAliasNbPages(), 0, 0, 'R');
-            }
-        };
+        $pdf = new ReportPDF('L', 'mm', 'A3', true, 'UTF-8', false);
         $pdf->printedAt = $printedAt;
         $pdf->SetCreator('KBS System');
         $pdf->SetAuthor(auth()->user()->name ?? 'System');
@@ -258,17 +249,7 @@ class ReportController extends Controller
 
         $printedAt = now()->format('Y-m-d H:i:s');
         $filename = 'group_product_sales_by_agent_' . now()->format('Ymd_His') . '.pdf';
-        $pdf = new class('P', 'mm', 'A4', true, 'UTF-8', false) extends \TCPDF {
-            public string $printedAt = '';
-
-            public function Footer()
-            {
-                $this->SetY(-7);
-                $this->SetFont('helvetica', '', 8);
-                $this->Cell(0, 4, 'Printed at ' . $this->printedAt, 0, 0, 'L');
-                $this->Cell(0, 4, 'Page ' . $this->getAliasNumPage() . ' of ' . $this->getAliasNbPages(), 0, 0, 'R');
-            }
-        };
+        $pdf = new ReportPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->printedAt = $printedAt;
         $pdf->SetCreator('KBS System');
         $pdf->SetAuthor(auth()->user()->name ?? 'System');
@@ -339,10 +320,10 @@ class ReportController extends Controller
             $fromDateTime = $fromDate;
             $toDateTime = $toDate;
             if (strlen($fromDate) == 10) {
-                $fromDateTime = $fromDate.' 00:00:00';
+                $fromDateTime = $fromDate . ' 00:00:00';
             }
             if (strlen($toDate) == 10) {
-                $toDateTime = $toDate.' 23:59:59';
+                $toDateTime = $toDate . ' 23:59:59';
             }
             $query->whereBetween('order_date', [$fromDateTime, $toDateTime]);
         }
@@ -359,9 +340,9 @@ class ReportController extends Controller
 
         // Filter by customer search
         if ($customerSearch) {
-            $query->where(function($q) use ($customerSearch) {
+            $query->where(function ($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
 
@@ -390,16 +371,16 @@ class ReportController extends Controller
 
         // Filter by agent_no (through customer)
         if ($agentNo) {
-            $receiptQuery->whereHas('customer', function($q) use ($agentNo) {
+            $receiptQuery->whereHas('customer', function ($q) use ($agentNo) {
                 $q->where('agent_no', $agentNo);
             });
         }
 
         // Filter by customer search
         if ($customerSearch) {
-            $receiptQuery->where(function($q) use ($customerSearch) {
+            $receiptQuery->where(function ($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
 
@@ -421,7 +402,7 @@ class ReportController extends Controller
         // CA Sales = INV orders with customer_type 'Cash' or 'Cash Sales'
         $caSales = Order::whereIn('type', ['INV'])
             ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->whereIn('customers.customer_type', ['Cash', 'Cash Sales', 'CASH']);
             });
 
@@ -436,10 +417,10 @@ class ReportController extends Controller
             $caSales->where('orders.agent_no', $agentNo);
         }
         if ($customerSearch) {
-            $caSales->where(function($q) use ($customerSearch) {
+            $caSales->where(function ($q) use ($customerSearch) {
                 $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
             });
         }
         $caSalesTotal = $caSales->sum('orders.net_amount') ?? 0;
@@ -447,7 +428,7 @@ class ReportController extends Controller
         // CR Sales = INV orders with customer_type 'CREDITOR' or 'Creditor'
         $crSales = Order::whereIn('type', ['INV'])
             ->join('customers', 'orders.customer_id', '=', 'customers.id')
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->whereIn('customers.customer_type', ['CREDITOR', 'Creditor']);
             });
 
@@ -462,10 +443,10 @@ class ReportController extends Controller
             $crSales->where('orders.agent_no', $agentNo);
         }
         if ($customerSearch) {
-            $crSales->where(function($q) use ($customerSearch) {
+            $crSales->where(function ($q) use ($customerSearch) {
                 $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
             });
         }
         $crSalesTotal = $crSales->sum('orders.net_amount') ?? 0;
@@ -485,9 +466,9 @@ class ReportController extends Controller
             $returns->where('agent_no', $agentNo);
         }
         if ($customerSearch) {
-            $returns->where(function($q) use ($customerSearch) {
+            $returns->where(function ($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
         $returns->SelectRaw('
@@ -520,7 +501,7 @@ class ReportController extends Controller
         }
 
         // Helper function to build receipt query with filters
-        $buildReceiptQuery = function() use ($receiptCalcFromDate, $receiptCalcToDate, $customerId, $agentNo, $customerSearch) {
+        $buildReceiptQuery = function () use ($receiptCalcFromDate, $receiptCalcToDate, $customerId, $agentNo, $customerSearch) {
             $query = Receipt::whereNull('deleted_at');
 
             if ($receiptCalcFromDate && $receiptCalcToDate) {
@@ -530,14 +511,14 @@ class ReportController extends Controller
                 $query->where('customer_id', $customerId);
             }
             if ($agentNo) {
-                $query->whereHas('customer', function($q) use ($agentNo) {
+                $query->whereHas('customer', function ($q) use ($agentNo) {
                     $q->where('agent_no', $agentNo);
                 });
             }
             if ($customerSearch) {
-                $query->where(function($q) use ($customerSearch) {
+                $query->where(function ($q) use ($customerSearch) {
                     $q->where('customer_code', 'like', "%{$customerSearch}%")
-                      ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+                        ->orWhere('customer_name', 'like', "%{$customerSearch}%");
                 });
             }
 
@@ -572,10 +553,10 @@ class ReportController extends Controller
             $caCollectionQuery->where('customers.agent_no', $agentNo);
         }
         if ($customerSearch) {
-            $caCollectionQuery->where(function($q) use ($customerSearch) {
+            $caCollectionQuery->where(function ($q) use ($customerSearch) {
                 $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
             });
         }
         $caCollection = $caCollectionQuery->sum('receipts.paid_amount') ?? 0;
@@ -605,10 +586,10 @@ class ReportController extends Controller
             $negativeCashOrderQuery->where('inv.agent_no', $agentNo);
         }
         if ($customerSearch) {
-            $negativeCashOrderQuery->where(function($q) use ($customerSearch) {
+            $negativeCashOrderQuery->where(function ($q) use ($customerSearch) {
                 $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
             });
         }
 
@@ -631,10 +612,10 @@ class ReportController extends Controller
             $crCollectionQuery->where('customers.agent_no', $agentNo);
         }
         if ($customerSearch) {
-            $crCollectionQuery->where(function($q) use ($customerSearch) {
+            $crCollectionQuery->where(function ($q) use ($customerSearch) {
                 $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.name', 'like', "%{$customerSearch}%")
-                  ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
             });
         }
         $crCollection = $crCollectionQuery->sum('receipts.paid_amount') ?? 0;
@@ -756,12 +737,45 @@ class ReportController extends Controller
         request()->flash();
 
         return view('admin.reports.sales-report', compact(
-            'orders', 'receipts', 'fromDate', 'toDate', 'datePreset', 'customerId', 'agentNo', 'customerSearch', 'agents',
-            'caSalesTotal', 'crSalesTotal', 'returnsTotal', 'returnsGood', 'returnsBad', 'totalSales', 'nettSales',
-            'cashCollection', 'ewalletCollection', 'onlineTransferCollection', 'cardCollection', 'chequeCollection', 'pdChequeCollection', 'totalCollectionByPaymentType',
-            'caCollection', 'crCollection', 'caReturns', 'crReturns', 'totalNegativeCashOrder', 'caCollectionNett', 'crCollectionNett', 'totalCollectionByCustomerType',
-            'accountBalance', 'returnsInfo',
-            'discountRows', 'orderLevelDiscountTotal', 'itemLevelDiscountTotal', 'discountGrandTotal', 'itemLevelInvDiscountTotal', 'itemLevelCnDiscountTotal'
+            'orders',
+            'receipts',
+            'fromDate',
+            'toDate',
+            'datePreset',
+            'customerId',
+            'agentNo',
+            'customerSearch',
+            'agents',
+            'caSalesTotal',
+            'crSalesTotal',
+            'returnsTotal',
+            'returnsGood',
+            'returnsBad',
+            'totalSales',
+            'nettSales',
+            'cashCollection',
+            'ewalletCollection',
+            'onlineTransferCollection',
+            'cardCollection',
+            'chequeCollection',
+            'pdChequeCollection',
+            'totalCollectionByPaymentType',
+            'caCollection',
+            'crCollection',
+            'caReturns',
+            'crReturns',
+            'totalNegativeCashOrder',
+            'caCollectionNett',
+            'crCollectionNett',
+            'totalCollectionByCustomerType',
+            'accountBalance',
+            'returnsInfo',
+            'discountRows',
+            'orderLevelDiscountTotal',
+            'itemLevelDiscountTotal',
+            'discountGrandTotal',
+            'itemLevelInvDiscountTotal',
+            'itemLevelCnDiscountTotal'
         ));
     }
 
@@ -925,7 +939,7 @@ class ReportController extends Controller
         $this->checkAccess();
 
         $fromDate = $request->input('from_date');
-        $toDate= $request->input('to_date');
+        $toDate = $request->input('to_date');
         $customerId = $request->input('customer_id');
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
@@ -964,9 +978,9 @@ class ReportController extends Controller
 
         // Filter by customer search
         if ($customerSearch) {
-            $query->where(function($q) use ($customerSearch) {
+            $query->where(function ($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('customer_name', 'like', "%{$customerSearch}%");
             });
         }
 
@@ -999,10 +1013,10 @@ class ReportController extends Controller
             if (strpos($pattern, '%') === false && strpos($pattern, '_') === false) {
                 $pattern = '%' . $pattern . '%';
             }
-            $query->where(function($q) use ($pattern) {
+            $query->where(function ($q) use ($pattern) {
                 $q->where('customer_code', 'like', $pattern)
-                  ->orWhere('name', 'like', $pattern)
-                  ->orWhere('company_name', 'like', $pattern);
+                    ->orWhere('name', 'like', $pattern)
+                    ->orWhere('company_name', 'like', $pattern);
             });
         }
 
@@ -1110,7 +1124,7 @@ class ReportController extends Controller
 
         // Filter by customer type (through customer)
         if ($customerType) {
-            $query->whereHas('customer', function($q) use ($customerType) {
+            $query->whereHas('customer', function ($q) use ($customerType) {
                 if ($customerType === 'Cash') {
                     $q->whereIn('customer_type', ['Cash', 'CASH']);
                 } elseif ($customerType === 'CREDITOR') {
@@ -1125,17 +1139,17 @@ class ReportController extends Controller
 
         // Filter by agent_no (through customer)
         if ($agentNo) {
-            $query->whereHas('customer', function($q) use ($agentNo) {
+            $query->whereHas('customer', function ($q) use ($agentNo) {
                 $q->where('agent_no', $agentNo);
             });
         }
 
         // Filter by customer search
         if ($customerSearch) {
-            $query->whereHas('customer', function($q) use ($customerSearch) {
+            $query->whereHas('customer', function ($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('name', 'like', "%{$customerSearch}%")
-                  ->orWhere('company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('name', 'like', "%{$customerSearch}%")
+                    ->orWhere('company_name', 'like', "%{$customerSearch}%");
             });
         }
 
@@ -1187,10 +1201,10 @@ class ReportController extends Controller
         }
 
         if ($customerSearch) {
-            $customerQuery->where(function($q) use ($customerSearch) {
+            $customerQuery->where(function ($q) use ($customerSearch) {
                 $q->where('customer_code', 'like', "%{$customerSearch}%")
-                  ->orWhere('name', 'like', "%{$customerSearch}%")
-                  ->orWhere('company_name', 'like', "%{$customerSearch}%");
+                    ->orWhere('name', 'like', "%{$customerSearch}%")
+                    ->orWhere('company_name', 'like', "%{$customerSearch}%");
             });
         }
 
@@ -1328,7 +1342,7 @@ class ReportController extends Controller
         }
 
         // Sort by date
-        usort($plData, function($a, $b) {
+        usort($plData, function ($a, $b) {
             return strtotime($a['date']) - strtotime($b['date']);
         });
 
@@ -1662,8 +1676,8 @@ class ReportController extends Controller
         $grandTotal = array_sum($agentTotals);
         $grandDiscountTotal = array_sum($agentDiscountTotals);
         $grandTotalsBreakdown = [
-            'inv' => array_sum(array_map(fn ($v) => (float) ($v['inv'] ?? 0), $agentTotalsBreakdown)),
-            'cn' => array_sum(array_map(fn ($v) => (float) ($v['cn'] ?? 0), $agentTotalsBreakdown)),
+            'inv' => array_sum(array_map(fn($v) => (float) ($v['inv'] ?? 0), $agentTotalsBreakdown)),
+            'cn' => array_sum(array_map(fn($v) => (float) ($v['cn'] ?? 0), $agentTotalsBreakdown)),
         ];
         $groupedItems = collect($items)->groupBy('item_group');
 
@@ -1708,7 +1722,6 @@ class ReportController extends Controller
             }
             return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
         };
-
         $agentHeaderColors = [
             [0, 255, 51],   // green
             [255, 0, 255],  // magenta
@@ -1973,8 +1986,8 @@ class ReportController extends Controller
         };
 
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colCode = 30.0;
-        $colDesc = 88.0;
+        $colCode = 15.0;
+        $colDesc = 62.0;
         $monthColumnCount = (count($months) * 3) + 3; // Per month RG/RB/Sales + Total RG/RB/Sales
         $colMonth = ($pageWidth - $colCode - $colDesc) / max(1, $monthColumnCount);
         $tableWidth = $colCode + $colDesc + ($colMonth * $monthColumnCount);
@@ -2008,13 +2021,13 @@ class ReportController extends Controller
             $pdf->SetFillColor(255, 255, 255);
             $pdf->Cell($colCode + $colDesc, 7, '', 1, 0, 'C', true);
             foreach ($months as $monthNo => $monthLabel) {
-                $pdf->Cell($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['rg'] ?? 0), 1, 0, 'C', true);
-                $pdf->Cell($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['rb'] ?? 0), 1, 0, 'C', true);
-                $pdf->Cell($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['sales'] ?? 0), 1, 0, 'C', true);
+                $pdf->CellSM($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['rg'] ?? 0), 1, 0, 'C', true);
+                $pdf->CellSM($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['rb'] ?? 0), 1, 0, 'C', true);
+                $pdf->CellSM($colMonth, 7, $formatQty($monthTotalsBreakdown[$monthNo]['sales'] ?? 0), 1, 0, 'C', true);
             }
-            $pdf->Cell($colMonth, 7, $formatQty(collect($monthTotalsBreakdown)->sum('rg')), 1, 0, 'C', true);
-            $pdf->Cell($colMonth, 7, $formatQty(collect($monthTotalsBreakdown)->sum('rb')), 1, 0, 'C', true);
-            $pdf->Cell($colMonth, 7, $formatQty($grandTotal), 1, 1, 'C', true);
+            $pdf->CellSM($colMonth, 7, $formatQty(collect($monthTotalsBreakdown)->sum('rg')), 1, 0, 'C', true);
+            $pdf->CellSM($colMonth, 7, $formatQty(collect($monthTotalsBreakdown)->sum('rb')), 1, 0, 'C', true);
+            $pdf->CellSM($colMonth, 7, $formatQty($grandTotal), 1, 1, 'C', true);
 
             // Row: CODE / ITEM DESCRIPTION / QTY SOLD span
             $pdf->SetFont('helvetica', 'BI', 9);
@@ -2022,21 +2035,21 @@ class ReportController extends Controller
             $pdf->Cell($colCode, 6, 'CODE', 1, 0, 'C', true);
             $pdf->Cell($colDesc, 6, 'ITEM DESCRIPTION', 1, 0, 'C', true);
             foreach ($months as $monthNo => $monthLabel) {
-                $pdf->Cell($colMonth * 3, 6, $monthLabel, 1, 0, 'C', true);
+                $pdf->CellSM($colMonth * 3, 6, $monthLabel, 1, 0, 'C', true);
             }
-            $pdf->Cell($colMonth * 3, 6, 'TOTAL', 1, 1, 'C', true);
+            $pdf->CellSM($colMonth * 3, 6, 'TOTAL', 1, 1, 'C', true);
 
             // Months header row
             $pdf->SetFont('helvetica', 'B', 9);
             $pdf->Cell($colCode + $colDesc, 6, '', 1, 0, 'C', true);
             foreach ($months as $monthNo => $monthLabel) {
-                $pdf->Cell($colMonth, 6, 'RG', 1, 0, 'C', true);
-                $pdf->Cell($colMonth, 6, 'RB', 1, 0, 'C', true);
-                $pdf->Cell($colMonth, 6, 'Sales', 1, 0, 'C', true);
+                $pdf->CellSM($colMonth, 6, 'RG', 1, 0, 'C', true);
+                $pdf->CellSM($colMonth, 6, 'RB', 1, 0, 'C', true);
+                $pdf->CellSM($colMonth, 6, 'Sales', 1, 0, 'C', true);
             }
-            $pdf->Cell($colMonth, 6, 'RG', 1, 0, 'C', true);
-            $pdf->Cell($colMonth, 6, 'RB', 1, 0, 'C', true);
-            $pdf->Cell($colMonth, 6, 'Sales', 1, 1, 'C', true);
+            $pdf->CellSM($colMonth, 6, 'RG', 1, 0, 'C', true);
+            $pdf->CellSM($colMonth, 6, 'RB', 1, 0, 'C', true);
+            $pdf->CellSM($colMonth, 6, 'Sales', 1, 1, 'C', true);
         };
 
         $ensureSpace = function ($neededHeight) use ($pdf, $drawHeader) {
@@ -2085,13 +2098,13 @@ class ReportController extends Controller
     private function getAgents()
     {
         return User::select('id', 'name', 'username', 'email')
-            ->where(function($query) {
+            ->where(function ($query) {
                 $query->where('username', '!=', 'KBS')
-                      ->where('email', '!=', 'KBS@kanesan.my');
+                    ->where('email', '!=', 'KBS@kanesan.my');
             })
             ->orderBy('name', 'asc')
             ->get()
-            ->filter(function($user) {
+            ->filter(function ($user) {
                 return !$user->hasRole('admin');
             })
             ->values();
