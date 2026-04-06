@@ -199,8 +199,8 @@ class StockRequestController extends Controller
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFillColor(230, 230, 230);
-        $pdf->Cell($colCode + $colDesc + $colUnit, 8, 'Grand Total', 1, 0, 'R', true);
-        $pdf->Cell($colReq, 8, $formatQty($grandRequested), 1, 1, 'R', true);
+        // $pdf->Cell($colCode + $colDesc + $colUnit, 8, 'Grand Total', 1, 0, 'R', true);
+        // $pdf->Cell($colReq, 8, $formatQty($grandRequested), 1, 1, 'R', true);
 
         return response($pdf->Output($filename, 'S'), 200, [
             'Content-Type' => 'application/pdf',
