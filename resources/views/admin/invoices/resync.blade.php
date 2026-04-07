@@ -56,15 +56,8 @@
             </div>
             <div class="col-md-3">
                 <div class="form-group">
-                    <label>Customer</label>
-                    <select name="customer_id" class="form-control">
-                        <option value="">All Customers</option>
-                        @foreach($customers ?? [] as $customer)
-                            <option value="{{ $customer->id }}" {{ ($customerId ?? '') == $customer->id ? 'selected' : '' }}>
-                                {{ $customer->customer_code }} - {{ $customer->company_name ?? $customer->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <label>Customer Search</label>
+                    <input type="text" name="customer_search" class="form-control" value="{{ $customerSearch ?? '' }}" placeholder="Code or Name">
                 </div>
             </div>
         </div>

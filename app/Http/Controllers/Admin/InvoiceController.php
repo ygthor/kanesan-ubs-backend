@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Customer;
 use App\Models\EInvoiceRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +31,8 @@ class InvoiceController extends Controller
 
         $fromDate = $request->input('from_date');
         $toDate = $request->input('to_date');
-        $customerId = $request->input('customer_id');
+        $customerSearch = trim((string) $request->input('customer_search', ''));
+        $customerId = $request->input('customer_id'); // Backward compatibility for existing bookmarked URLs
         $type = $request->input('type'); // Allow multiple types
         $referenceNo = $request->input('reference_no');
         $agentNo = $request->input('agent_no');
@@ -57,8 +57,14 @@ class InvoiceController extends Controller
             $query->whereIn('type', $type);
         }
 
-        // Filter by customer
-        if ($customerId) {
+        // Filter by customer code or customer name
+        if ($customerSearch !== '') {
+            $query->where(function ($q) use ($customerSearch) {
+                $pattern = '%' . $customerSearch . '%';
+                $q->where('customer_code', 'like', $pattern)
+                    ->orWhere('customer_name', 'like', $pattern);
+            });
+        } elseif ($customerId) {
             $query->where('customer_id', $customerId);
         }
 
@@ -99,15 +105,12 @@ class InvoiceController extends Controller
             return $order;
         });
 
-        // Get customers for filter dropdown
-        $customers = Customer::orderBy('customer_code', 'asc')->get();
-
         // Ensure type is always an array for the view
         if (!is_array($type)) {
             $type = $type ? [$type] : [];
         }
 
-        return view('admin.invoices.index', compact('orders', 'fromDate', 'toDate', 'customerId', 'type', 'referenceNo', 'agentNo', 'customers'));
+        return view('admin.invoices.index', compact('orders', 'fromDate', 'toDate', 'customerSearch', 'type', 'referenceNo', 'agentNo'));
     }
 
     /**
@@ -164,7 +167,8 @@ class InvoiceController extends Controller
 
         $fromDate = $request->input('from_date');
         $toDate = $request->input('to_date');
-        $customerId = $request->input('customer_id');
+        $customerSearch = trim((string) $request->input('customer_search', ''));
+        $customerId = $request->input('customer_id'); // Backward compatibility for existing bookmarked URLs
         $type = $request->input('type', ['INV', 'CN']); // Default to INV and CN
         $referenceNo = $request->input('reference_no');
         $agentNo = $request->input('agent_no');
@@ -208,8 +212,14 @@ class InvoiceController extends Controller
             $query->whereIn('type', $type);
         }
 
-        // Filter by customer
-        if ($customerId) {
+        // Filter by customer code or customer name
+        if ($customerSearch !== '') {
+            $query->where(function ($q) use ($customerSearch) {
+                $pattern = '%' . $customerSearch . '%';
+                $q->where('customer_code', 'like', $pattern)
+                    ->orWhere('customer_name', 'like', $pattern);
+            });
+        } elseif ($customerId) {
             $query->where('customer_id', $customerId);
         }
 
@@ -236,15 +246,12 @@ class InvoiceController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        // Get customers for filter dropdown
-        $customers = Customer::orderBy('customer_code', 'asc')->get();
-
         // Ensure type is always an array for the view
         if (!is_array($type)) {
             $type = $type ? [$type] : ['INV', 'CN'];
         }
 
-        return view('admin.invoices.resync', compact('orders', 'fromDate', 'toDate', 'customerId', 'type', 'referenceNo', 'agentNo', 'customers', 'perPage'));
+        return view('admin.invoices.resync', compact('orders', 'fromDate', 'toDate', 'customerSearch', 'type', 'referenceNo', 'agentNo', 'perPage'));
     }
 
     /**
