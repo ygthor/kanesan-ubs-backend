@@ -458,6 +458,17 @@
     </div>
 
     @php
+        $normalizeCustomerType = function ($type) {
+            $rawType = strtoupper(trim((string) $type));
+            if (in_array($rawType, ['CASH', 'CASH SALES'], true)) {
+                return 'CASH';
+            }
+            if ($rawType === 'CREDITOR') {
+                return 'CREDITOR';
+            }
+            return null;
+        };
+
         // Combine orders and receipts, then sort by date
         $combinedItems = collect();
 
@@ -469,6 +480,7 @@
                 'order_type' => $order->type,
                 'customer_code' => $order->customer_code,
                 'customer_name' => $order->customer_name,
+                'customer_type' => optional($order->customer)->customer_type ?? ($order->customer_type ?? null),
                 'agent_no' => $order->agent_no ?? 'N/A',
                 'amount' => $order->net_amount ?? 0,
             ]);
@@ -482,73 +494,191 @@
                 'order_type' => 'RC',
                 'customer_code' => $receipt->customer_code,
                 'customer_name' => $receipt->customer_name,
+                'customer_type' => optional($receipt->customer)->customer_type ?? ($receipt->customer_type ?? null),
                 'agent_no' => ($receipt->customer && $receipt->customer->agent_no) ? $receipt->customer->agent_no : 'N/A',
                 'amount' => $receipt->paid_amount ?? 0,
             ]);
         }
 
         $combinedItems = $combinedItems->sortByDesc('date');
+
+        $customerSummary = $combinedItems
+            ->groupBy(function ($item) use ($normalizeCustomerType) {
+                return implode('|', [
+                    $item['customer_code'] ?? '',
+                    $item['customer_name'] ?? '',
+                    $normalizeCustomerType($item['customer_type'] ?? null) ?? '-',
+                ]);
+            })
+            ->map(function ($rows) use ($normalizeCustomerType) {
+                $firstRow = $rows->first();
+                return [
+                    'customer_code' => $firstRow['customer_code'] ?? '-',
+                    'customer_name' => $firstRow['customer_name'] ?? '-',
+                    'customer_type' => $normalizeCustomerType($firstRow['customer_type'] ?? null) ?? '-',
+                    'inv' => $rows->where('order_type', 'INV')->sum('amount'),
+                    'cn' => $rows->where('order_type', 'CN')->sum('amount'),
+                    'rc' => $rows->where('order_type', 'RC')->sum('amount'),
+                ];
+            })
+            ->sortBy(function ($item) {
+                return strtoupper((string) ($item['customer_name'] ?? ''));
+            })
+            ->values();
     @endphp
 
-    <div class="table-responsive">
-        <table class="table table-striped table-bordered table-hover">
-            <thead class="thead-dark">
-                <tr>
-                    <th>Reference No</th>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Customer Code</th>
-                    <th>Customer Name</th>
-                    <th>Agent No</th>
-                    <th>Net Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($combinedItems as $item)
-                    <tr>
-                        <td>{{ $item['reference_no'] }}</td>
-                        <td>{{ \Carbon\Carbon::parse($item['date'])->format('d/m/Y') }}</td>
-                        <td>
-                            @if($item['type'] == 'receipt')
-                                <span class="badge badge-primary">RC</span>
-                            @else
-                                <span class="badge {{ $item['order_type'] == 'INV' ? 'badge-success' : 'badge-warning' }}">
-                                    {{ $item['order_type'] }}
-                                </span>
-                            @endif
-                        </td>
-                        <td>{{ $item['customer_code'] }}</td>
-                        <td>{{ $item['customer_name'] }}</td>
-                        <td>{{ $item['agent_no'] }}</td>
-                        <td class="text-right">RM {{ number_format($item['amount'], 2) }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="7" class="text-center">No records found for the selected criteria.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-            @if($combinedItems->count() > 0)
-                <tfoot>
-                    @php
-                        $totalINV = $combinedItems->where('order_type', 'INV')->sum('amount');
-                        $totalCN = $combinedItems->where('order_type', 'CN')->sum('amount');
-                        $totalRC = $combinedItems->where('order_type', 'RC')->sum('amount');
-                    @endphp
-                    <tr class="font-weight-bold">
-                        <td colspan="6" class="text-right">Total INV:</td>
-                        <td class="text-right">RM {{ number_format($totalINV, 2) }}</td>
-                    </tr>
-                    <tr class="font-weight-bold">
-                        <td colspan="6" class="text-right">Total CN:</td>
-                        <td class="text-right">RM {{ number_format($totalCN, 2) }}</td>
-                    </tr>
-                    <tr class="font-weight-bold">
-                        <td colspan="6" class="text-right">Total RC:</td>
-                        <td class="text-right">RM {{ number_format($totalRC, 2) }}</td>
-                    </tr>
-                </tfoot>
-            @endif
-        </table>
+    <ul class="nav nav-tabs mb-3" id="salesReportTabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="transactions-tab" data-bs-toggle="tab" href="#transactions-pane" role="tab" aria-controls="transactions-pane" aria-selected="true">Transactions</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="customer-tab" data-bs-toggle="tab" href="#customer-pane" role="tab" aria-controls="customer-pane" aria-selected="false">Customer</a>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="salesReportTabsContent">
+        <div class="tab-pane fade show active" id="transactions-pane" role="tabpanel" aria-labelledby="transactions-tab">
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Reference No</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Customer Code</th>
+                            <th>Customer Name</th>
+                            <th>Customer Type</th>
+                            <th>Agent No</th>
+                            <th>Net Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($combinedItems as $item)
+                            <tr>
+                                <td>{{ $item['reference_no'] }}</td>
+                                <td>{{ \Carbon\Carbon::parse($item['date'])->format('d/m/Y') }}</td>
+                                <td>
+                                    @if($item['type'] == 'receipt')
+                                        <span class="badge badge-primary">RC</span>
+                                    @else
+                                        <span class="badge {{ $item['order_type'] == 'INV' ? 'badge-success' : 'badge-warning' }}">
+                                            {{ $item['order_type'] }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td>{{ $item['customer_code'] }}</td>
+                                <td>{{ $item['customer_name'] }}</td>
+                                <td>{{ $normalizeCustomerType($item['customer_type'] ?? null) ?? '-' }}</td>
+                                <td>{{ $item['agent_no'] }}</td>
+                                <td class="text-right">RM {{ number_format($item['amount'], 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center">No records found for the selected criteria.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                    @if($combinedItems->count() > 0)
+                        <tfoot>
+                            @php
+                                $totalINV = $combinedItems->where('order_type', 'INV')->sum('amount');
+                                $totalCN = $combinedItems->where('order_type', 'CN')->sum('amount');
+                                $totalRC = $combinedItems->where('order_type', 'RC')->sum('amount');
+
+                                $totalInvCash = $combinedItems->filter(function ($item) use ($normalizeCustomerType) {
+                                    return $item['order_type'] === 'INV' && $normalizeCustomerType($item['customer_type'] ?? null) === 'CASH';
+                                })->sum('amount');
+                                $totalInvCredit = $combinedItems->filter(function ($item) use ($normalizeCustomerType) {
+                                    return $item['order_type'] === 'INV' && $normalizeCustomerType($item['customer_type'] ?? null) === 'CREDITOR';
+                                })->sum('amount');
+
+                                $totalCnCash = $combinedItems->filter(function ($item) use ($normalizeCustomerType) {
+                                    return $item['order_type'] === 'CN' && $normalizeCustomerType($item['customer_type'] ?? null) === 'CASH';
+                                })->sum('amount');
+                                $totalCnCredit = $combinedItems->filter(function ($item) use ($normalizeCustomerType) {
+                                    return $item['order_type'] === 'CN' && $normalizeCustomerType($item['customer_type'] ?? null) === 'CREDITOR';
+                                })->sum('amount');
+
+                                $totalRcCash = $combinedItems->filter(function ($item) use ($normalizeCustomerType) {
+                                    return $item['order_type'] === 'RC' && $normalizeCustomerType($item['customer_type'] ?? null) === 'CASH';
+                                })->sum('amount');
+                                $totalRcCredit = $combinedItems->filter(function ($item) use ($normalizeCustomerType) {
+                                    return $item['order_type'] === 'RC' && $normalizeCustomerType($item['customer_type'] ?? null) === 'CREDITOR';
+                                })->sum('amount');
+                            @endphp
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total INV:</td>
+                                <td class="text-right">RM {{ number_format($totalINV, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total INV CASH:</td>
+                                <td class="text-right">RM {{ number_format($totalInvCash, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total INV CREDITOR:</td>
+                                <td class="text-right">RM {{ number_format($totalInvCredit, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total CN:</td>
+                                <td class="text-right">RM {{ number_format($totalCN, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total CN CASH:</td>
+                                <td class="text-right">RM {{ number_format($totalCnCash, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total CN CREDITOR:</td>
+                                <td class="text-right">RM {{ number_format($totalCnCredit, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total RC:</td>
+                                <td class="text-right">RM {{ number_format($totalRC, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total RC CASH:</td>
+                                <td class="text-right">RM {{ number_format($totalRcCash, 2) }}</td>
+                            </tr>
+                            <tr class="font-weight-bold">
+                                <td colspan="7" class="text-right">Total RC CREDITOR:</td>
+                                <td class="text-right">RM {{ number_format($totalRcCredit, 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    @endif
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="customer-pane" role="tabpanel" aria-labelledby="customer-tab">
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Customer Code</th>
+                            <th>Customer Name</th>
+                            <th>Customer Type</th>
+                            <th class="text-right">INV</th>
+                            <th class="text-right">CN</th>
+                            <th class="text-right">RC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($customerSummary as $row)
+                            <tr>
+                                <td>{{ $row['customer_code'] }}</td>
+                                <td>{{ $row['customer_name'] }}</td>
+                                <td>{{ $row['customer_type'] }}</td>
+                                <td class="text-right">RM {{ number_format($row['inv'], 2) }}</td>
+                                <td class="text-right">RM {{ number_format($row['cn'], 2) }}</td>
+                                <td class="text-right">RM {{ number_format($row['rc'], 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="text-center">No records found for the selected criteria.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 @endsection
