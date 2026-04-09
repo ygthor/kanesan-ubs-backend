@@ -191,7 +191,7 @@ class StockRequestController extends Controller
                 $pdf->Cell($colCode, $rowHeight, (string) $item->item_no, 1, 0, 'L');
                 $pdf->MultiCell($colDesc, $rowHeight, $desc, 1, 'L', false, 0);
                 $pdf->Cell($colUnit, $rowHeight, (string) ($item->unit ?? '-'), 1, 0, 'L');
-                $pdf->Cell($colReq, $rowHeight, $formatQty($item->requested_qty), 1, 0, 'R');
+                $pdf->Cell($colReq, $rowHeight, $formatQty($item->requested_qty), 1, 0, 'C');
                 $pdf->SetXY($x, $y + $rowHeight);
 
                 $requestedQty = (float) $item->requested_qty;
