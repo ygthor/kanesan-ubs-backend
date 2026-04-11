@@ -1,0 +1,24 @@
+meta {
+  name: Get Specific Customer
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{url}}/api/customers/1
+  body: none
+  auth: inherit
+}
+
+params:path {
+  customerId: 1
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

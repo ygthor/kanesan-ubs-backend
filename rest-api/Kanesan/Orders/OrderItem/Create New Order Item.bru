@@ -1,0 +1,30 @@
+meta {
+  name: Create New Order Item
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{url}}/api/orders-items
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "order_id":23,
+      "product_id": 10,
+      "quantity": 1,
+      "unit_price": 2000
+  }
+}
+
+settings {
+  encodeUrl: true
+}

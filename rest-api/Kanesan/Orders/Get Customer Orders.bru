@@ -1,0 +1,25 @@
+meta {
+  name: Get Customer Orders
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{url}}/api/orders?customer_code=3000/A01&paginate=0
+  body: none
+  auth: inherit
+}
+
+params:query {
+  customer_code: 3000/A01
+  paginate: 0
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

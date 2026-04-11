@@ -1,0 +1,27 @@
+meta {
+  name: Update Customer
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{url}}/api/customers/256
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "address1": "456 API Avenue"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

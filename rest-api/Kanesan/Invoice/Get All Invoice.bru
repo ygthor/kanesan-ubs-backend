@@ -1,0 +1,20 @@
+meta {
+  name: Get All Invoice
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{url}}/api/invoices
+  body: none
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

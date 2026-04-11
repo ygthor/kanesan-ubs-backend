@@ -1,0 +1,36 @@
+meta {
+  name: Delete Receipt
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{url}}/api/receipts/1
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "receipt_no": "RCPT-2025-102",
+      "customer_id": 2,
+      "customer_name": "Gamma Retail Enterprise",
+      "customer_code": "CUST2050",
+      "receipt_date": "2025-06-08 12:20:00",
+      "payment_type": "Cash",
+      "debt_amount": 150.75,
+      "transaction_amount": 150.75,
+      "paid_amount": 150.75,
+      "payment_reference_no": "Payment at counter"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

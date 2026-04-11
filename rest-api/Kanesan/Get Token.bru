@@ -1,0 +1,16 @@
+meta {
+  name: Get Token
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{url}}/api/auth/token
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  identifier: S01
+  password: password
+}

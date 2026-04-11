@@ -1,0 +1,21 @@
+meta {
+  name: Get Inventory
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{url}}/api/inventory
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      
+  }
+}
+
+settings {
+  encodeUrl: true
+}

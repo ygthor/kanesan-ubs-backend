@@ -1,0 +1,24 @@
+meta {
+  name: Delete Customer
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{url}}/api/customers/1
+  body: none
+  auth: inherit
+}
+
+params:path {
+  customerId: 1
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

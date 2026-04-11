@@ -1,0 +1,19 @@
+meta {
+  name: Get Product Copy
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{url}}/api/icitem?branchId=Penang
+  body: none
+  auth: inherit
+}
+
+params:query {
+  branchId: Penang
+}
+
+settings {
+  encodeUrl: true
+}

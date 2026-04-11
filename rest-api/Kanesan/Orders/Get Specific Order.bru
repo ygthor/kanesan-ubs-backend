@@ -1,0 +1,24 @@
+meta {
+  name: Get Specific Order
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{url}}/api/orders/1
+  body: none
+  auth: inherit
+}
+
+params:path {
+  orderId: 1
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

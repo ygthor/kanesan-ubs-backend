@@ -1,0 +1,40 @@
+meta {
+  name: Create New Customer
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{url}}/api/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "customer_code": "CUST_POSTMAN_001",
+      "company_name": "Postman Test Company",
+      "address1": "123 API Lane",
+      "address2": "Suite B",
+      "postcode": "54321",
+      "state": "Test State",
+      "territory": "Global",
+      "telephone1": "555-0011",
+      "telephone2": "555-0022",
+      "fax_no": "555-0033",
+      "contact_person": "Peter Tester",
+      "customer_group": "Test Group",
+      "customer_type": "Standard",
+      "lot_type": "Residential"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

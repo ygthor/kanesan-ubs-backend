@@ -1,0 +1,20 @@
+meta {
+  name: GET customer outstanding
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{url}}/api/customers/outstanding-invoices?customer_code=3000/A14&include_paid=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  customer_code: 3000/A14
+  include_paid: true
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,0 +1,39 @@
+meta {
+  name: Receipt (Cheque)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{url}}/api/receipts
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "receipt_no": "RCPT-2025-002",
+      "customer_id": 1,
+      "customer_name": "Beta Wholesale Sdn Bhd",
+      "customer_code": "CUST1001",
+      "receipt_date": "2025-06-08 12:15:00",
+      "payment_type": "Cheque",
+      "debt_amount": 500.00,
+      "transaction_amount": 250.00,
+      "paid_amount": 250.00,
+      "cheque_no": "123456",
+      "cheque_type": "Local",
+      "bank_name": "Maybank",
+      "payment_reference_no": null
+  }
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Get Customer Invoice
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{url}}/api/invoices?page=1&per_page=15&CUSTNO=KL0001&invoice_type=CS
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 1
+  per_page: 15
+  CUSTNO: KL0001
+  invoice_type: CS
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Create New Customer Copy
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{url}}/api/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {"company_name":"123","company_name2":"123","address1":"123","address2":"23","postcode":"23","state":null,"territory":"S01","telephone1":"123","telephone2":"123","email":"123","customer_group":"Restaurant","payment_type":"Invoice","payment_term":"123"}
+}
+
+settings {
+  encodeUrl: true
+}

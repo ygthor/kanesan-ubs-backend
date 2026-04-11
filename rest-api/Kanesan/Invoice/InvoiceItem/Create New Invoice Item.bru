@@ -1,0 +1,30 @@
+meta {
+  name: Create New Invoice Item
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{url}}/api/invoices-items
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "reference_code":"INV00007",
+      "product_code": "SW-UBS1",
+      "quantity": 1,
+      "unit_price": 2000
+  }
+}
+
+settings {
+  encodeUrl: true
+}

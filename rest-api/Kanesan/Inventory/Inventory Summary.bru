@@ -1,0 +1,20 @@
+meta {
+  name: Inventory Summary
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{url}}/api/inventory/summary
+  body: none
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

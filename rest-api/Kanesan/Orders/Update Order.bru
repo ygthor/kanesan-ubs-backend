@@ -1,0 +1,53 @@
+meta {
+  name: Update Order
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{url}}/api/orders/27
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "type": "SO",
+      "customer_id": 10,
+      "order_date": "2025-07-21",
+      "remarks": "TESTING UPDATE",
+      "tax1_percentage": 8,
+      "discount": 1,
+      "items": [
+          {
+              "product_id": 1,
+              "quantity": 2,
+              "unit_price": 10.00,
+              "discount": 1.00,
+              "is_free_good": false,
+              "is_trade_return": false,
+              "trade_return_is_good": true
+          },
+          {
+              "product_id": 2,
+              "quantity": 2,
+              "unit_price": 50.00,
+              "discount": 1.00,
+              "is_free_good": false,
+              "is_trade_return": false,
+              "trade_return_is_good": true
+          }
+  
+      ]
+  }
+}
+
+settings {
+  encodeUrl: true
+}

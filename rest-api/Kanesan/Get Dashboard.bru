@@ -1,0 +1,23 @@
+meta {
+  name: Get Dashboard
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{url}}/api/dashboard
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "date_from": "2024-01-01",
+      "date_to": "2024-01-02",
+      "branchId": "xx"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

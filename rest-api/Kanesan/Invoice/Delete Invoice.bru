@@ -1,0 +1,43 @@
+meta {
+  name: Delete Invoice
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{url}}/api/invoices/1
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "type": "SO",
+      "customer_id": 10,
+      "order_date": "2025-07-21",
+      "remarks": "Please deliver after 2 PM.",
+      "tax1_percentage": 8,
+      "discount": 1,
+      "items": [
+          {
+              "product_id": 1,
+              "quantity": 2,
+              "unit_price": 10.00,
+              "discount": 1.00,
+              "is_free_good": false,
+              "is_trade_return": false,
+              "trade_return_is_good": true
+          }
+      ]
+  }
+}
+
+settings {
+  encodeUrl: true
+}

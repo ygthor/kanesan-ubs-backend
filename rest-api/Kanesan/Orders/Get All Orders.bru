@@ -1,0 +1,29 @@
+meta {
+  name: Get All Orders
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{url}}/api/orders?start_date=2026-03-18&end_date=2026-03-18&order_type=INV&agent_no=S01&page=1&per_page=1000
+  body: none
+  auth: inherit
+}
+
+params:query {
+  start_date: 2026-03-18
+  end_date: 2026-03-18
+  order_type: INV
+  agent_no: S01
+  page: 1
+  per_page: 1000
+}
+
+headers {
+  Accept: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+settings {
+  encodeUrl: true
+}

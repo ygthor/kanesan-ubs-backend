@@ -1,0 +1,30 @@
+meta {
+  name: Create New Order
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{url}}/api/orders
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {
+      "type": "SO",
+      "customer_id": 10,
+      "order_date": "2025-07-31",
+      "remarks": "Please deliver after 2 PM."
+  }
+}
+
+settings {
+  encodeUrl: true
+}

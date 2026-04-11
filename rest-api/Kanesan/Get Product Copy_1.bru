@@ -1,0 +1,19 @@
+meta {
+  name: Get Product Copy_1
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{url}}/api/products?branchId=Penang
+  body: none
+  auth: inherit
+}
+
+params:query {
+  branchId: Penang
+}
+
+settings {
+  encodeUrl: true
+}

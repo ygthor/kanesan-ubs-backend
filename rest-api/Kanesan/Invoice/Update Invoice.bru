@@ -1,0 +1,25 @@
+meta {
+  name: Update Invoice
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{url}}/api/invoices/INV00003
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Authorization: Bearer {{authToken}}
+}
+
+body:json {
+  {"type":"IV","customer_code":"3000/S01","date":"2025-08-11","remarks":""}
+}
+
+settings {
+  encodeUrl: true
+}
