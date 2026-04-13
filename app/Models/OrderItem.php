@@ -22,6 +22,7 @@ class OrderItem extends BaseModel
         'product_name',         // Denormalized product name
         'description',
         'sku_code',             // Denormalized SKU
+        'unit',
         'quantity',
         'unit_price',
         'discount',             // Discount amount for this line item
@@ -73,8 +74,11 @@ class OrderItem extends BaseModel
     /**
      * Accessor to get the unit from icitem
      */
-    public function getUnitAttribute()
+    public function getUnitAttribute($value)
     {
+        if (!empty($value)) {
+            return $value;
+        }
         return $this->item ? $this->item->UNIT : null;
     }
 

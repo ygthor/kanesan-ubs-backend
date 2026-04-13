@@ -69,6 +69,16 @@ Route::get('/script_to_run/update_customer_name', function () {
     echo 'success';
 });
 
+Route::get('/script_to_run/update_order_item_unit', function () {
+    \Illuminate\Support\Facades\DB::statement("
+        UPDATE order_items oi
+        JOIN icitem i ON oi.product_no COLLATE utf8mb4_unicode_ci = i.ITEMNO COLLATE utf8mb4_unicode_ci
+        SET oi.unit = i.UNIT
+        WHERE oi.unit IS NULL OR oi.unit = '';
+    ");
+    return response()->json(['status' => 'success', 'message' => 'Order Item units updated successfully']);
+});
+
 
 
 /**

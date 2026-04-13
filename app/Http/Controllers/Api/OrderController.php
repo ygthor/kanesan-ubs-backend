@@ -358,6 +358,11 @@ class OrderController extends Controller
                 $discount = $itemData['discount'] ?? 0;
                 $unique_key = "$invReferenceNo|$invItemCount";
 
+                $icitemObj = \App\Models\Icitem::find($product->product_no);
+                if (!$icitemObj) {
+                    $icitemObj = \App\Models\Icitem::whereRaw('LOWER(ITEMNO) = LOWER(?)', [$product->product_no])->first();
+                }
+
                 $orderItem = $invOrder->items()->create([
                     'unique_key' => $unique_key,
                     'reference_no' => $invReferenceNo,
@@ -368,6 +373,7 @@ class OrderController extends Controller
                     'product_name' => $product->product_name,
                     'description' => $product->product_name,
                     'sku_code' => $product->sku_code,
+                    'unit' => $icitemObj ? $icitemObj->UNIT : null,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount' => $discount,
@@ -419,6 +425,11 @@ class OrderController extends Controller
                     $discount = $itemData['discount'] ?? 0;
                     $unique_key = "$cnReferenceNo|$cnItemCount";
 
+                    $icitemObj = \App\Models\Icitem::find($product->product_no);
+                    if (!$icitemObj) {
+                        $icitemObj = \App\Models\Icitem::whereRaw('LOWER(ITEMNO) = LOWER(?)', [$product->product_no])->first();
+                    }
+
                     $orderItem = $cnOrder->items()->create([
                         'unique_key' => $unique_key,
                         'reference_no' => $cnReferenceNo,
@@ -429,6 +440,7 @@ class OrderController extends Controller
                         'product_name' => $product->product_name,
                         'description' => $product->product_name,
                         'sku_code' => $product->sku_code,
+                        'unit' => $icitemObj ? $icitemObj->UNIT : null,
                         'quantity' => $quantity,
                         'unit_price' => $unitPrice,
                         'discount' => $discount,
@@ -644,6 +656,7 @@ class OrderController extends Controller
                     'product_name' => $icitem->DESP ?? 'Unknown Product',
                     'description' => $icitem->DESP ?? 'Unknown Product',
                     'sku_code' => $icitem->ITEMNO, // Use ITEMNO as SKU
+                    'unit' => $icitem->UNIT ?? null,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'discount' => $discount,
@@ -706,6 +719,7 @@ class OrderController extends Controller
                         'product_name' => $icitem->DESP ?? 'Unknown Product',
                         'description' => $icitem->DESP ?? 'Unknown Product',
                         'sku_code' => $icitem->ITEMNO, // Use ITEMNO as SKU
+                        'unit' => $icitem->UNIT ?? null,
                         'quantity' => $quantity,
                         'unit_price' => $unitPrice,
                         'discount' => $discount,
