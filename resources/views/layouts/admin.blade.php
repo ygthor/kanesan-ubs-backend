@@ -24,52 +24,53 @@
             background-color: #f8f9fa;
             border-top: none;
         }
-        
-        .btn-group-sm > .btn, .btn-sm {
+
+        .btn-group-sm>.btn,
+        .btn-sm {
             padding: 0.25rem 0.5rem;
             font-size: 0.875rem;
             border-radius: 0.2rem;
         }
-        
+
         .action-buttons {
             white-space: nowrap;
         }
-        
+
         .action-buttons .btn {
             margin-right: 0.25rem;
         }
-        
+
         .action-buttons .btn:last-child {
             margin-right: 0;
         }
-        
+
         .search-box {
             max-width: 300px;
         }
-        
+
         .pagination-wrapper {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-top: 1rem;
         }
-        
+
         .pagination-wrapper .pagination {
             margin-bottom: 0;
         }
-        
+
         .pagination-wrapper .pagination .page-link {
             padding: 0.375rem 0.75rem;
             font-size: 0.875rem;
         }
-        
+
         .pagination-wrapper .pagination .page-link i,
         .pagination-wrapper .pagination .page-link svg {
             font-size: 0.875rem;
             width: 0.875rem;
             height: 0.875rem;
         }
-        
+
         .per-page-selector {
             width: auto;
             display: inline-block;
@@ -83,21 +84,41 @@
         $(document).ready(function() {
             // Initialize tooltips
             $('[data-toggle="tooltip"]').tooltip();
-            
+
             // Initialize popovers
             $('[data-toggle="popover"]').popover();
-            
+
             // Confirm delete actions
             $('.btn-delete').click(function(e) {
                 if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
                     e.preventDefault();
                 }
             });
-            
+
             // Auto-hide alerts after 5 seconds (except persistent alerts)
             // setTimeout(function() {
             //     $('.alert').not('.alert-persistent').fadeOut('slow');
             // }, 5000);
+        });
+
+        document.addEventListener('wheel', function(e) {
+            const active = document.activeElement;
+            if (active && active.type === 'number') {
+                active.blur(); // or preventDefault alternative below
+            }
+        }, {
+            passive: false
+        });
+        // Prevent arrow keys changing number
+        document.addEventListener('keydown', function(e) {
+            const active = document.activeElement;
+            if (
+                active &&
+                active.type === 'number' &&
+                (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+            ) {
+                e.preventDefault();
+            }
         });
     </script>
 @endpush
