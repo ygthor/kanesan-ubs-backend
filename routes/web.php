@@ -282,3 +282,33 @@ Route::get('/maintenance/recalc-orders', function () {
         'errors' => $errors,
     ]);
 });
+
+Route::get('/maintenance/update-free-good-prices', function () {
+    $updated = 0;
+    $errors = [];
+
+    // Find all free goods where unit_price is 0
+    \App\Models\OrderItem::with('item')->where('is_free_good', true)->where('unit_price', 0)->chunk(200, function ($items) use (&$updated, &$errors) {
+        foreach ($items as $item) {
+            try {
+                if ($item->item) {
+                    $item->unit_price = $item->item->PRICE ?? $item->item->UCOST ?? 0;
+                    $item->amount = 0; // Make sure amount stays 0 for free good
+                    $item->save();
+                    $updated++;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = [
+                    'id' => $item->id,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+    });
+
+    return response()->json([
+        'status' => 'ok',
+        'updated_items' => $updated,
+        'errors' => $errors,
+    ]);
+});

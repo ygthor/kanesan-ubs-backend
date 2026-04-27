@@ -353,7 +353,7 @@ class OrderController extends Controller
                     return makeResponse(400, 'Invalid product ID or product_no: ' . $productId);
                 }
 
-                $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);
+                $unitPrice = $itemData['unit_price'] ?? $product->price;
                 $quantity = $itemData['quantity'];
                 $discount = $itemData['discount'] ?? 0;
                 $unique_key = "$invReferenceNo|$invItemCount";
@@ -420,7 +420,7 @@ class OrderController extends Controller
                         return makeResponse(400, 'Invalid product ID or product_no: ' . $productId);
                     }
 
-                    $unitPrice = $itemData['is_free_good'] ? 0 : ($itemData['unit_price'] ?? $product->price);
+                    $unitPrice = $itemData['unit_price'] ?? $product->price;
                     $quantity = $itemData['quantity'];
                     $discount = $itemData['discount'] ?? 0;
                     $unique_key = "$cnReferenceNo|$cnItemCount";
@@ -642,7 +642,7 @@ class OrderController extends Controller
                 }
 
                 $isFreeGood = $itemData['is_free_good'] ?? false;
-                $unitPrice = $isFreeGood ? 0 : ($itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0);
+                $unitPrice = $itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0;
                 $quantity = $itemData['quantity'];
                 $discount = $itemData['discount'] ?? 0;
                 $unique_key = "$referenceNo|$itemCount";
@@ -705,7 +705,7 @@ class OrderController extends Controller
                     }
 
                     $isFreeGood = $itemData['is_free_good'] ?? false;
-                    $unitPrice = $isFreeGood ? 0 : ($itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0);
+                    $unitPrice = $itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0;
                     $quantity = $itemData['quantity'];
                     $discount = $itemData['discount'] ?? 0;
                     $unique_key = "$cnReferenceNo|$cnItemCount";

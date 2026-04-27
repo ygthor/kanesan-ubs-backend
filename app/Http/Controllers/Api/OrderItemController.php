@@ -174,18 +174,16 @@ class OrderItemController extends Controller
             $orderData['sku_code'] = $icitem->ITEMNO; // Use ITEMNO as SKU
             $orderData['description'] = $icitem->DESP ?? 'Unknown Product'; // Use DESP from icitem table
 
-            // Handle free goods
+            // Calculate amount
             if (isset($orderData['is_free_good']) && $orderData['is_free_good']) {
-                $orderData['unit_price'] = 0;
-                $orderData['discount'] = 0;
-            }
-
-            // Calculate amount: (quantity * unit_price) - discount
-            $discount = isset($orderData['discount']) ? (float)$orderData['discount'] : 0.0;
-            $orderData['amount'] = ($orderData['quantity'] * $orderData['unit_price']) - $discount;
-            // Ensure amount doesn't go negative
-            if ($orderData['amount'] < 0) {
                 $orderData['amount'] = 0;
+            } else {
+                $discount = isset($orderData['discount']) ? (float)$orderData['discount'] : 0.0;
+                $orderData['amount'] = ($orderData['quantity'] * $orderData['unit_price']) - $discount;
+                // Ensure amount doesn't go negative
+                if ($orderData['amount'] < 0) {
+                    $orderData['amount'] = 0;
+                }
             }
             
             // Trade return items in CN orders should not be marked as is_trade_return

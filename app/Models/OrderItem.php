@@ -146,8 +146,9 @@ class OrderItem extends BaseModel
     public function calculate()
     {
         if ($this->is_free_good) {
-            return 0.00;
+            $this->amount = 0.00;
+        } else {
+            $this->amount = $this->quantity * $this->unit_price;
         }
-        $this->amount = $this->quantity * $this->unit_price;
     }
 }
