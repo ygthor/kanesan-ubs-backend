@@ -174,8 +174,11 @@ class OrderItemController extends Controller
             $orderData['sku_code'] = $icitem->ITEMNO; // Use ITEMNO as SKU
             $orderData['description'] = $icitem->DESP ?? 'Unknown Product'; // Use DESP from icitem table
 
-            // Calculate amount
-            if (isset($orderData['is_free_good']) && $orderData['is_free_good']) {
+            // Calculate amount and handle unit price for free goods
+            $isFreeGood = $orderData['is_free_good'] ?? false;
+            if ($isFreeGood) {
+                // If it's a free good, use the product's price and ignore user input
+                $orderData['unit_price'] = $icitem->PRICE ?? $icitem->UCOST ?? 0;
                 $orderData['amount'] = 0;
             } else {
                 $discount = isset($orderData['discount']) ? (float)$orderData['discount'] : 0.0;

@@ -290,6 +290,13 @@ class OrderController extends Controller
                 return makeResponse(422, 'Agent number is required for stock management.', null);
             }
 
+            // ==============================================================================
+            // DEPRECATED: Items processing is now handled via createInvoiceWithItems endpoint
+            // The following code is commented out to prevent confusion, as the Product model
+            // no longer maps to an existing 'products' table, and the mobile app no longer
+            // sends items through this endpoint.
+            // ==============================================================================
+            /*
             $items = $request->input('items') ?? [];
 
             // Separate regular items from trade return items
@@ -463,6 +470,8 @@ class OrderController extends Controller
                 // Record stock movements for the CN order
                 $stockService->recordOrderMovements($cnOrder);
             }
+            */
+
 
             DB::commit();
 
@@ -642,7 +651,8 @@ class OrderController extends Controller
                 }
 
                 $isFreeGood = $itemData['is_free_good'] ?? false;
-                $unitPrice = $itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0;
+                // If it's a free good, use the product's price and ignore user input
+                $unitPrice = $isFreeGood ? ($icitem->PRICE ?? 0) : ($itemData['unit_price'] ?? $icitem->PRICE ?? 0);
                 $quantity = $itemData['quantity'];
                 $discount = $itemData['discount'] ?? 0;
                 $unique_key = "$referenceNo|$itemCount";
@@ -705,7 +715,8 @@ class OrderController extends Controller
                     }
 
                     $isFreeGood = $itemData['is_free_good'] ?? false;
-                    $unitPrice = $itemData['unit_price'] ?? $icitem->PRICE ?? $icitem->UCOST ?? 0;
+                    // If it's a free good, use the product's price and ignore user input
+                    $unitPrice = $isFreeGood ? ($icitem->PRICE ?? 0) : ($itemData['unit_price'] ?? $icitem->PRICE ?? 0);
                     $quantity = $itemData['quantity'];
                     $discount = $itemData['discount'] ?? 0;
                     $unique_key = "$cnReferenceNo|$cnItemCount";
