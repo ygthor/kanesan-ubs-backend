@@ -472,11 +472,11 @@ class ReportController extends Controller
             });
         }
         $returns->SelectRaw('
-            SUM(IF(trade_return_is_good = 1, amount, 0)) as return_good,
-            SUM(IF(trade_return_is_good = 0, amount, 0)) as return_bad,
-            SUM(IF(trade_return_is_good = 1, 1, 0)) as return_good_count,
-            SUM(IF(trade_return_is_good = 0, 1, 0)) as return_bad_count,
-            SUM(amount) as total_amount
+            SUM(IF(trade_return_is_good = 1 AND COALESCE(is_free_good, 0) = 0, amount, 0)) as return_good,
+            SUM(IF(trade_return_is_good = 0 AND COALESCE(is_free_good, 0) = 0, amount, 0)) as return_bad,
+            SUM(IF(trade_return_is_good = 1 AND COALESCE(is_free_good, 0) = 0, 1, 0)) as return_good_count,
+            SUM(IF(trade_return_is_good = 0 AND COALESCE(is_free_good, 0) = 0, 1, 0)) as return_bad_count,
+            SUM(IF(COALESCE(is_free_good, 0) = 0, amount, 0)) as total_amount
         ');
         $returns = $returns->first();
 
@@ -845,8 +845,8 @@ class ReportController extends Controller
                 COALESCE(NULLIF(i.DESP, ''), NULLIF(oi.product_name, ''), oi.product_no) as product_description,
                 SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) as inv_qty,
                 SUM(IF(o.type = 'CN', COALESCE(oi.quantity, 0), 0)) as cn_qty,
-                SUM(IF(o.type = 'INV', COALESCE(oi.amount, 0), 0)) as inv_amount,
-                SUM(IF(o.type = 'CN', COALESCE(oi.amount, 0), 0)) as cn_amount,
+                SUM(IF(o.type = 'INV' AND COALESCE(oi.is_free_good, 0) = 0, COALESCE(oi.amount, 0), 0)) as inv_amount,
+                SUM(IF(o.type = 'CN' AND COALESCE(oi.is_free_good, 0) = 0, COALESCE(oi.amount, 0), 0)) as cn_amount,
                 SUM(COALESCE(oi.discount, 0)) as discount_total
             ")
             ->groupBy('oi.product_no')
@@ -881,16 +881,16 @@ class ReportController extends Controller
                 $rows->orderByRaw("(SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) - SUM(IF(o.type = 'CN', COALESCE(oi.quantity, 0), 0))) {$sortDir}");
                 break;
             case 'inv_amount':
-                $rows->orderByRaw("SUM(IF(o.type = 'INV', COALESCE(oi.amount, 0), 0)) {$sortDir}");
+                $rows->orderByRaw("SUM(IF(o.type = 'INV' AND COALESCE(oi.is_free_good, 0) = 0, COALESCE(oi.amount, 0), 0)) {$sortDir}");
                 break;
             case 'cn_amount':
-                $rows->orderByRaw("SUM(IF(o.type = 'CN', COALESCE(oi.amount, 0), 0)) {$sortDir}");
+                $rows->orderByRaw("SUM(IF(o.type = 'CN' AND COALESCE(oi.is_free_good, 0) = 0, COALESCE(oi.amount, 0), 0)) {$sortDir}");
                 break;
             case 'discount_total':
                 $rows->orderByRaw("SUM(COALESCE(oi.discount, 0)) {$sortDir}");
                 break;
             case 'net_amount':
-                $rows->orderByRaw("(SUM(IF(o.type = 'INV', COALESCE(oi.amount, 0), 0)) - SUM(IF(o.type = 'CN', COALESCE(oi.amount, 0), 0))) {$sortDir}");
+                $rows->orderByRaw("(SUM(IF(o.type = 'INV' AND COALESCE(oi.is_free_good, 0) = 0, COALESCE(oi.amount, 0), 0)) - SUM(IF(o.type = 'CN' AND COALESCE(oi.is_free_good, 0) = 0, COALESCE(oi.amount, 0), 0))) {$sortDir}");
                 break;
             case 'product_no':
             default:

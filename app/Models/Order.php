@@ -117,7 +117,8 @@ class Order extends BaseModel
         // Trade returns are now in separate CN orders, so INV orders only have regular items
         // CN orders contain all trade return items
         foreach ($this->items as $item) {
-            $lineAmount = $item->amount;
+            // Explicitly skip free goods — their amount should always be 0
+            $lineAmount = $item->is_free_good ? 0.00 : ($item->amount ?? 0);
             $regularTotal += $lineAmount; // All items in this order are regular items
             $itemDiscounts += ($item->discount ?? 0);
         }

@@ -141,10 +141,9 @@ class OrderController extends Controller
 
                 $adjustedNetAmount = 0.0;
                 foreach ($order->items as $item) {
-                    // Check if item is a free good
-                    if (!$item->isFreeGood) {
-                        // $adjustedNetAmount += ($item->quantity * $item->unit_price);
-                        $adjustedNetAmount += ($item->amount);
+                    // Use is_free_good (snake_case) — the correct Eloquent model property
+                    if (!$item->is_free_good) {
+                        $adjustedNetAmount += ($item->amount ?? 0.0);
                     }
                 }
 
