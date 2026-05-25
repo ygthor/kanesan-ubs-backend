@@ -1593,13 +1593,13 @@ class ReportController extends Controller
             ->selectRaw("
                 oi.product_no as item_code,
                 COALESCE(NULLIF(TRIM(o.agent_no), ''), 'N/A') as agent_no,
-                o.type as order_type,
-                SUM(COALESCE(oi.quantity, 0)) as qty,
-                SUM(COALESCE(oi.discount, 0)) as discount
+                SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) as inv_qty,
+                SUM(IF(o.type = 'CN' AND COALESCE(oi.trade_return_is_good, 1) = 1, COALESCE(oi.quantity, 0), 0)) as rg_qty,
+                SUM(IF(o.type = 'CN' AND COALESCE(oi.trade_return_is_good, 1) = 0, COALESCE(oi.quantity, 0), 0)) as rb_qty,
+                SUM(IF(o.type = 'INV', COALESCE(oi.discount, 0), 0)) as inv_discount
             ")
             ->groupBy('oi.product_no')
             ->groupBy('o.agent_no')
-            ->groupBy('o.type')
             ->get();
 
         $agentColumns = $rows->pluck('agent_no')->unique()->sort()->values()->all();
@@ -1611,7 +1611,7 @@ class ReportController extends Controller
         foreach ($agentColumns as $agent) {
             $agentTotals[$agent] = 0;
             $agentDiscountTotals[$agent] = 0;
-            $agentTotalsBreakdown[$agent] = ['inv' => 0.0, 'cn' => 0.0];
+            $agentTotalsBreakdown[$agent] = ['inv' => 0.0, 'rg' => 0.0, 'rb' => 0.0];
         }
 
         foreach ($baseItems as $baseItem) {
@@ -1621,7 +1621,7 @@ class ReportController extends Controller
                 'item_code' => $baseItem->item_code,
                 'item_description' => $baseItem->item_description,
                 'agents' => array_fill_keys($agentColumns, 0),
-                'agent_breakdown' => array_fill_keys($agentColumns, ['inv' => 0.0, 'cn' => 0.0]),
+                'agent_breakdown' => array_fill_keys($agentColumns, ['inv' => 0.0, 'rg' => 0.0, 'rb' => 0.0]),
                 'total' => 0,
                 'agent_discounts' => array_fill_keys($agentColumns, 0),
                 'discount_total' => 0,
@@ -1636,8 +1636,10 @@ class ReportController extends Controller
             }
             $itemKey = $itemKeyByCode[$code];
             $agent = $row->agent_no;
-            $qty = (float) $row->qty;
-            $discount = (float) ($row->discount ?? 0);
+            $invQty = (float) ($row->inv_qty ?? 0);
+            $rgQty = (float) ($row->rg_qty ?? 0);
+            $rbQty = (float) ($row->rb_qty ?? 0);
+            $discount = (float) ($row->inv_discount ?? 0);
             if (!array_key_exists($agent, $items[$itemKey]['agents'])) {
                 $items[$itemKey]['agents'][$agent] = 0;
                 $items[$itemKey]['agent_discounts'][$agent] = 0;
@@ -1648,37 +1650,55 @@ class ReportController extends Controller
                     $agentDiscountTotals[$agent] = 0;
                 }
                 if (!isset($agentTotalsBreakdown[$agent])) {
-                    $agentTotalsBreakdown[$agent] = ['inv' => 0.0, 'cn' => 0.0];
+                    $agentTotalsBreakdown[$agent] = ['inv' => 0.0, 'rg' => 0.0, 'rb' => 0.0];
                 }
             }
-            $type = strtoupper((string) ($row->order_type ?? 'INV'));
-            if ($type === 'CN') {
-                $items[$itemKey]['agent_breakdown'][$agent]['cn'] += $qty;
-                $items[$itemKey]['agents'][$agent] -= $qty;
-                $items[$itemKey]['total'] -= $qty;
-                $items[$itemKey]['agent_discounts'][$agent] -= $discount;
-                $items[$itemKey]['discount_total'] -= $discount;
-                $agentTotalsBreakdown[$agent]['cn'] += $qty;
-                $agentTotals[$agent] -= $qty;
-                $agentDiscountTotals[$agent] -= $discount;
-            } else {
-                $items[$itemKey]['agent_breakdown'][$agent]['inv'] += $qty;
-                $items[$itemKey]['agents'][$agent] += $qty;
-                $items[$itemKey]['total'] += $qty;
-                $items[$itemKey]['agent_discounts'][$agent] += $discount;
-                $items[$itemKey]['discount_total'] += $discount;
-                $agentTotalsBreakdown[$agent]['inv'] += $qty;
-                $agentTotals[$agent] += $qty;
-                $agentDiscountTotals[$agent] += $discount;
-            }
+            $items[$itemKey]['agent_breakdown'][$agent]['inv'] += $invQty;
+            $items[$itemKey]['agent_breakdown'][$agent]['rg'] += $rgQty;
+            $items[$itemKey]['agent_breakdown'][$agent]['rb'] += $rbQty;
+            // Keep sold quantity based on INV only; RB is displayed separately in the UI.
+            $items[$itemKey]['agents'][$agent] += $invQty;
+            $items[$itemKey]['total'] += $invQty;
+            $items[$itemKey]['agent_discounts'][$agent] += $discount;
+            $items[$itemKey]['discount_total'] += $discount;
+            $agentTotalsBreakdown[$agent]['inv'] += $invQty;
+            $agentTotalsBreakdown[$agent]['rg'] += $rgQty;
+            $agentTotalsBreakdown[$agent]['rb'] += $rbQty;
+            $agentTotals[$agent] += $invQty;
+            $agentDiscountTotals[$agent] += $discount;
         }
 
         $grandTotal = array_sum($agentTotals);
         $grandDiscountTotal = array_sum($agentDiscountTotals);
         $grandTotalsBreakdown = [
             'inv' => array_sum(array_map(fn($v) => (float) ($v['inv'] ?? 0), $agentTotalsBreakdown)),
-            'cn' => array_sum(array_map(fn($v) => (float) ($v['cn'] ?? 0), $agentTotalsBreakdown)),
+            'rg' => array_sum(array_map(fn($v) => (float) ($v['rg'] ?? 0), $agentTotalsBreakdown)),
+            'rb' => array_sum(array_map(fn($v) => (float) ($v['rb'] ?? 0), $agentTotalsBreakdown)),
         ];
+
+        // Hide synthetic N/A column when displayed quantities are zero (INV and RB).
+        $naAgentKey = null;
+        foreach ($agentColumns as $agentCol) {
+            if (strtoupper(trim((string) $agentCol)) === 'N/A') {
+                $naAgentKey = $agentCol;
+                break;
+            }
+        }
+        if ($naAgentKey !== null) {
+            $naBreakdown = $agentTotalsBreakdown[$naAgentKey] ?? ['inv' => 0.0, 'rg' => 0.0, 'rb' => 0.0];
+            $eps = 0.00001;
+            $naDisplayZero = (abs((float) ($naBreakdown['inv'] ?? 0)) < $eps)
+                && (abs((float) ($naBreakdown['rb'] ?? 0)) < $eps);
+            if ($naDisplayZero) {
+                $agentColumns = array_values(array_filter($agentColumns, fn($a) => $a !== $naAgentKey));
+                unset($agentTotals[$naAgentKey], $agentDiscountTotals[$naAgentKey], $agentTotalsBreakdown[$naAgentKey]);
+                foreach ($items as &$item) {
+                    unset($item['agents'][$naAgentKey], $item['agent_discounts'][$naAgentKey], $item['agent_breakdown'][$naAgentKey]);
+                }
+                unset($item);
+            }
+        }
+
         $groupedItems = collect($items)->groupBy('item_group');
 
         return [
@@ -1711,6 +1731,8 @@ class ReportController extends Controller
         $groupedItems = $report['groupedItems'];
         $agentColumns = $report['agentColumns'];
         $agentTotals = $report['agentTotals'];
+        $agentTotalsBreakdown = $report['agentTotalsBreakdown'] ?? [];
+        $grandTotalsBreakdown = $report['grandTotalsBreakdown'] ?? [];
         $fromDate = $report['fromDate'];
         $toDate = $report['toDate'];
         $grandTotal = $report['grandTotal'];
@@ -1722,6 +1744,13 @@ class ReportController extends Controller
             }
             return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
         };
+        $displayQty = function ($inv, $rb) use ($formatQty) {
+            $invText = $formatQty($inv);
+            if ((float) $rb <= 0) {
+                return $invText;
+            }
+            return $invText . ' (-' . $formatQty($rb) . ')';
+        };
         $agentHeaderColors = [
             [0, 255, 51],   // green
             [255, 0, 255],  // magenta
@@ -1731,8 +1760,8 @@ class ReportController extends Controller
         ];
 
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colCode = 25.0;
-        $colDesc = 78.0;
+        $colCode = 17.0;
+        $colDesc = 68.0;
         $remaining = max(40, $pageWidth - $colCode - $colDesc);
         $agentCount = max(1, count($agentColumns));
         $colOther = $remaining / ($agentCount + 1); // +1 total column
@@ -1747,9 +1776,12 @@ class ReportController extends Controller
             $toDate,
             $agentColumns,
             $agentTotals,
+            $agentTotalsBreakdown,
             $grandTotal,
+            $grandTotalsBreakdown,
             $report,
             $formatQty,
+            $displayQty,
             $agentHeaderColors,
             $colCode,
             $colDesc,
@@ -1767,12 +1799,12 @@ class ReportController extends Controller
             $pdf->Ln(1);
 
             // Totals row with period badge at right
-            $pdf->SetFont('helvetica', '', 9);
+            $pdf->SetFont('helvetica', '', 7);
             $pdf->SetFillColor(255, 255, 255);
             $pdf->Cell($colCode, 6, '', 0, 0, 'C', true);
             $pdf->Cell($colDesc, 6, '', 0, 0, 'C', true);
             foreach ($agentColumns as $agent) {
-                $pdf->Cell($colOther, 6, $formatQty($agentTotals[$agent] ?? 0), 0, 0, 'C', true);
+                $pdf->Cell($colOther, 6, $displayQty($agentTotals[$agent] ?? 0, $agentTotalsBreakdown[$agent]['rb'] ?? 0), 0, 0, 'C', true);
             }
             $pdf->SetFillColor(0, 0, 0);
             $pdf->SetTextColor(255, 255, 255);
@@ -1825,11 +1857,12 @@ class ReportController extends Controller
                 $pdf->Cell($colDesc, 6, (string) $item['item_description'], 1, 0, 'L', true);
 
                 foreach ($agentColumns as $agent) {
-                    $pdf->Cell($colOther, 6, $formatQty($item['agents'][$agent] ?? 0), 1, 0, 'C', true);
+                    $pdf->SetFont('helvetica', '', 8);
+                    $pdf->Cell($colOther, 6, $displayQty($item['agents'][$agent] ?? 0, $item['agent_breakdown'][$agent]['rb'] ?? 0), 1, 0, 'C', true);
                 }
 
-                $pdf->SetFont('helvetica', 'B', 9);
-                $pdf->Cell($colTotal, 6, $formatQty($item['total'] ?? 0), 1, 1, 'C', true);
+                $pdf->SetFont('helvetica', 'B', 8);
+                $pdf->Cell($colTotal, 6, $displayQty($item['total'] ?? 0, collect($item['agent_breakdown'] ?? [])->sum('rb')), 1, 1, 'C', true);
             }
 
             $ensureSpace(6);
@@ -1840,13 +1873,42 @@ class ReportController extends Controller
 
         // Grand total footer row
         $ensureSpace(7);
-        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetFont('helvetica', 'B', 8);
         $pdf->SetFillColor(245, 245, 245);
-        $pdf->Cell($colCode + $colDesc, 7, 'GRAND TOTAL', 1, 0, 'R', true);
+        $grandRowH = 8;
+        $pdf->Cell($colCode + $colDesc, $grandRowH, 'GRAND TOTAL', 1, 0, 'R', true);
         foreach ($agentColumns as $agent) {
-            $pdf->Cell($colOther, 7, $formatQty($agentTotals[$agent] ?? 0), 1, 0, 'C', true);
+            $invVal = $agentTotals[$agent] ?? 0;
+            $rbVal = (float) ($agentTotalsBreakdown[$agent]['rb'] ?? 0);
+            $x = $pdf->GetX();
+            $y = $pdf->GetY();
+            $pdf->Cell($colOther, $grandRowH, '', 1, 0, 'C', true);
+
+            $lineH = $grandRowH / 2;
+            $pdf->SetXY($x, $y);
+            $pdf->SetFont('helvetica', 'B', 8);
+            $pdf->Cell($colOther, $lineH, $formatQty($invVal), 0, 0, 'C', false);
+            if ($rbVal > 0) {
+                $pdf->SetXY($x, $y + $lineH);
+                $pdf->SetFont('helvetica', '', 7);
+                $pdf->Cell($colOther, $lineH, '(-' . $formatQty($rbVal) . ')', 0, 0, 'C', false);
+            }
+            $pdf->SetXY($x + $colOther, $y);
         }
-        $pdf->Cell($colTotal, 7, $formatQty($grandTotal), 1, 1, 'C', true);
+        $x = $pdf->GetX();
+        $y = $pdf->GetY();
+        $grandRb = (float) ($grandTotalsBreakdown['rb'] ?? 0);
+        $pdf->Cell($colTotal, $grandRowH, '', 1, 1, 'C', true);
+        $lineH = $grandRowH / 2;
+        $pdf->SetXY($x, $y);
+        $pdf->SetFont('helvetica', 'B', 8);
+        $pdf->Cell($colTotal, $lineH, $formatQty($grandTotal), 0, 0, 'C', false);
+        if ($grandRb > 0) {
+            $pdf->SetXY($x, $y + $lineH);
+            $pdf->SetFont('helvetica', '', 7);
+            $pdf->Cell($colTotal, $lineH, '(-' . $formatQty($grandRb) . ')', 0, 0, 'C', false);
+        }
+        $pdf->SetXY($x + $colTotal, $y);
     }
 
     private function resolveDateRangeByPreset(?string $preset, ?string $fromDate, ?string $toDate): array
