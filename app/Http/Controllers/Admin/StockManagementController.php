@@ -174,6 +174,77 @@ class StockManagementController extends Controller
     }
 
     /**
+     * Check and validate stock data for problems (e.g. negative stock balances).
+     */
+    public function check(Request $request)
+    {
+        $user = auth()->user();
+
+        // Check if user is admin or KBS
+        if (!$user || (!$user->hasRole('admin') && $user->username !== 'KBS' && $user->email !== 'KBS@kanesan.my')) {
+            abort(403, 'Unauthorized access. Stock Management is only available for administrators and KBS users.');
+        }
+
+        // Get all agents (users) - exclude KBS and admin users
+        $agents = User::select('id', 'name', 'username', 'email')
+            ->where(function ($query) {
+                $query->where('username', '!=', 'KBS')
+                    ->where('email', '!=', 'KBS@kanesan.my');
+            })
+            ->orderBy('name', 'asc')
+            ->get()
+            ->filter(function ($user) {
+                return !$user->hasRole('admin');
+            })
+            ->values();
+
+        $negativeStocks = [];
+        $itemNos = [];
+        $stockService = new \App\Services\StockService();
+
+        foreach ($agents as $agent) {
+            $agentName = $agent->name ?? $agent->username;
+            $summary = $stockService->getAgentStockSummary($agentName);
+
+            foreach ($summary as $stockItem) {
+                $realStock = $stockItem['stockIn'] + $stockItem['returnGood'] - $stockItem['stockOut'];
+                if ($realStock < 0) {
+                    $itemNo = $stockItem['ITEMNO'];
+                    $itemNos[] = $itemNo;
+                    $negativeStocks[] = [
+                        'agent_id' => $agent->id,
+                        'agent_name' => $agentName,
+                        'agent_username' => $agent->username,
+                        'ITEMNO' => $itemNo,
+                        'stock_in' => $stockItem['stockIn'],
+                        'return_good' => $stockItem['returnGood'],
+                        'stock_out' => $stockItem['stockOut'],
+                        'real_stock' => $realStock
+                    ];
+                }
+            }
+        }
+
+        // Fetch item details (descriptions & groups) for items with negative stock
+        $items = collect([]);
+        if (!empty($itemNos)) {
+            $items = Icitem::whereIn('ITEMNO', array_unique($itemNos))
+                ->get()
+                ->keyBy('ITEMNO');
+        }
+
+        // Attach description and group to each negative stock entry
+        foreach ($negativeStocks as &$entry) {
+            $item = $items->get($entry['ITEMNO']);
+            $entry['DESP'] = $item ? ($item->DESP ?? 'N/A') : 'N/A';
+            $entry['GROUP'] = $item ? ($item->GROUP ?? 'N/A') : 'N/A';
+        }
+        unset($entry); // Break reference
+
+        return view('inventory.check', compact('negativeStocks'));
+    }
+
+    /**
      * Show the form for creating a new stock transaction.
      */
     public function create(Request $request)

@@ -37,6 +37,7 @@ Route::middleware(['auth'])->group(function () {
 // Stock Management routes (requires authentication and admin/KBS access - checked in controller)
 Route::middleware(['auth'])->prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'index'])->name('stock-management');
+    Route::get('/stock-management/check', [\App\Http\Controllers\Admin\StockManagementController::class, 'check'])->name('stock-management.check');
     Route::get('/stock-management/create', [\App\Http\Controllers\Admin\StockManagementController::class, 'create'])->name('stock-management.create');
     Route::post('/stock-management', [\App\Http\Controllers\Admin\StockManagementController::class, 'store'])->name('stock-management.store');
     Route::get('/stock-management/item/{itemno}/transactions', [\App\Http\Controllers\Admin\StockManagementController::class, 'showItemTransactions'])->name('stock-management.item.transactions');

@@ -108,6 +108,12 @@
 
 @section('card-title', 'Stock Management')
 
+@section('card-tools')
+    <a href="{{ route('inventory.stock-management.check') }}" class="btn btn-sm btn-outline-danger">
+        <i class="fas fa-exclamation-triangle"></i> Check Data
+    </a>
+@endsection
+
 @section('admin-content')
     <!-- Agent Selection Section -->
     <div class="card mb-3">
