@@ -70,8 +70,8 @@ class ReportController extends Controller
                 'icon' => 'fas fa-receipt',
             ],
             [
-                'name' => 'Customer Balance Report',
-                'description' => 'Display customer balances (Receipts - INV + CN) with P&L detail view',
+                'name' => 'Customer Statement',
+                'description' => 'Display customer statements (Receipts - INV + CN) with P&L detail and print option',
                 'route' => route('admin.reports.customer-balance'),
                 'icon' => 'fas fa-balance-scale',
             ],
@@ -842,7 +842,7 @@ class ReportController extends Controller
         $rows = $query
             ->selectRaw("
                 oi.product_no as product_no,
-                COALESCE(NULLIF(i.DESP, ''), NULLIF(oi.product_name, ''), oi.product_no) as product_description,
+                COALESCE(NULLIF(i.DESP COLLATE utf8mb4_unicode_ci, ''), NULLIF(oi.product_name, ''), oi.product_no) as product_description,
                 SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) as inv_qty,
                 SUM(IF(o.type = 'CN', COALESCE(oi.quantity, 0), 0)) as cn_qty,
                 SUM(IF(o.type = 'INV' AND COALESCE(oi.is_free_good, 0) = 0, COALESCE(oi.amount, 0), 0)) as inv_amount,
@@ -850,7 +850,7 @@ class ReportController extends Controller
                 SUM(COALESCE(oi.discount, 0)) as discount_total
             ")
             ->groupBy('oi.product_no')
-            ->groupByRaw("COALESCE(NULLIF(i.DESP, ''), NULLIF(oi.product_name, ''), oi.product_no)");
+            ->groupByRaw("COALESCE(NULLIF(i.DESP COLLATE utf8mb4_unicode_ci, ''), NULLIF(oi.product_name, ''), oi.product_no)");
 
         $allowedSort = [
             'product_no',
@@ -869,7 +869,7 @@ class ReportController extends Controller
 
         switch ($sortBy) {
             case 'product_description':
-                $rows->orderByRaw("COALESCE(NULLIF(i.DESP, ''), NULLIF(oi.product_name, ''), oi.product_no) {$sortDir}");
+                $rows->orderByRaw("COALESCE(NULLIF(i.DESP COLLATE utf8mb4_unicode_ci, ''), NULLIF(oi.product_name, ''), oi.product_no) {$sortDir}");
                 break;
             case 'inv_qty':
                 $rows->orderByRaw("SUM(IF(o.type = 'INV', COALESCE(oi.quantity, 0), 0)) {$sortDir}");
@@ -1251,7 +1251,7 @@ class ReportController extends Controller
         // Get agents for filter dropdown
         $agents = $this->getAgents();
 
-        return view('admin.reports.customer-balance-report', compact('customerBalances', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents'));
+        return view('admin.reports.customer-statement', compact('customerBalances', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'agents'));
     }
 
     /**
@@ -1357,6 +1357,142 @@ class ReportController extends Controller
             'total_credit' => $totalCredit,
             'total_debit' => $totalDebit,
             'balance' => $balance,
+        ]);
+    }
+
+    /**
+     * Export customer balance details (P&L data) to PDF
+     */
+    public function exportCustomerBalanceDetailPdf(Request $request, $customerId)
+    {
+        $this->checkAccess();
+
+        $fromDate = $request->input('from_date');
+        $toDate = $request->input('to_date');
+
+        // Set default dates if not provided
+        if (!$fromDate) {
+            $fromDate = date('Y-01-01');
+        }
+        if (!$toDate) {
+            $toDate = date('Y-m-d');
+        }
+
+        // Ensure dates include full time range for queries
+        $fromDateForQuery = $fromDate;
+        $toDateForQuery = $toDate;
+        if (strlen($fromDateForQuery) == 10) {
+            $fromDateForQuery .= ' 00:00:00';
+        }
+        if (strlen($toDateForQuery) == 10) {
+            $toDateForQuery .= ' 23:59:59';
+        }
+
+        $customer = Customer::findOrFail($customerId);
+
+        // Get all receipts
+        $receipts = Receipt::where('customer_id', $customerId)
+            ->whereNull('deleted_at')
+            ->whereBetween('receipt_date', [$fromDateForQuery, $toDateForQuery])
+            ->orderBy('receipt_date', 'asc')
+            ->get();
+
+        // Get all INV orders
+        $invOrders = Order::where('customer_id', $customerId)
+            ->where('type', 'INV')
+            ->whereBetween('order_date', [$fromDateForQuery, $toDateForQuery])
+            ->orderBy('order_date', 'asc')
+            ->get();
+
+        // Get all CN orders
+        $cnOrders = Order::where('customer_id', $customerId)
+            ->where('type', 'CN')
+            ->whereBetween('order_date', [$fromDateForQuery, $toDateForQuery])
+            ->orderBy('order_date', 'asc')
+            ->get();
+
+        // Build P&L data
+        $plData = [];
+
+        // Add receipts (Credit)
+        foreach ($receipts as $receipt) {
+            $plData[] = [
+                'description' => 'RECEIPT ' . $receipt->receipt_no,
+                'date' => $receipt->receipt_date,
+                'credit' => $receipt->paid_amount,
+                'debit' => 0,
+                'type' => 'receipt',
+            ];
+        }
+
+        // Add INV orders (Debit)
+        foreach ($invOrders as $order) {
+            $plData[] = [
+                'description' => 'INV' . $order->reference_no,
+                'date' => $order->order_date,
+                'credit' => 0,
+                'debit' => $order->net_amount,
+                'type' => 'inv',
+            ];
+        }
+
+        // Add CN orders (Credit - reduces debt)
+        foreach ($cnOrders as $order) {
+            $plData[] = [
+                'description' => 'CN' . $order->reference_no,
+                'date' => $order->order_date,
+                'credit' => $order->net_amount,
+                'debit' => 0,
+                'type' => 'cn',
+            ];
+        }
+
+        // Sort by date
+        usort($plData, function ($a, $b) {
+            return strtotime($a['date']) - strtotime($b['date']);
+        });
+
+        // Calculate totals
+        $totalCredit = collect($plData)->sum('credit');
+        $totalDebit = collect($plData)->sum('debit');
+        $balance = $totalCredit - $totalDebit;
+
+        // Generate filename
+        $filename = 'customer_statement_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $customer->customer_code) . '_' . now()->format('Ymd_His') . '.pdf';
+        $printedAt = now()->format('Y-m-d H:i:s');
+
+        // Render PDF HTML view
+        $html = view('pdf.customer-statement', compact(
+            'customer',
+            'plData',
+            'fromDate',
+            'toDate',
+            'totalCredit',
+            'totalDebit',
+            'balance'
+        ))->render();
+
+        // Create PDF instance
+        $pdf = new \App\Services\PDF\ReportPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+        $pdf->printedAt = $printedAt;
+        
+        $pdf->SetCreator('KBS System');
+        $pdf->SetAuthor(auth()->user()->name ?? 'System');
+        $pdf->SetTitle('Customer Statement - ' . $customer->name);
+        
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(true);
+
+        $pdf->SetMargins(10, 10, 10);
+        $pdf->SetAutoPageBreak(true, 10);
+
+        $pdf->AddPage();
+        $pdf->writeHTML($html, true, false, true, false, '');
+
+        // Output to inline PDF
+        return response($pdf->Output($filename, 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
         ]);
     }
 

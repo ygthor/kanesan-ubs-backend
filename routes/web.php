@@ -129,6 +129,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/receipts', [\App\Http\Controllers\Admin\ReportController::class, 'receiptReport'])->name('receipts');
         Route::get('/customer-balance', [\App\Http\Controllers\Admin\ReportController::class, 'customerBalanceReport'])->name('customer-balance');
         Route::get('/customer-balance/{customerId}/detail', [\App\Http\Controllers\Admin\ReportController::class, 'getCustomerBalanceDetail'])->name('customer-balance.detail');
+        Route::get('/customer-balance/{customerId}/print', [\App\Http\Controllers\Admin\ReportController::class, 'exportCustomerBalanceDetailPdf'])->name('customer-balance.print');
     });
 });
 

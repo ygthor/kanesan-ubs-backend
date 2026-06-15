@@ -1,16 +1,16 @@
 @extends('layouts.admin')
 
-@section('title', 'Customer Balance Report - Kanesan UBS Backend')
+@section('title', 'Customer Statement - Kanesan UBS Backend')
 
-@section('page-title', 'Customer Balance Report')
+@section('page-title', 'Customer Statement')
 
 @section('breadcrumbs')
     <li class="breadcrumb-item"><a href="/dashboard">Home</a></li>
     <li class="breadcrumb-item"><a href="/admin/reports">Reports</a></li>
-    <li class="breadcrumb-item active">Customer Balance Report</li>
+    <li class="breadcrumb-item active">Customer Statement</li>
 @endsection
 
-@section('card-title', 'Customer Balance Report (Receipts - INV + CN)')
+@section('card-title', 'Customer Statement (Receipts - INV + CN)')
 
 @section('admin-content')
     <!-- Filters -->
@@ -88,13 +88,18 @@
                             RM {{ number_format($balance['balance'], 2) }}
                         </td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-info view-detail" 
+                            <button type="button" class="btn btn-sm btn-info view-detail me-2 mb-1" 
                                     data-customer-id="{{ $balance['customer']->id }}"
                                     data-customer-name="{{ $balance['customer']->name }}"
                                     data-from-date="{{ $fromDate ?? date('Y-01-01') }}"
                                     data-to-date="{{ $toDate ?? date('Y-m-d') }}">
                                 <i class="fas fa-eye"></i> View Details
                             </button>
+                            <a href="{{ route('admin.reports.customer-balance.print', ['customerId' => $balance['customer']->id, 'from_date' => $fromDate ?? date('Y-01-01'), 'to_date' => $toDate ?? date('Y-m-d')]) }}" 
+                               class="btn btn-sm btn-success mb-1" 
+                               target="_blank">
+                                <i class="fas fa-print"></i> Print
+                            </a>
                         </td>
                     </tr>
                 @empty
@@ -123,7 +128,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="plDetailModalLabel">P&L Detail - <span id="modalCustomerName"></span></h5>
+                    <h5 class="modal-title" id="plDetailModalLabel">Customer Statement - <span id="modalCustomerName"></span></h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close" style="border: none; background: none; font-size: 1.5rem; opacity: 0.5; cursor: pointer;">
                         <span aria-hidden="true">&times;</span>
                     </button>

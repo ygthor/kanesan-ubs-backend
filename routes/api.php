@@ -16,8 +16,9 @@ use App\Http\Controllers\Api\DebtController;
 use App\Http\Controllers\Api\IcitemController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\OrderItemController;
-use App\Http\Controllers\Api\InvoiceController;
-use App\Http\Controllers\Api\InvoiceItemController;
+// Unused legacy controller imports removed to prevent class-loading exceptions:
+// use App\Http\Controllers\Api\InvoiceController;
+// use App\Http\Controllers\Api\InvoiceItemController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\TimeTestController;
@@ -100,8 +101,8 @@ Route::get('/script_to_run/update_order_item_unit', function () {
  * }
  * }
  */
-Route::get('/customer/invoices/print2', [InvoiceController::class, 'printInvoiceReport']);
-Route::get('invoices/{refNo}/print2', [InvoiceController::class, 'printInvoice']);
+// Route::get('/customer/invoices/print2', [InvoiceController::class, 'printInvoiceReport']);
+// Route::get('invoices/{refNo}/print2', [InvoiceController::class, 'printInvoice']);
 
 
 
