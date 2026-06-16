@@ -79,7 +79,12 @@
                 @forelse($customerBalances ?? [] as $balance)
                     <tr>
                         <td>{{ $balance['customer']->customer_code }}</td>
-                        <td>{{ $balance['customer']->name }}</td>
+                        <td>
+                            {{ $balance['customer']->company_name ?: $balance['customer']->name }}
+                            @if($balance['customer']->company_name && $balance['customer']->name && $balance['customer']->company_name !== $balance['customer']->name)
+                                <br><small class="text-muted">{{ $balance['customer']->name }}</small>
+                            @endif
+                        </td>
                         <td>{{ $balance['customer']->agent_no ?? 'N/A' }}</td>
                         <td class="text-right">RM {{ number_format($balance['total_receipts'], 2) }}</td>
                         <td class="text-right">RM {{ number_format($balance['total_inv'], 2) }}</td>
@@ -139,6 +144,28 @@
                         <p class="mt-3">Loading details...</p>
                     </div>
                     <div id="plDetailContent" style="display: none;">
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tbody>
+                                    <tr>
+                                        <td class="font-weight-bold" style="width: 18%;">Customer Code:</td>
+                                        <td style="width: 32%;" id="modalCustomerCode"></td>
+                                        <td class="font-weight-bold" style="width: 18%;">Statement Date:</td>
+                                        <td style="width: 32%;" id="modalStatementDate"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-weight-bold">Customer Name:</td>
+                                        <td id="modalHeaderCustomerName"></td>
+                                        <td class="font-weight-bold">Period:</td>
+                                        <td id="modalPeriod"></td>
+                                    </tr>
+                                    <tr id="modalCompanyNameRow" style="display: none;">
+                                        <td class="font-weight-bold">Company Name:</td>
+                                        <td colspan="3" id="modalCompanyName"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-bordered table-sm">
                                 <thead class="thead-dark">
@@ -191,6 +218,8 @@ $(document).ready(function() {
         $('#plDetailContent').hide();
         $('#plDetailError').hide();
         $('#plDetailTableBody').empty();
+        $('#modalCustomerCode, #modalStatementDate, #modalHeaderCustomerName, #modalPeriod, #modalCompanyName').text('');
+        $('#modalCompanyNameRow').hide();
     });
     
     // Fallback close button handler (in case Bootstrap JS doesn't work)
@@ -213,6 +242,8 @@ $(document).ready(function() {
         $('#plDetailContent').hide();
         $('#plDetailError').hide();
         $('#plDetailTableBody').empty();
+        $('#modalCustomerCode, #modalStatementDate, #modalHeaderCustomerName, #modalPeriod, #modalCompanyName').text('');
+        $('#modalCompanyNameRow').hide();
         
         // Fetch detail data
         $.ajax({
@@ -224,6 +255,39 @@ $(document).ready(function() {
             },
             success: function(response) {
                 $('#loadingSpinner').hide();
+
+                const customer = response.customer || {};
+                const formatDate = function(dateValue) {
+                    if (!dateValue) {
+                        return '';
+                    }
+
+                    const dateText = String(dateValue).slice(0, 10);
+                    const dateParts = dateText.split('-');
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+                        return dateParts[2] + '/' + dateParts[1] + '/' + dateParts[0];
+                    }
+
+                    const date = new Date(dateValue);
+                    if (Number.isNaN(date.getTime())) {
+                        return dateValue;
+                    }
+
+                    return date.toLocaleDateString('en-GB');
+                };
+
+                $('#modalCustomerCode').text(customer.customer_code || '');
+                $('#modalStatementDate').text(@json(date('d/m/Y')));
+                $('#modalHeaderCustomerName').text(customer.name || customerName || '');
+                $('#modalPeriod').text(formatDate(fromDate) + ' - ' + formatDate(toDate));
+
+                if (customer.company_name) {
+                    $('#modalCompanyName').text(customer.company_name);
+                    $('#modalCompanyNameRow').show();
+                } else {
+                    $('#modalCompanyName').text('');
+                    $('#modalCompanyNameRow').hide();
+                }
                 
                 if (response.pl_data && response.pl_data.length > 0) {
                     let tableBody = '';
