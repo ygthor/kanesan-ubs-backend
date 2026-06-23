@@ -61,27 +61,27 @@ class CustomerController extends Controller
         }
 
         // Handle sorting
-        $sortBy = $request->input('sort_by', 'created_at'); // Default to created_at
-        $sortOrder = $request->input('sort_order', 'desc'); // Default to desc
+        $sortBy = $request->input('sort_by', 'company_name'); // Default to company_name
+        $sortOrder = $request->input('sort_order', 'asc'); // Default to asc
 
         // Validate sort_by field
         $allowedSortFields = ['created_at', 'company_name', 'customer_code'];
         if (!in_array($sortBy, $allowedSortFields)) {
-            $sortBy = 'created_at';
+            $sortBy = 'company_name';
         }
 
         // Validate sort_order
         $sortOrder = strtolower($sortOrder);
         if (!in_array($sortOrder, ['asc', 'desc'])) {
-            $sortOrder = 'desc';
+            $sortOrder = ($sortBy === 'company_name') ? 'asc' : 'desc';
         }
 
         // Apply sorting
         $query->orderBy($sortBy, $sortOrder);
 
-        // Add secondary sort by company_name if not already the primary sort
-        if ($sortBy !== 'company_name') {
-            $query->orderBy('company_name', 'asc');
+        // Add secondary sort by created_at desc if not already the primary sort
+        if ($sortBy !== 'created_at') {
+            $query->orderBy('created_at', 'desc');
         }
 
         $customers = $query->with('users')->get();
