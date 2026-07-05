@@ -1719,7 +1719,9 @@ class ReportController extends Controller
                             ->where('o.created_at', '>', '2025-12-14 23:59:59');
                     });
             })
-            ->whereBetween('o.order_date', [$fromDateForQuery, $toDateForQuery]);
+            ->whereBetween('o.order_date', [$fromDateForQuery, $toDateForQuery])
+            ->whereNotNull('o.agent_no')
+            ->whereRaw("TRIM(o.agent_no) != ''");
 
         if (!empty($filters['agent_no'])) {
             $aggQuery->where('o.agent_no', $filters['agent_no']);
