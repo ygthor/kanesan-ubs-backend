@@ -77,7 +77,7 @@ class DebtController extends Controller
             ->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
             ->where('orders.type', 'INV')
             ->where(function ($q) {
-                $q->whereRaw('(COALESCE(oi_sum.sales_amount, 0) - COALESCE(cn_sum.credit_amount, 0) - COALESCE(pay_sum.total_payments, 0)) > 0.01')
+                $q->whereRaw('(COALESCE(orders.net_amount, 0) - COALESCE(cn_sum.credit_amount, 0) - COALESCE(pay_sum.total_payments, 0)) > 0.01')
                   ->orWhere('orders.net_amount', 0);
             });
 
@@ -125,13 +125,13 @@ class DebtController extends Controller
 
                 // All amounts come from SQL aggregations — no extra queries needed
                 $totalPayments     = (float) ($invoice->total_payments ?? 0);
-                $salesAmount       = (float) ($invoice->sales_amount ?? 0);
+                $salesAmount       = (float) ($invoice->net_amount ?? 0); // Use net_amount to include discounts!
                 $creditAmount      = (float) ($invoice->credit_amount ?? 0);
                 $tradeReturnAmount = 0.0;
 
                 $totalReturnAmt = $tradeReturnAmount + $creditAmount;
 
-                // Outstanding balance = sales amount - return amount - credit amount - payments
+                // Outstanding balance = sales amount (net_amount) - return amount - credit amount - payments
                 $outstandingBalance = $salesAmount - $tradeReturnAmount - $creditAmount - $totalPayments;
 
                 // need to exclude credit note only invoice, cn is with zero salesamount

@@ -1,0 +1,8 @@
+-- Date: 2026-07-07
+-- Description: Fixed outstanding debt calculation logic in DebtController.php
+-- Details:
+--   1. Changed the outstanding balance calculations to use orders.net_amount instead of the raw item-level sum (oi_sum.sales_amount).
+--   2. This ensures that both header-level and item-level discounts are correctly factored in when computing outstanding balances for customer debts.
+--   3. Invoices that were paid in full based on their net amount (e.g., S401105) will no longer incorrectly show remaining balances or appear in the outstanding debts list.
+-- Files modified:
+--   - app/Http/Controllers/Api/DebtController.php
