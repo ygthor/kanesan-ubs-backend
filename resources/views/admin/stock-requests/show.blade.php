@@ -101,7 +101,7 @@
                             <th>Description</th>
                             <th>Unit</th>
                             <th style="width:130px">Requested Qty</th>
-                            <th style="width:150px">Approved Qty <small class="text-muted">(editable)</small></th>
+                            <th style="width:150px" class="text-right">Approved Qty <small class="text-muted">(editable)</small></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -129,12 +129,13 @@
                                     <td>{{ $item->description ?? '-' }}</td>
                                     <td>{{ $item->unit ?? '-' }}</td>
                                     <td class="text-right">{{ $formatQty($item->requested_qty) }}</td>
-                                    <td>
+                                    <td class="text-right">
                                         <input type="number"
                                                name="items[{{ $itemIndex }}][approved_qty]"
-                                               class="form-control form-control-sm"
-                                               value="{{ $item->requested_qty }}"
+                                               class="form-control form-control-sm text-right"
+                                               value="{{ number_format($approvedQty, 1, '.', '') }}"
                                                min="0"
+                                               step="0.1"
                                                required>
                                     </td>
                                 </tr>
