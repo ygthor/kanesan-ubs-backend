@@ -1050,4 +1050,210 @@ class OrderController extends Controller
             'invoice_count' => $formattedInvoices->count(),
         ]);
     }
+
+    // ==========================================================================
+    // CN2 — Manual Credit Notes (app-only, NOT synced to UBS)
+    // ==========================================================================
+
+    /**
+     * List CN2 credit notes.
+     * Agents see only their own CN2 orders; KBS/admin see all.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getCreditNotes(Request $request)
+    {
+        $user = auth()->user();
+
+        $query = Order::with('customer')
+            ->where('type', 'CN2')
+            ->orderBy('created_at', 'desc');
+
+        // Non-admin agents can only see their own credit notes
+        if ($user && !hasFullAccess()) {
+            $query->where('agent_no', $user->name);
+        }
+
+        // Optional customer code filter
+        if ($request->has('customer_code')) {
+            $query->where('customer_code', $request->input('customer_code'));
+        }
+
+        $creditNotes = $query->get()->map(function ($order) {
+            return [
+                'id'                 => $order->id,
+                'reference_no'       => $order->reference_no,
+                'credit_invoice_no'  => $order->credit_invoice_no,
+                'customer_id'        => $order->customer_id,
+                'customer_code'      => $order->customer_code,
+                'customer_name'      => $order->customer_name,
+                'amount'             => (float) ($order->net_amount ?? 0),
+                'remarks'            => $order->remarks ?? '',
+                'order_date'         => $order->order_date
+                    ? $order->order_date->toIso8601String()
+                    : null,
+                'agent_no'           => $order->agent_no,
+                'status'             => $order->status,
+            ];
+        });
+
+        return makeResponse(200, 'CN2 credit notes retrieved successfully.', $creditNotes);
+    }
+
+    /**
+     * Create a CN2 (manual) credit note linked to an existing unpaid invoice.
+     * CN2 orders are app-only and must NOT be synced to UBS.
+     *
+     * @bodyParam customer_code string required  Customer code (e.g. AHS3185)
+     * @bodyParam credit_invoice_no string required  Reference number of the linked INV order
+     * @bodyParam amount        float  required  Amount to deduct from the invoice
+     * @bodyParam remarks       string nullable  Optional remarks
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function createCreditNote(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_code'     => 'required|string|exists:customers,customer_code',
+            'credit_invoice_no' => 'required|string',
+            'amount'            => 'required|numeric|min:0.01',
+            'remarks'           => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
+        }
+
+        // Look up customer by code
+        $customer = Customer::where('customer_code', $request->input('customer_code'))->first();
+
+        if (!$customer) {
+            return makeResponse(404, 'Customer not found with code: ' . $request->input('customer_code'));
+        }
+
+        // Verify the linked invoice exists and belongs to the same customer
+        $linkedInvoice = Order::where('reference_no', $request->input('credit_invoice_no'))
+            ->where('type', 'INV')
+            ->where('customer_code', $customer->customer_code)
+            ->first();
+
+        if (!$linkedInvoice) {
+            return makeResponse(404, 'Linked invoice not found or does not belong to this customer.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $user = auth()->user();
+
+            $agentNo = null;
+            if ($user) {
+                $isKBS = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
+                $agentNo = ($isKBS && $request->has('agent_no'))
+                    ? $request->input('agent_no')
+                    : ($user->name ?? $user->username ?? null);
+            }
+
+            $amount = (float) $request->input('amount');
+
+            $order = Order::create([
+                'type'              => 'CN2',
+                'customer_id'       => $customer->id,
+                'customer_code'     => $customer->customer_code,
+                'customer_name'     => $customer->company_name ?? $customer->name ?? 'N/A',
+                'credit_invoice_no' => $request->input('credit_invoice_no'),
+                'order_date'        => now(),
+                'status'            => 'pending',
+                'agent_no'          => $agentNo,
+                // Store the deduction amount directly on the order (no items needed)
+                'gross_amount'      => $amount,
+                'net_amount'        => $amount,
+                'grand_amount'      => $amount,
+                'tax1'              => 0,
+                'tax1_percentage'   => 0,
+                'discount'          => 0,
+                'remarks'           => $request->input('remarks', ''),
+                'created_by'        => $user?->id,
+                'updated_by'        => $user?->id,
+                'branch_id'         => 0,
+            ]);
+
+            // Generate CN2 reference number (CN200001 format)
+            $order->reference_no = $order->getReferenceNo();
+            $order->save();
+
+            DB::commit();
+
+            return makeResponse(201, 'CN2 credit note created successfully.', [
+                'id'                => $order->id,
+                'reference_no'      => $order->reference_no,
+                'credit_invoice_no' => $order->credit_invoice_no,
+                'customer_code'     => $order->customer_code,
+                'customer_name'     => $order->customer_name,
+                'amount'            => $amount,
+                'remarks'           => $order->remarks,
+                'order_date'        => $order->order_date->toIso8601String(),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('createCreditNote error: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to create credit note: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update a CN2 (manual) credit note.
+     * Only amount and remarks can be updated.
+     *
+     * @param int $id The order ID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateCreditNote(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'amount'  => 'required|numeric|min:0.01',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return makeResponse(422, 'Validation errors.', ['errors' => $validator->errors()]);
+        }
+
+        $order = Order::where('id', $id)->where('type', 'CN2')->first();
+
+        if (!$order) {
+            return makeResponse(404, 'Credit note not found.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $user = auth()->user();
+            $amount = (float) $request->input('amount');
+
+            $order->update([
+                'gross_amount' => $amount,
+                'net_amount'   => $amount,
+                'grand_amount' => $amount,
+                'remarks'      => $request->input('remarks', ''),
+                'updated_by'   => $user?->id,
+            ]);
+
+            DB::commit();
+
+            return makeResponse(200, 'CN2 credit note updated successfully.', [
+                'id'                => $order->id,
+                'reference_no'      => $order->reference_no,
+                'credit_invoice_no' => $order->credit_invoice_no,
+                'customer_code'     => $order->customer_code,
+                'customer_name'     => $order->customer_name,
+                'amount'            => $amount,
+                'remarks'           => $order->remarks,
+                'order_date'        => $order->order_date ? ($order->order_date instanceof \Carbon\Carbon ? $order->order_date->toIso8601String() : $order->order_date) : null,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('updateCreditNote error: ' . $e->getMessage());
+            return makeResponse(500, 'Failed to update credit note: ' . $e->getMessage());
+        }
+    }
 }
+

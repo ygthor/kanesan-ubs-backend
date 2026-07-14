@@ -211,7 +211,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/stock-requests/{id}', [StockRequestController::class, 'show'])->name('stock-requests.show');
 
     Route::get('/debts', [DebtController::class, 'index'])->name('debts.index')->middleware('filter.customer');
+
+    // CN2 Credit Notes (manual credit notes, app-only — NOT synced to UBS)
+    Route::get('/credit-notes', [OrderController::class, 'getCreditNotes'])->name('credit-notes.index');
+    Route::post('/credit-notes', [OrderController::class, 'createCreditNote'])->name('credit-notes.store');
+    Route::put('/credit-notes/{id}', [OrderController::class, 'updateCreditNote'])->name('credit-notes.update');
+
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+
     
     // Inventory Management Routes
     Route::prefix('inventory')->group(function () {

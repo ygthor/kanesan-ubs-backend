@@ -70,6 +70,12 @@ class ReportController extends Controller
                 'icon' => 'fas fa-receipt',
             ],
             [
+                'name' => 'CN2 Credit Notes Report',
+                'description' => 'Display all CN2 (manual) credit notes created in the app with filtering options',
+                'route' => route('admin.reports.credit-notes'),
+                'icon' => 'fas fa-file-invoice',
+            ],
+            [
                 'name' => 'Customer Statement',
                 'description' => 'Display customer statements (Receipts - INV + CN) with P&L detail and print option',
                 'route' => route('admin.reports.customer-balance'),
@@ -1160,6 +1166,62 @@ class ReportController extends Controller
         $agents = $this->getAgents();
 
         return view('admin.reports.receipt-report', compact('receipts', 'fromDate', 'toDate', 'customerId', 'agentNo', 'customerSearch', 'paymentType', 'customerType', 'agents'));
+    }
+
+    /**
+     * CN2 Credit Note Report - Display all manual credit notes
+     */
+    public function creditNoteReport(Request $request)
+    {
+        $this->checkAccess();
+
+        $fromDateTime = $request->input('from_date');
+        $toDateTime = $request->input('to_date');
+        $fromDate = $fromDateTime;
+        $toDate = $toDateTime;
+        $agentNo = $request->input('agent_no');
+        $customerSearch = $request->input('customer_search');
+        $status = $request->input('status');
+
+        $query = Order::where('type', 'CN2');
+
+        // Apply date filter only if provided
+        if ($fromDateTime && $toDateTime) {
+            $fromDateForQuery = $fromDateTime;
+            $toDateForQuery = $toDateTime;
+            if (strlen($fromDateForQuery) == 10) {
+                $fromDateForQuery .= ' 00:00:00';
+            }
+            if (strlen($toDateForQuery) == 10) {
+                $toDateForQuery .= ' 23:59:59';
+            }
+            $query->whereBetween('order_date', [$fromDateForQuery, $toDateForQuery]);
+        }
+
+        // Filter by agent_no
+        if ($agentNo) {
+            $query->where('agent_no', $agentNo);
+        }
+
+        // Filter by status
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        // Filter by customer search
+        if ($customerSearch) {
+            $query->where(function ($q) use ($customerSearch) {
+                $q->where('customer_code', 'like', "%{$customerSearch}%")
+                    ->orWhere('customer_name', 'like', "%{$customerSearch}%");
+            });
+        }
+
+        $creditNotes = $query->with('customer')->orderBy('order_date', 'desc')->get();
+
+        // Get agents for filter dropdown
+        $agents = $this->getAgents();
+
+        return view('admin.reports.credit-note-report', compact('creditNotes', 'fromDate', 'toDate', 'agentNo', 'customerSearch', 'status', 'agents'));
     }
 
     /**

@@ -236,7 +236,7 @@ class CustomerController extends Controller
             // Use custom response function for success
             return makeResponse(201, 'Customer created successfully.', $customer);
         } catch (\Exception $e) {
-            // Log::error('Error creating customer: ' . $e->getMessage()); // Consider logging
+            Log::error('Error creating customer: ' . $e->getMessage()); // Consider logging
             // Use custom response function for server errors
             return makeResponse(500, 'Failed to create customer.', ['error' => $e->getMessage()]);
         }

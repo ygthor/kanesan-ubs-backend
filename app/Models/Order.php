@@ -143,6 +143,22 @@ class Order extends BaseModel
     {
         $type = $this->type;
         $agentNo = $this->agent_no;
+
+        // CN2 (manual credit note) uses a global sequential format: CN200001, CN200002, …
+        // No agent prefix — all agents share the same sequence
+        if ($type === 'CN2') {
+            $prefix = 'CN2';
+            $query = Order::where('type', 'CN2');
+            $count = $query->count();
+            $running_number = $count + 1;
+            while (true) {
+                $refNo = $prefix . str_pad($running_number, 5, '0', STR_PAD_LEFT);
+                $chk = Order::where('reference_no', '=', $refNo)->first();
+                if ($chk === null) break;
+                $running_number++;
+            }
+            return $refNo;
+        }
         
         // Build prefix based on agent code
         // Examples: S01 → S1, S02 → S2, S03 → S3
@@ -192,3 +208,4 @@ class Order extends BaseModel
         return $refNo;
     }
 }
+

@@ -43,9 +43,10 @@ class DebtController extends Controller
             ->groupBy('ro.order_refno');
 
         $creditAgg = DB::table('orders as cn')
-            ->where('cn.type', 'CN')
+            ->whereIn('cn.type', ['CN', 'CN2'])  // Include CN (trade returns) and CN2 (manual credit notes)
             ->selectRaw('cn.credit_invoice_no, SUM(cn.net_amount) as credit_amount')
             ->groupBy('cn.credit_invoice_no');
+
 
         $invoicesQuery = Order::query()
             ->select([
