@@ -310,12 +310,23 @@ class OrderController extends Controller
                 }
             }
 
-            // Helper function to get product by product_id or product_no
+            // Helper function to get product by product_no or ITEMNO from Icitem
             $getProduct = function($itemData) {
-                if (isset($itemData['product_id'])) {
-                    return Product::find($itemData['product_id']);
-                } elseif (isset($itemData['product_no'])) {
-                    return Product::where('product_no', $itemData['product_no'])->first();
+                $pNo = $itemData['product_no'] ?? $itemData['product_id'] ?? null;
+                if ($pNo) {
+                    $item = \App\Models\Icitem::find($pNo);
+                    if (!$item) {
+                        $item = \App\Models\Icitem::whereRaw('LOWER(ITEMNO) = LOWER(?)', [$pNo])->first();
+                    }
+                    if ($item) {
+                        return (object) [
+                            'id'           => null,
+                            'product_no'   => $item->ITEMNO,
+                            'product_name' => $item->NAME ?? $item->ITEMNO,
+                            'price'        => (float) ($item->PRICE ?? 0),
+                            'unit'         => $item->UNIT,
+                        ];
+                    }
                 }
                 return null;
             };
@@ -804,42 +815,67 @@ class OrderController extends Controller
 
         $linkedCreditNotes = [];
         if ($order->type === 'INV') {
-            Log::info("Fetching linked credit notes for invoice: {$order->reference_no}");
+            Log::info("Fetching linked credit notes (CN & CN2) for invoice: {$order->reference_no}");
             $linkedCNOrders = Order::where('credit_invoice_no', $order->reference_no)
-                ->where('type', 'CN')
+                ->whereIn('type', ['CN', 'CN2'])
                 ->with('items.item', 'customer')
                 ->get();
 
-            // Pre-compute linked_credit_note_count per product_no in ONE query.
-            // This replaces the N+1 accessor (getLinkedCreditNoteCountAttribute) which
-            // was firing 1+M queries per item, causing 30s timeouts on large orders.
+            // Pre-compute linked_credit_note_count, credited_quantity, credited_amount per product_no
             if ($linkedCNOrders->isNotEmpty()) {
                 $cnReferenceNos = $linkedCNOrders->pluck('reference_no');
-                $cnItemCounts = OrderItem::whereIn('reference_no', $cnReferenceNos)
-                    ->selectRaw('product_no, COUNT(*) as cnt')
+                $cnItemAgg = OrderItem::whereIn('reference_no', $cnReferenceNos)
+                    ->selectRaw('product_no, COUNT(*) as cnt, SUM(quantity) as credited_qty, SUM(amount) as credited_amt')
                     ->groupBy('product_no')
-                    ->pluck('cnt', 'product_no');
+                    ->get()
+                    ->keyBy('product_no');
             } else {
-                $cnItemCounts = collect();
+                $cnItemAgg = collect();
             }
 
-            // Set pre-computed value on each INV item (bypasses the accessor)
+            // Set pre-computed values on each INV item (bypasses the accessor)
             foreach ($order->items as $item) {
-                $item->setAttribute('linked_credit_note_count', $cnItemCounts[$item->product_no] ?? 0);
+                $agg = $cnItemAgg->get($item->product_no);
+                $cnt = (int) ($agg ? $agg->cnt : 0);
+                $creditedQty = (float) ($agg ? $agg->credited_qty : 0);
+                $creditedAmt = (float) ($agg ? $agg->credited_amt : 0);
+
+                $origQty = (float) ($item->quantity ?? 0);
+                $origAmt = (float) ($item->amount ?? ($origQty * ($item->unit_price ?? 0)));
+
+                $remainingQty = max(0, $origQty - $creditedQty);
+                $remainingAmt = max(0, $origAmt - $creditedAmt);
+
+                $item->setAttribute('linked_credit_note_count', $cnt);
+                $item->setAttribute('credited_quantity', $creditedQty);
+                $item->setAttribute('credited_amount', $creditedAmt);
+                $item->setAttribute('remaining_quantity', $remainingQty);
+                $item->setAttribute('remaining_amount', $remainingAmt);
             }
 
-            // Pre-set count=0 on CN items to prevent lazy-loading their order relationship
+            // Pre-set count=0 and default remaining attributes on CN/CN2 items
             foreach ($linkedCNOrders as $cnOrder) {
                 foreach ($cnOrder->items as $item) {
                     $item->setAttribute('linked_credit_note_count', 0);
+                    $item->setAttribute('credited_quantity', 0.0);
+                    $item->setAttribute('credited_amount', 0.0);
+                    $item->setAttribute('remaining_quantity', (float) ($item->quantity ?? 0));
+                    $item->setAttribute('remaining_amount', (float) ($item->amount ?? 0));
                 }
             }
 
             $linkedCreditNotes = $linkedCNOrders->toArray();
         } else {
-            // Non-INV orders: set count=0 for all items (avoids any lazy loading)
+            // Non-INV orders: set default remaining attributes
             foreach ($order->items as $item) {
+                $origQty = (float) ($item->quantity ?? 0);
+                $origAmt = (float) ($item->amount ?? ($origQty * ($item->unit_price ?? 0)));
+
                 $item->setAttribute('linked_credit_note_count', 0);
+                $item->setAttribute('credited_quantity', 0.0);
+                $item->setAttribute('credited_amount', 0.0);
+                $item->setAttribute('remaining_quantity', $origQty);
+                $item->setAttribute('remaining_amount', $origAmt);
             }
         }
 
@@ -1065,7 +1101,7 @@ class OrderController extends Controller
     {
         $user = auth()->user();
 
-        $query = Order::with('customer')
+        $query = Order::with(['customer', 'items.item'])
             ->where('type', 'CN2')
             ->orderBy('created_at', 'desc');
 
@@ -1094,6 +1130,7 @@ class OrderController extends Controller
                     : null,
                 'agent_no'           => $order->agent_no,
                 'status'             => $order->status,
+                'items'              => $order->items,
             ];
         });
 
@@ -1106,18 +1143,23 @@ class OrderController extends Controller
      *
      * @bodyParam customer_code string required  Customer code (e.g. AHS3185)
      * @bodyParam credit_invoice_no string required  Reference number of the linked INV order
-     * @bodyParam amount        float  required  Amount to deduct from the invoice
+     * @bodyParam amount        float  optional  Amount to deduct from the invoice (calculated from items if omitted)
      * @bodyParam remarks       string nullable  Optional remarks
+     * @bodyParam items         array  optional  Line items for the credit note
      *
      * @return \Illuminate\Http\JsonResponse
      */
     public function createCreditNote(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'customer_code'     => 'required|string|exists:customers,customer_code',
-            'credit_invoice_no' => 'required|string',
-            'amount'            => 'required|numeric|min:0.01',
-            'remarks'           => 'nullable|string|max:500',
+            'customer_code'      => 'required|string|exists:customers,customer_code',
+            'credit_invoice_no'  => 'required|string',
+            'amount'             => 'nullable|numeric|min:0.01',
+            'remarks'            => 'nullable|string|max:500',
+            'items'              => 'nullable|array',
+            'items.*.product_no' => 'required_with:items|string',
+            'items.*.quantity'   => 'required_with:items|numeric|min:0.01',
+            'items.*.unit_price' => 'required_with:items|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -1141,19 +1183,84 @@ class OrderController extends Controller
             return makeResponse(404, 'Linked invoice not found or does not belong to this customer.');
         }
 
+        $itemsInput = $request->input('items', []);
+
+        // Double deduction validation for items
+        if (!empty($itemsInput)) {
+            $invItems = OrderItem::where('reference_no', $linkedInvoice->reference_no)->get()->keyBy('product_no');
+
+            $existingCnRefNos = Order::where('credit_invoice_no', $linkedInvoice->reference_no)
+                ->whereIn('type', ['CN', 'CN2'])
+                ->pluck('reference_no');
+
+            $creditedPerProduct = OrderItem::whereIn('reference_no', $existingCnRefNos)
+                ->selectRaw('product_no, SUM(quantity) as credited_qty, SUM(amount) as credited_amt')
+                ->groupBy('product_no')
+                ->get()
+                ->keyBy('product_no');
+
+            // Aggregate requested quantity and amount by product_no
+            $aggregatedRequests = [];
+            foreach ($itemsInput as $it) {
+                $pNo = $it['product_no'] ?? '';
+                if (empty($pNo)) continue;
+                $qty = (float) ($it['quantity'] ?? 0);
+                $price = (float) ($it['unit_price'] ?? 0);
+                $amt = isset($it['amount']) ? (float) $it['amount'] : ($qty * $price);
+                
+                if (!isset($aggregatedRequests[$pNo])) {
+                    $aggregatedRequests[$pNo] = [
+                        'quantity' => 0.0,
+                        'amount' => 0.0,
+                    ];
+                }
+                $aggregatedRequests[$pNo]['quantity'] += $qty;
+                $aggregatedRequests[$pNo]['amount'] += $amt;
+            }
+
+            foreach ($aggregatedRequests as $pNo => $req) {
+                $reqQty = $req['quantity'];
+                $reqAmt = $req['amount'];
+
+                $invItem = $invItems->get($pNo);
+                if ($invItem) {
+                    $origQty = (float) ($invItem->quantity ?? 0);
+                    $origAmt = (float) ($invItem->amount ?? ($origQty * ($invItem->unit_price ?? 0)));
+                    $creditedInfo = $creditedPerProduct->get($pNo);
+                    $alreadyCreditedQty = (float) ($creditedInfo ? $creditedInfo->credited_qty : 0);
+                    $alreadyCreditedAmt = (float) ($creditedInfo ? $creditedInfo->credited_amt : 0);
+
+                    $remainingQty = max(0, $origQty - $alreadyCreditedQty);
+                    $remainingAmt = max(0, $origAmt - $alreadyCreditedAmt);
+
+                    if ($reqQty > ($remainingQty + 0.01)) {
+                        return makeResponse(422, "Requested credit quantity ({$reqQty}) for item {$pNo} exceeds available remaining quantity ({$remainingQty}).");
+                    }
+                    if ($reqAmt > ($remainingAmt + 0.01)) {
+                        return makeResponse(422, "Requested credit amount (RM " . number_format($reqAmt, 2) . ") for item {$pNo} exceeds available remaining amount (RM " . number_format($remainingAmt, 2) . ").");
+                    }
+                }
+            }
+        }
+
+        // Calculate amount if items provided, or use provided amount
+        $calculatedAmount = 0;
+        if (!empty($itemsInput)) {
+            foreach ($itemsInput as $it) {
+                $q = (float) ($it['quantity'] ?? 0);
+                $p = (float) ($it['unit_price'] ?? 0);
+                $calculatedAmount += isset($it['amount']) ? (float) $it['amount'] : ($q * $p);
+            }
+        }
+
+        $amount = $request->has('amount') && (float) $request->input('amount') > 0
+            ? (float) $request->input('amount')
+            : ($calculatedAmount > 0 ? $calculatedAmount : 0.0);
+
         DB::beginTransaction();
         try {
             $user = auth()->user();
-
-            $agentNo = null;
-            if ($user) {
-                $isKBS = ($user->username === 'KBS' || $user->email === 'KBS@kanesan.my');
-                $agentNo = ($isKBS && $request->has('agent_no'))
-                    ? $request->input('agent_no')
-                    : ($user->name ?? $user->username ?? null);
-            }
-
-            $amount = (float) $request->input('amount');
+            $agentNo = $linkedInvoice->agent_no;
 
             $order = Order::create([
                 'type'              => 'CN2',
@@ -1164,7 +1271,6 @@ class OrderController extends Controller
                 'order_date'        => now(),
                 'status'            => 'pending',
                 'agent_no'          => $agentNo,
-                // Store the deduction amount directly on the order (no items needed)
                 'gross_amount'      => $amount,
                 'net_amount'        => $amount,
                 'grand_amount'      => $amount,
@@ -1181,7 +1287,52 @@ class OrderController extends Controller
             $order->reference_no = $order->getReferenceNo();
             $order->save();
 
+            // Create OrderItem records if items were provided
+            if (!empty($itemsInput)) {
+                $itemCount = 1;
+                foreach ($itemsInput as $itemData) {
+                    $uniqueKey = $order->reference_no . '|' . $itemCount;
+                    $qty = (float) ($itemData['quantity'] ?? 0);
+                    $price = (float) ($itemData['unit_price'] ?? 0);
+                    $lineAmt = isset($itemData['amount']) ? (float) $itemData['amount'] : ($qty * $price);
+                    $productNo = $itemData['product_no'] ?? '';
+                    $productName = $itemData['product_name'] ?? $itemData['description'] ?? 'N/A';
+
+                    $icitemObj = \App\Models\Icitem::find($productNo);
+                    if (!$icitemObj && !empty($productNo)) {
+                        $icitemObj = \App\Models\Icitem::whereRaw('LOWER(ITEMNO) = LOWER(?)', [$productNo])->first();
+                    }
+                    if ($icitemObj && (empty($productName) || $productName === 'N/A')) {
+                        $productName = $icitemObj->NAME ?? $productName;
+                    }
+                    $productId = null;
+
+                    $order->items()->create([
+                        'unique_key'           => $uniqueKey,
+                        'reference_no'         => $order->reference_no,
+                        'order_id'             => $order->id,
+                        'item_count'           => $itemCount,
+                        'product_id'           => $productId,
+                        'product_no'           => $productNo,
+                        'product_name'         => $productName,
+                        'description'          => $productName,
+                        'sku_code'             => $itemData['sku_code'] ?? null,
+                        'unit'                 => $itemData['unit'] ?? ($icitemObj ? $icitemObj->UNIT : null),
+                        'quantity'             => $qty,
+                        'unit_price'           => $price,
+                        'discount'             => 0,
+                        'amount'               => $lineAmt,
+                        'is_free_good'         => false,
+                        'is_trade_return'      => isset($itemData['is_trade_return']) ? (bool) $itemData['is_trade_return'] : true,
+                        'trade_return_is_good' => isset($itemData['trade_return_is_good']) ? (bool) $itemData['trade_return_is_good'] : true,
+                    ]);
+                    $itemCount++;
+                }
+            }
+
             DB::commit();
+
+            $order->load('items.item');
 
             return makeResponse(201, 'CN2 credit note created successfully.', [
                 'id'                => $order->id,
@@ -1192,6 +1343,7 @@ class OrderController extends Controller
                 'amount'            => $amount,
                 'remarks'           => $order->remarks,
                 'order_date'        => $order->order_date->toIso8601String(),
+                'items'             => $order->items,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1202,7 +1354,7 @@ class OrderController extends Controller
 
     /**
      * Update a CN2 (manual) credit note.
-     * Only amount and remarks can be updated.
+     * Amount, remarks, and items can be updated.
      *
      * @param int $id The order ID
      * @return \Illuminate\Http\JsonResponse
@@ -1210,8 +1362,12 @@ class OrderController extends Controller
     public function updateCreditNote(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'amount'  => 'required|numeric|min:0.01',
-            'remarks' => 'nullable|string|max:500',
+            'amount'             => 'nullable|numeric|min:0.01',
+            'remarks'            => 'nullable|string|max:500',
+            'items'              => 'nullable|array',
+            'items.*.product_no' => 'required_with:items|string',
+            'items.*.quantity'   => 'required_with:items|numeric|min:0.01',
+            'items.*.unit_price' => 'required_with:items|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -1224,20 +1380,140 @@ class OrderController extends Controller
             return makeResponse(404, 'Credit note not found.');
         }
 
+        $itemsInput = $request->input('items', []);
+
+        // Double deduction validation for items (excluding this order being updated)
+        if (!empty($itemsInput) && $order->credit_invoice_no) {
+            $invItems = OrderItem::where('reference_no', $order->credit_invoice_no)->get()->keyBy('product_no');
+
+            $existingCnRefNos = Order::where('credit_invoice_no', $order->credit_invoice_no)
+                ->whereIn('type', ['CN', 'CN2'])
+                ->where('id', '!=', $order->id)
+                ->pluck('reference_no');
+
+            $creditedPerProduct = OrderItem::whereIn('reference_no', $existingCnRefNos)
+                ->selectRaw('product_no, SUM(quantity) as credited_qty, SUM(amount) as credited_amt')
+                ->groupBy('product_no')
+                ->get()
+                ->keyBy('product_no');
+
+            // Aggregate requested quantity and amount by product_no
+            $aggregatedRequests = [];
+            foreach ($itemsInput as $it) {
+                $pNo = $it['product_no'] ?? '';
+                if (empty($pNo)) continue;
+                $qty = (float) ($it['quantity'] ?? 0);
+                $price = (float) ($it['unit_price'] ?? 0);
+                $amt = isset($it['amount']) ? (float) $it['amount'] : ($qty * $price);
+                
+                if (!isset($aggregatedRequests[$pNo])) {
+                    $aggregatedRequests[$pNo] = [
+                        'quantity' => 0.0,
+                        'amount' => 0.0,
+                    ];
+                }
+                $aggregatedRequests[$pNo]['quantity'] += $qty;
+                $aggregatedRequests[$pNo]['amount'] += $amt;
+            }
+
+            foreach ($aggregatedRequests as $pNo => $req) {
+                $reqQty = $req['quantity'];
+                $reqAmt = $req['amount'];
+
+                $invItem = $invItems->get($pNo);
+                if ($invItem) {
+                    $origQty = (float) ($invItem->quantity ?? 0);
+                    $origAmt = (float) ($invItem->amount ?? ($origQty * ($invItem->unit_price ?? 0)));
+                    $creditedInfo = $creditedPerProduct->get($pNo);
+                    $alreadyCreditedQty = (float) ($creditedInfo ? $creditedInfo->credited_qty : 0);
+                    $alreadyCreditedAmt = (float) ($creditedInfo ? $creditedInfo->credited_amt : 0);
+
+                    $remainingQty = max(0, $origQty - $alreadyCreditedQty);
+                    $remainingAmt = max(0, $origAmt - $alreadyCreditedAmt);
+
+                    if ($reqQty > ($remainingQty + 0.01)) {
+                        return makeResponse(422, "Requested credit quantity ({$reqQty}) for item {$pNo} exceeds available remaining quantity ({$remainingQty}).");
+                    }
+                    if ($reqAmt > ($remainingAmt + 0.01)) {
+                        return makeResponse(422, "Requested credit amount (RM " . number_format($reqAmt, 2) . ") for item {$pNo} exceeds available remaining amount (RM " . number_format($remainingAmt, 2) . ").");
+                    }
+                }
+            }
+        }
+
+        $calculatedAmount = 0;
+        if (!empty($itemsInput)) {
+            foreach ($itemsInput as $it) {
+                $q = (float) ($it['quantity'] ?? 0);
+                $p = (float) ($it['unit_price'] ?? 0);
+                $calculatedAmount += isset($it['amount']) ? (float) $it['amount'] : ($q * $p);
+            }
+        }
+
+        $amount = $request->has('amount') && (float) $request->input('amount') > 0
+            ? (float) $request->input('amount')
+            : ($calculatedAmount > 0 ? $calculatedAmount : (float) $order->net_amount);
+
         DB::beginTransaction();
         try {
             $user = auth()->user();
-            $amount = (float) $request->input('amount');
 
             $order->update([
                 'gross_amount' => $amount,
                 'net_amount'   => $amount,
                 'grand_amount' => $amount,
-                'remarks'      => $request->input('remarks', ''),
+                'remarks'      => $request->input('remarks', $order->remarks),
                 'updated_by'   => $user?->id,
             ]);
 
+            // Re-create items if provided
+            if ($request->has('items')) {
+                OrderItem::where('reference_no', $order->reference_no)->delete();
+
+                $itemCount = 1;
+                foreach ($itemsInput as $itemData) {
+                    $uniqueKey = $order->reference_no . '|' . $itemCount;
+                    $qty = (float) ($itemData['quantity'] ?? 0);
+                    $price = (float) ($itemData['unit_price'] ?? 0);
+                    $lineAmt = isset($itemData['amount']) ? (float) $itemData['amount'] : ($qty * $price);
+                    $productNo = $itemData['product_no'] ?? '';
+                    $productName = $itemData['product_name'] ?? $itemData['description'] ?? 'N/A';
+
+                    $icitemObj = \App\Models\Icitem::find($productNo);
+                    if (!$icitemObj && !empty($productNo)) {
+                        $icitemObj = \App\Models\Icitem::whereRaw('LOWER(ITEMNO) = LOWER(?)', [$productNo])->first();
+                    }
+                    if ($icitemObj && (empty($productName) || $productName === 'N/A')) {
+                        $productName = $icitemObj->NAME ?? $productName;
+                    }
+                    $productId = null;
+
+                    $order->items()->create([
+                        'unique_key'           => $uniqueKey,
+                        'reference_no'         => $order->reference_no,
+                        'order_id'             => $order->id,
+                        'item_count'           => $itemCount,
+                        'product_id'           => $productId,
+                        'product_no'           => $productNo,
+                        'product_name'         => $productName,
+                        'description'          => $productName,
+                        'sku_code'             => $itemData['sku_code'] ?? null,
+                        'unit'                 => $itemData['unit'] ?? ($icitemObj ? $icitemObj->UNIT : null),
+                        'quantity'             => $qty,
+                        'unit_price'           => $price,
+                        'discount'             => 0,
+                        'amount'               => $lineAmt,
+                        'is_free_good'         => false,
+                        'is_trade_return'      => isset($itemData['is_trade_return']) ? (bool) $itemData['is_trade_return'] : true,
+                        'trade_return_is_good' => isset($itemData['trade_return_is_good']) ? (bool) $itemData['trade_return_is_good'] : true,
+                    ]);
+                    $itemCount++;
+                }
+            }
+
             DB::commit();
+
+            $order->load('items.item');
 
             return makeResponse(200, 'CN2 credit note updated successfully.', [
                 'id'                => $order->id,
@@ -1248,6 +1524,7 @@ class OrderController extends Controller
                 'amount'            => $amount,
                 'remarks'           => $order->remarks,
                 'order_date'        => $order->order_date ? ($order->order_date instanceof \Carbon\Carbon ? $order->order_date->toIso8601String() : $order->order_date) : null,
+                'items'             => $order->items,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
