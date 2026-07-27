@@ -36,6 +36,27 @@ class InvoiceController extends Controller
         $type = $request->input('type'); // Allow multiple types
         $referenceNo = $request->input('reference_no');
         $agentNo = $request->input('agent_no');
+        $sort = $request->input('sort', 'order_date'); // Default sort column
+        $direction = strtolower($request->input('direction', 'desc')); // Default sort direction
+
+        // Validate sort column
+        $allowedSorts = [
+            'reference_no' => 'reference_no',
+            'order_date' => 'order_date',
+            'type' => 'type',
+            'customer_code' => 'customer_code',
+            'customer_name' => 'customer_name',
+            'agent_no' => 'agent_no',
+            'net_amount' => 'net_amount',
+        ];
+        if (!array_key_exists($sort, $allowedSorts)) {
+            $sort = 'order_date';
+        }
+
+        // Validate direction
+        if (!in_array($direction, ['asc', 'desc'])) {
+            $direction = 'desc';
+        }
 
         $query = Order::with('customer');
 
@@ -78,13 +99,12 @@ class InvoiceController extends Controller
             $query->where('agent_no', 'like', '%' . $agentNo . '%');
         }
 
-        // Order by date desc, then id desc
+        // Apply sorting
         $orders = $query
-            // ->orderBy('id', 'desc')
-            // ->orderBy('order_date', 'desc')
-            ->orderBy('reference_no', 'desc')
+            ->orderBy($allowedSorts[$sort], $direction)
+            ->orderBy('id', 'desc')
             ->paginate(200)
-            ->withQueryString();;
+            ->withQueryString();
 
         $orderReferenceNos = $orders->getCollection()
             ->pluck('reference_no')
@@ -110,7 +130,7 @@ class InvoiceController extends Controller
             $type = $type ? [$type] : [];
         }
 
-        return view('admin.invoices.index', compact('orders', 'fromDate', 'toDate', 'customerSearch', 'type', 'referenceNo', 'agentNo'));
+        return view('admin.invoices.index', compact('orders', 'fromDate', 'toDate', 'customerSearch', 'type', 'referenceNo', 'agentNo', 'sort', 'direction'));
     }
 
     /**
@@ -149,7 +169,7 @@ class InvoiceController extends Controller
 
         // Get linked invoice (if this is a credit note)
         $linkedInvoice = null;
-        if ($order->type == 'CN' && $order->credit_invoice_no) {
+        if (in_array($order->type, ['CN', 'CN2']) && $order->credit_invoice_no) {
             $linkedInvoice = Order::where('reference_no', $order->credit_invoice_no)
                 ->with('customer')
                 ->first();

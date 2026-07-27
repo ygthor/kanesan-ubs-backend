@@ -14,7 +14,7 @@
 
 @section('admin-content')
     <!-- E-Invoice Request Status -->
-    @if($order->type == 'INV' || $order->type == 'CN')
+    @if(in_array($order->type, ['INV', 'CN', 'CN2']))
         <div class="alert {{ $eInvoiceRequest ? 'alert-warning' : 'alert-info' }} mb-4 alert-persistent">
             <strong><i class="fas fa-file-invoice"></i> E-Invoice Request Status:</strong>
             @if($eInvoiceRequest)
@@ -51,7 +51,7 @@
                                 <tr>
                                     <td style="font-weight: 600; background-color: #f8f9fa;">Type</td>
                                     <td>
-                                        <span class="badge {{ $order->type == 'INV' ? 'badge-success' : ($order->type == 'CN' ? 'badge-warning' : 'badge-info') }}">
+                                        <span class="badge {{ $order->type == 'INV' ? 'badge-success' : (in_array($order->type, ['CN', 'CN2']) ? 'badge-warning' : 'badge-info') }}">
                                             {{ $order->type }}
                                         </span>
                                     </td>

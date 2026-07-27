@@ -38,6 +38,7 @@
                         <option value="INV" {{ in_array('INV', $type ?? []) ? 'selected' : '' }}>INV</option>
                         <option value="DO" {{ in_array('DO', $type ?? []) ? 'selected' : '' }}>DO</option>
                         <option value="CN" {{ in_array('CN', $type ?? []) ? 'selected' : '' }}>CN</option>
+                        <option value="CN2" {{ in_array('CN2', $type ?? []) ? 'selected' : '' }}>CN2</option>
                         <option value="SO" {{ in_array('SO', $type ?? []) ? 'selected' : '' }}>SO</option>
                     </select>
                 </div>
@@ -80,14 +81,28 @@
         <table class="table table-sm table-striped table-bordered table-hover">
             <thead class="thead-dark">
                 <tr>
-                    <th>Reference No</th>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Customer Code</th>
-                    <th>Customer Name</th>
-                    <th>Agent No</th>
-                    <th>Net Amount</th>
-                    <th>Receipt Amount</th>
+                    @php
+                        $sortable = function($column, $title) use ($sort, $direction) {
+                            $isCurrent = $sort === $column;
+                            $nextDir = ($isCurrent && $direction === 'asc') ? 'desc' : 'asc';
+                            $url = request()->fullUrlWithQuery(['sort' => $column, 'direction' => $nextDir]);
+                            $icon = '';
+                            if ($isCurrent) {
+                                $icon = $direction === 'asc' ? ' <i class="fas fa-sort-up"></i>' : ' <i class="fas fa-sort-down"></i>';
+                            } else {
+                                $icon = ' <i class="fas fa-sort text-muted" style="opacity: 0.5;"></i>';
+                            }
+                            return '<a href="' . e($url) . '" class="text-white text-decoration-none d-block">' . e($title) . $icon . '</a>';
+                        };
+                    @endphp
+                    <th>{!! $sortable('reference_no', 'Reference No') !!}</th>
+                    <th>{!! $sortable('order_date', 'Date') !!}</th>
+                    <th>{!! $sortable('type', 'Type') !!}</th>
+                    <th>{!! $sortable('customer_code', 'Customer Code') !!}</th>
+                    <th>{!! $sortable('customer_name', 'Customer Name') !!}</th>
+                    <th>{!! $sortable('agent_no', 'Agent No') !!}</th>
+                    <th class="text-right">{!! $sortable('net_amount', 'Net Amount') !!}</th>
+                    <th class="text-right">Receipt Amount</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -97,7 +112,7 @@
                         <td>{{ $order->reference_no }}</td>
                         <td>{{ \Carbon\Carbon::parse($order->order_date)->format('d/m/Y') }}</td>
                         <td>
-                            <span class="badge {{ $order->type == 'INV' ? 'badge-success' : ($order->type == 'CN' ? 'badge-warning' : 'badge-info') }}">
+                            <span class="badge {{ $order->type == 'INV' ? 'badge-success' : (in_array($order->type, ['CN', 'CN2']) ? 'badge-warning' : 'badge-info') }}">
                                 {{ $order->type }}
                             </span>
                         </td>
@@ -116,7 +131,7 @@
                             <a href="{{ route('admin.invoices.show', $order->id) }}" class="btn btn-sm btn-link p-0 text-info">
                                 View
                             </a>
-                            @if($order->type == 'INV' || $order->type == 'CN')
+                            @if(in_array($order->type, ['INV', 'CN', 'CN2']))
                                 <span class="mx-1">|</span>
                                 @php
                                     $eInvoiceRequest = \App\Models\EInvoiceRequest::where('invoice_no', $order->reference_no)
