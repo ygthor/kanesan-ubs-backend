@@ -318,7 +318,7 @@ class ReportController extends Controller
         $agentNo = $request->input('agent_no');
         $customerSearch = $request->input('customer_search');
 
-        $query = Order::whereIn('type', ['INV', 'CN']);
+        $query = Order::whereIn('type', ['INV', 'CN', 'CN2']);
 
         // Apply date filter only if provided
         if ($fromDate && $toDate) {
@@ -457,9 +457,9 @@ class ReportController extends Controller
         }
         $crSalesTotal = $crSales->sum('orders.net_amount') ?? 0;
 
-        // Return = CN orders (all CN orders are returns)
+        // Return = CN & CN2 orders (all CN/CN2 orders are returns)
         $returns = OrderItem::leftJoin('orders', 'order_items.reference_no', '=', 'orders.reference_no');
-        $returns->where('type', 'CN');
+        $returns->whereIn('type', ['CN', 'CN2']);
 
         // Apply same filters as main query
         if ($calcFromDate && $calcToDate) {
@@ -567,10 +567,10 @@ class ReportController extends Controller
         }
         $caCollection = $caCollectionQuery->sum('receipts.paid_amount') ?? 0;
 
-        // Negative CASH invoices: linked CN total exceeds invoice net amount
+        // Negative CASH invoices: linked CN/CN2 total exceeds invoice net amount
         $cnTotalsSubQuery = Order::from('orders as cn')
             ->select('cn.credit_invoice_no', DB::raw('SUM(cn.net_amount) as total_cn_amount'))
-            ->where('cn.type', 'CN')
+            ->whereIn('cn.type', ['CN', 'CN2'])
             ->groupBy('cn.credit_invoice_no');
 
         $negativeCashOrderQuery = Order::from('orders as inv')

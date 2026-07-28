@@ -171,7 +171,7 @@ class ReportController extends Controller
         // We deduct the absolute negative amount from CASH collection.
         $cnTotalsSubQuery = DB::table('orders as cn')
             ->select('cn.credit_invoice_no', DB::raw('SUM(cn.net_amount) as total_cn_amount'))
-            ->where('cn.type', 'CN')
+            ->whereIn('cn.type', ['CN', 'CN2'])
             ->groupBy('cn.credit_invoice_no');
 
         $negativeCashOrderQuery = DB::table('orders as inv')

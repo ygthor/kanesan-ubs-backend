@@ -50,7 +50,7 @@ class BusinessReportService
                 $join->on('inv_order_items.reference_no', '=', 'cn_orders.credit_invoice_no');
             })
             ->whereBetween('cn_orders.order_date', [$fromDate, $toDate])
-            ->where('cn_orders.type', 'CN')
+            ->whereIn('cn_orders.type', ['CN', 'CN2'])
             ->groupBy(
                 'cn_orders.reference_no',
                 'cn_orders.credit_invoice_no',
