@@ -50,6 +50,16 @@ class CustomerController extends Controller
             }
         }
 
+        // Handle search query filtering if provided
+        if ($request->has('search') && !empty($request->input('search'))) {
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('customer_code', 'like', "%{$search}%")
+                  ->orWhere('company_name', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
         // Handle territory filtering if provided
         if ($request->has('territory') && $request->input('territory') !== null && $request->input('territory') !== '') {
             $territory = $request->input('territory');
@@ -82,6 +92,10 @@ class CustomerController extends Controller
         // Add secondary sort by created_at desc if not already the primary sort
         if ($sortBy !== 'created_at') {
             $query->orderBy('created_at', 'desc');
+        }
+
+        if ($request->has('limit') && is_numeric($request->input('limit'))) {
+            $query->limit((int) $request->input('limit'));
         }
 
         $customers = $query->with('users')->get();
