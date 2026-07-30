@@ -233,7 +233,7 @@ class ReportController extends Controller
         }
 
         $totalCrCollect = $totalCrCollect;
-        $totalCashCollect = $totalCashCollect - $CaReturnWithoutInv - $totalNegativeCashOrder;
+        $totalCashCollect = $totalCashCollect - $totalCashReturn - $totalNegativeCashOrder;
 
         // Total collection = CA + CR (cheques are already included in CA/CR totals)
         // Cheques are shown separately for reporting but are part of CA/CR based on customer_type
