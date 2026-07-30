@@ -636,7 +636,7 @@ class ReportController extends Controller
         ]);
 
         $caReturns = $returnsInfo['Cash_withoutInv'] + $returnsInfo['Cash_withInv'];
-        $crReturns = $returnsInfo['Credit_withoutInv'] + $returnsInfo['Credit_withInv'];
+        $crReturns = 0; // CUSTOMER SAID CR NO NEED RETURN FOR COLLECTION DEDUCTION
 
         // Calculate nett collections (matching API logic)
         $caCollectionNett = $caCollection - $caReturns - $totalNegativeCashOrder;
