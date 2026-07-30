@@ -123,6 +123,7 @@ class ReportController extends Controller
             'to_date' => $toDateForQuery,
             'agent_no' => $agentNoToFilter,
             'customer_id' => $customerId,
+            'customer_search' => $customerSearch,
         ]);
         // dd($returnsInfo);
 
@@ -319,10 +320,10 @@ class ReportController extends Controller
 
         // Calculate adjusted net amount for each invoice (deduct linked CN totals)
         $adjustedOrders = $orders->map(function ($order) use ($userName) {
-            // Get linked CN orders for this invoice
+            // Get linked CN/CN2 orders for this invoice
             $linkedCNsQuery = DB::table('orders')
                 ->where('credit_invoice_no', $order->reference_no)
-                ->where('type', 'CN');
+                ->whereIn('type', ['CN', 'CN2']);
 
             // Filter linked CN orders by agent_no if user doesn't have full access
             if ($userName) {

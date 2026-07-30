@@ -20,10 +20,11 @@ class BusinessReportService
     */
     public function getTradeReturns($params)
     {
-        $fromDate = $params['from_date'];
-        $toDate = $params['to_date'];
-        $agentNo = $params['agent_no'];
-        $customerId = $params['customer_id'];
+        $fromDate = $params['from_date'] ?? null;
+        $toDate = $params['to_date'] ?? null;
+        $agentNo = $params['agent_no'] ?? null;
+        $customerId = $params['customer_id'] ?? null;
+        $customerSearch = $params['customer_search'] ?? null;
 
         if (empty($fromDate)) {
             $fromDate = date('Y-01-01');
@@ -36,7 +37,7 @@ class BusinessReportService
             return response()->json(['error' => 'from_date and to_date are required'], 422);
         }
 
-        // Returns: Credit Notes (type='CN')
+        // Returns: Credit Notes (type='CN' or 'CN2')
         $returnsQuery = DB::table('orders AS cn_orders')
             ->selectRaw('
                 customers.customer_type,
@@ -65,6 +66,13 @@ class BusinessReportService
         if ($customerId) {
             $returnsQuery->where('cn_orders.customer_id', $customerId);
         }
+        if ($customerSearch) {
+            $returnsQuery->where(function ($q) use ($customerSearch) {
+                $q->where('customers.customer_code', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.name', 'like', "%{$customerSearch}%")
+                    ->orWhere('customers.company_name', 'like', "%{$customerSearch}%");
+            });
+        }
         $returns = $returnsQuery->get();
 
         $CR_withInv = 0;
@@ -73,7 +81,8 @@ class BusinessReportService
         $CA_withoutInv = 0;
 
         foreach ($returns as $return) {
-            if ($return->customer_type == 'CREDITOR') {
+            $custType = strtoupper(trim($return->customer_type ?? ''));
+            if ($custType === 'CREDITOR') {
                 if ($return->inv_count > 0) {
                     $CR_withInv += $return->net_amount;
                 } else {
@@ -87,8 +96,6 @@ class BusinessReportService
                 }
             }
         }
-
-        
 
         return [
             'Credit_withInv' => $CR_withInv,

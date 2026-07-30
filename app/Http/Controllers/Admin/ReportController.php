@@ -632,10 +632,11 @@ class ReportController extends Controller
             'to_date' => $calcToDate,
             'agent_no' => $agentNo,
             'customer_id' => $customerId,
+            'customer_search' => $customerSearch,
         ]);
 
-        $caReturns = $returnsInfo['Cash_withoutInv'];
-        $crReturns = 0; // CUSTOMER SAID CR NO NEED RETURN
+        $caReturns = $returnsInfo['Cash_withoutInv'] + $returnsInfo['Cash_withInv'];
+        $crReturns = $returnsInfo['Credit_withoutInv'] + $returnsInfo['Credit_withInv'];
 
         // Calculate nett collections (matching API logic)
         $caCollectionNett = $caCollection - $caReturns - $totalNegativeCashOrder;
