@@ -636,11 +636,13 @@ class ReportController extends Controller
         ]);
 
         $caReturns = $returnsInfo['Cash_withoutInv'] + $returnsInfo['Cash_withInv'];
+        $caReturnWithoutInv = $returnsInfo['Cash_withoutInv'];
         $crReturns = 0; // CUSTOMER SAID CR NO NEED RETURN FOR COLLECTION DEDUCTION
 
         // Calculate nett collections (matching API logic)
-        // Do NOT subtract $caReturns here. Receipts (paid_amount) already reflect net collected cash.
-        $caCollectionNett = $caCollection - $totalNegativeCashOrder;
+        // Receipts (paid_amount) already reflect net collected cash for linked returns (Cash_withInv).
+        // Only standalone cash returns without invoice (Cash_withoutInv) need to be deducted from CA collection.
+        $caCollectionNett = $caCollection - $caReturnWithoutInv - $totalNegativeCashOrder;
         $crCollectionNett = $crCollection - $crReturns;
         $totalCollectionByCustomerType = $caCollectionNett + $crCollectionNett;
 
@@ -771,6 +773,7 @@ class ReportController extends Controller
             'caCollection',
             'crCollection',
             'caReturns',
+            'caReturnWithoutInv',
             'crReturns',
             'totalNegativeCashOrder',
             'caCollectionNett',

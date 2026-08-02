@@ -233,9 +233,9 @@ class ReportController extends Controller
         }
 
         $totalCrCollect = $totalCrCollect;
-        // Do NOT subtract $totalCashReturn here. Receipts (paid_amount) already reflect net collected cash.
-        // Subtracting $totalCashReturn causes double deduction of cash returns.
-        $totalCashCollect = $totalCashCollect - $totalNegativeCashOrder;
+        // Receipts (paid_amount) already reflect net collected cash for linked returns (Cash_withInv).
+        // Only standalone cash returns without invoice (Cash_withoutInv) need to be deducted from total cash collect.
+        $totalCashCollect = $totalCashCollect - $CaReturnWithoutInv - $totalNegativeCashOrder;
 
         // Total collection = CA + CR (cheques are already included in CA/CR totals)
         // Cheques are shown separately for reporting but are part of CA/CR based on customer_type
