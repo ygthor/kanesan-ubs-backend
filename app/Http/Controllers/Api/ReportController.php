@@ -233,7 +233,9 @@ class ReportController extends Controller
         }
 
         $totalCrCollect = $totalCrCollect;
-        $totalCashCollect = $totalCashCollect - $totalCashReturn - $totalNegativeCashOrder;
+        // Do NOT subtract $totalCashReturn here. Receipts (paid_amount) already reflect net collected cash.
+        // Subtracting $totalCashReturn causes double deduction of cash returns.
+        $totalCashCollect = $totalCashCollect - $totalNegativeCashOrder;
 
         // Total collection = CA + CR (cheques are already included in CA/CR totals)
         // Cheques are shown separately for reporting but are part of CA/CR based on customer_type

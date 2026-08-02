@@ -274,7 +274,8 @@
                             </tr>
                             <tr>
                                 <td class="font-weight-bold py-1 pl-3">Less: CA Returns</td>
-                                <td class="text-right py-1">(RM {{ number_format($caReturns ?? 0, 2) }})</td>
+                                <td class="text-right py-1">-- NO NEED --</td>
+                                {{-- <td class="text-right py-1">(RM {{ number_format($caReturns ?? 0, 2) }})</td> --}}
                             </tr>
                             <tr>
                                 <td class="font-weight-bold py-1 pl-3">Less: Negative Order</td>

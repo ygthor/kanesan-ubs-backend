@@ -639,7 +639,8 @@ class ReportController extends Controller
         $crReturns = 0; // CUSTOMER SAID CR NO NEED RETURN FOR COLLECTION DEDUCTION
 
         // Calculate nett collections (matching API logic)
-        $caCollectionNett = $caCollection - $caReturns - $totalNegativeCashOrder;
+        // Do NOT subtract $caReturns here. Receipts (paid_amount) already reflect net collected cash.
+        $caCollectionNett = $caCollection - $totalNegativeCashOrder;
         $crCollectionNett = $crCollection - $crReturns;
         $totalCollectionByCustomerType = $caCollectionNett + $crCollectionNett;
 
