@@ -1330,6 +1330,12 @@ class OrderController extends Controller
                 }
             }
 
+            // Record stock movements in item_transactions audit log
+            if (!empty($itemsInput)) {
+                $stockService = new StockService();
+                $stockService->recordOrderMovements($order);
+            }
+
             DB::commit();
 
             $order->load('items.item');
@@ -1509,6 +1515,13 @@ class OrderController extends Controller
                     ]);
                     $itemCount++;
                 }
+            }
+
+            // Update stock movements in item_transactions audit log
+            if (!empty($itemsInput)) {
+                $stockService = new StockService();
+                $stockService->reverseOrderMovements($order);
+                $stockService->recordOrderMovements($order);
             }
 
             DB::commit();

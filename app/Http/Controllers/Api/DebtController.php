@@ -97,7 +97,8 @@ class DebtController extends Controller
         }
 
                 $invoicesWithCustomers = $invoicesQuery
-            ->orderBy('order_date', 'asc')
+            ->orderBy('order_date', 'desc')
+            ->orderBy('reference_no', 'desc')
             ->get();
 
         // Filter out invoices without customer data and group by customer

@@ -971,7 +971,7 @@ class StockManagementController extends Controller
             ->join('icitem', function ($join) {
                 $join->on(DB::raw('order_items.product_no COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
             })
-            ->whereIn('orders.type', ['INV', 'DO', 'CN']);
+            ->whereIn('orders.type', ['INV', 'DO', 'CN', 'CN2']);
 
         if ($filters['agent_no']) {
             $ordersQuery->where('orders.agent_no', $filters['agent_no']);
@@ -1024,7 +1024,7 @@ class StockManagementController extends Controller
                 } else {
                     $transactionType = 'out'; // Regular INV or trade return bad
                 }
-            } elseif ($order->type === 'CN') {
+            } elseif (in_array($order->type, ['CN', 'CN2'])) {
                 if ($order->trade_return_is_good) {
                     $transactionType = 'in'; // Trade return good
                 } else {
@@ -1087,7 +1087,7 @@ class StockManagementController extends Controller
             ->join('icitem', function ($join) {
                 $join->on(DB::raw('order_items.product_no COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
             })
-            ->whereIn('orders.type', ['INV', 'DO', 'CN']);
+            ->whereIn('orders.type', ['INV', 'DO', 'CN', 'CN2']);
 
         if ($filters['agent_no']) {
             $summaryOrdersQuery->where('orders.agent_no', $filters['agent_no']);
@@ -1152,7 +1152,7 @@ class StockManagementController extends Controller
                     // Regular INV = Stock OUT
                     $itemSummary[$itemNo]['stock_out'] += $qty;
                 }
-            } elseif ($order->type === 'CN') {
+            } elseif (in_array($order->type, ['CN', 'CN2'])) {
                 if ($order->trade_return_is_good) {
                     // Trade return good = Return Good
                     $itemSummary[$itemNo]['return_good'] += $qty;

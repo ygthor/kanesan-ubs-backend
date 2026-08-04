@@ -74,7 +74,7 @@ class StockService
                     // Normal INV item = Stock OUT
                     $stockOut += $qty;
                 }
-            } elseif ($orderItem->type === 'CN') {
+            } elseif (in_array($orderItem->type, ['CN', 'CN2'])) {
                 if ($tradeReturnIsGood) {
                     // Trade return good = Stock IN (returnGood) - adds to available stock
                     $returnGood += $qty;
@@ -222,7 +222,7 @@ class StockService
                 $transactionType = 'in';
             } elseif ($order->type === 'INV') {
                 $transactionType = 'out';
-            } elseif ($order->type === 'CN' && $tradeReturnIsGood) {
+            } elseif (in_array($order->type, ['CN', 'CN2']) && $tradeReturnIsGood) {
                 $transactionType = 'in'; // CN with good return = stock in
             }
 
@@ -240,8 +240,8 @@ class StockService
                 $notes = 'DO';
             } elseif ($order->type === 'INV') {
                 $notes = 'Invoice';
-            } elseif ($order->type === 'CN') {
-                $notes = 'CN';
+            } elseif (in_array($order->type, ['CN', 'CN2'])) {
+                $notes = $order->type;
             }
 
             $allTransactions->push([
@@ -481,8 +481,8 @@ class StockService
                         "INV Order: {$order->reference_no}"
                     );
                 }
-            } elseif ($orderType === 'CN') {
-                // CN = Trade Return
+            } elseif (in_array($orderType, ['CN', 'CN2'])) {
+                // CN / CN2 = Trade Return
                 if ($tradeReturnIsGood) {
                     // Trade return good = Stock IN
                     $this->recordMovement(
@@ -492,7 +492,7 @@ class StockService
                         'in',
                         $referenceType,
                         $referenceId,
-                        "CN Trade Return Good: {$order->reference_no}"
+                        "{$orderType} Trade Return Good: {$order->reference_no}"
                     );
                 } else {
                     // Trade return bad = No stock change (do nothing)
@@ -642,8 +642,8 @@ class StockService
                 } else {
                     $itemTotals[$itemNo]['stockOut'] += $qty;
                 }
-            } elseif ($orderItem->type === 'CN') {
-                // CN = Trade Return
+            } elseif (in_array($orderItem->type, ['CN', 'CN2'])) {
+                // CN / CN2 = Trade Return
                 if ($tradeReturnIsGood) {
                     // Trade return good = adds to available stock
                     $itemTotals[$itemNo]['returnGood'] += $qty;
@@ -798,7 +798,7 @@ class StockService
         $order_summary = DB::Table('order_items AS oi')
         ->selectRaw('
             SUM(IF(o.type = "DO", oi.quantity, 0)) AS do_stock_in,
-            SUM(IF(o.type = "CN" AND oi.trade_return_is_good = 1, oi.quantity, 0)) AS cn_stock_in,
+            SUM(IF(o.type IN ("CN", "CN2") AND oi.trade_return_is_good = 1, oi.quantity, 0)) AS cn_stock_in,
             SUM(IF(o.type = "INV", oi.quantity, 0)) AS inv_stock_out
         ')
         ->leftJoin('orders AS o','o.reference_no','=','oi.reference_no')
