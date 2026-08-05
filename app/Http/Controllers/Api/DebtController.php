@@ -98,6 +98,7 @@ class DebtController extends Controller
 
                 $invoicesWithCustomers = $invoicesQuery
             ->orderBy('order_date', 'desc')
+            ->orderBy('orders.id', 'desc')
             ->orderBy('reference_no', 'desc')
             ->get();
 
@@ -148,6 +149,7 @@ class DebtController extends Controller
 
 
                 return [
+                    'id' => $invoice->id,
                     'salesNo' => $invoice->reference_no, // Invoice reference number
                     'salesDate' => $orderDate->toDateString(),  // Return date-only format (YYYY-MM-DD)
                     'paymentType' => $firstInvoice->payment_type ?? 'Credit', // Fallback value
