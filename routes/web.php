@@ -85,6 +85,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::resource('announcements', \App\Http\Controllers\Admin\AnnouncementController::class);
 
     // Period Management
+    Route::post('periods/{period}/close', [\App\Http\Controllers\Admin\PeriodManagementController::class, 'close'])->name('periods.close');
     Route::resource('periods', \App\Http\Controllers\Admin\PeriodManagementController::class);
 
     // Stock Request Management (KBS/admin only)

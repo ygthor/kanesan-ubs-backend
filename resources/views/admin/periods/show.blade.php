@@ -79,8 +79,7 @@
                                     @foreach($months as $index => $month)
                                         <tr>
                                             <td class="text-center">{{ $index + 1 }}</td>
-                                            <td>{{ $month->format('Y') }}-{{ $month->format('m') }} </td>
-                                            
+                                            <td>{{ $month->format('Y') }}-{{ $month->format('m') }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -96,6 +95,14 @@
                     <h5 class="card-title">Actions</h5>
                 </div>
                 <div class="card-body">
+                    @if($period->isOpen())
+                        <form method="POST" action="{{ route('admin.periods.close', $period->id) }}" onsubmit="return confirm('Are you sure you want to close this period?');">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-danger btn-block mb-2">
+                                <i class="fas fa-lock"></i> Close Period
+                            </button>
+                        </form>
+                    @endif
                     <a href="{{ route('admin.periods.edit', $period->id) }}" class="btn btn-warning btn-block mb-2">
                         <i class="fas fa-edit"></i> Edit Period
                     </a>
