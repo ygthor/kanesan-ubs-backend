@@ -51,7 +51,7 @@
                                 <tr>
                                     <td style="font-weight: 600; background-color: #f8f9fa;">Type</td>
                                     <td>
-                                        <span class="badge {{ $order->type == 'INV' ? 'badge-success' : (in_array($order->type, ['CN', 'CN2']) ? 'badge-warning' : 'badge-info') }}">
+                                        <span class="badge {{ $order->type == 'INV' ? 'badge-success' : ($order->type == 'CN2' ? 'badge-info' : ($order->type == 'CN' ? 'badge-warning' : 'badge-secondary')) }}">
                                             {{ $order->type }}
                                         </span>
                                     </td>
@@ -303,6 +303,7 @@
                                 <thead class="thead-light">
                                     <tr>
                                         <th>Reference No</th>
+                                        <th>Type</th>
                                         <th>Date</th>
                                         <th>Customer</th>
                                         <th class="text-right">Net Amount</th>
@@ -313,6 +314,11 @@
                                     @foreach($linkedCreditNotes as $cn)
                                         <tr>
                                             <td>{{ $cn->reference_no }}</td>
+                                            <td>
+                                                <span class="badge {{ $cn->type == 'CN2' ? 'badge-info' : 'badge-warning' }}">
+                                                    {{ $cn->type }}
+                                                </span>
+                                            </td>
                                             <td>{{ \Carbon\Carbon::parse($cn->order_date)->format('d/m/Y') }}</td>
                                             <td>{{ $cn->customer_name }}</td>
                                             <td class="text-right">RM {{ number_format($cn->net_amount ?? 0, 2) }}</td>
@@ -332,7 +338,7 @@
         @endif
 
         <!-- Linked Invoice (if credit note) -->
-        @if($order->type == 'CN' && $linkedInvoice)
+        @if(in_array($order->type, ['CN', 'CN2']) && $linkedInvoice)
             <div class="col-md-12">
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">

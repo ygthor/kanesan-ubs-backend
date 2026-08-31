@@ -160,7 +160,7 @@ class InvoiceController extends Controller
         // Get linked credit notes (if this is an invoice)
         $linkedCreditNotes = [];
         if ($order->type == 'INV') {
-            $linkedCreditNotes = Order::where('type', 'CN')
+            $linkedCreditNotes = Order::whereIn('type', ['CN', 'CN2'])
                 ->where('credit_invoice_no', $order->reference_no)
                 ->with('customer')
                 ->orderBy('order_date', 'desc')
