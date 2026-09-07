@@ -30,19 +30,7 @@ class DebtController extends Controller
         $searchTerm = $request->input('search');
         $customerCode = $request->input('customer_code');
 
-        // Pre-aggregate payments (receipt_orders) once and join to invoices.
-        $paymentsAgg = DB::table('receipt_orders as ro')
-            ->join('receipts as r', 'ro.receipt_id', '=', 'r.id')
-            ->whereNull('r.deleted_at')
-            ->selectRaw('ro.order_refno, SUM(ro.amount_applied) as total_payments')
-            ->groupBy('ro.order_refno');
-
-        // Pre-aggregate credit notes once and join to invoices.
-        $creditAgg = DB::table('orders as cn')
-            ->whereIn('cn.type', ['CN', 'CN2'])  // Include CN (trade returns) and CN2 (manual credit notes)
-            ->selectRaw('cn.credit_invoice_no, SUM(cn.net_amount) as credit_amount')
-            ->groupBy('cn.credit_invoice_no');
-
+        // Step 1: Query candidate invoices for the agent/customer directly with an indexed query
         $invoicesQuery = Order::query()
             ->select([
                 'orders.id',
@@ -56,21 +44,9 @@ class DebtController extends Controller
                 'customers.company_name',
                 'customers.payment_type',
                 'customers.payment_term',
-                DB::raw('COALESCE(pay_sum.total_payments, 0) as total_payments'),
-                DB::raw('COALESCE(cn_sum.credit_amount, 0) as credit_amount'),
             ])
-            ->leftJoinSub($paymentsAgg, 'pay_sum', function ($join) {
-                $join->on('pay_sum.order_refno', '=', 'orders.reference_no');
-            })
-            ->leftJoinSub($creditAgg, 'cn_sum', function ($join) {
-                $join->on('cn_sum.credit_invoice_no', '=', 'orders.reference_no');
-            })
             ->leftJoin('customers', 'orders.customer_id', '=', 'customers.id')
-            ->where('orders.type', 'INV')
-            ->where(function ($q) {
-                $q->whereRaw('(COALESCE(orders.net_amount, 0) - COALESCE(cn_sum.credit_amount, 0) - COALESCE(pay_sum.total_payments, 0)) > 0.01')
-                  ->orWhere('orders.net_amount', 0);
-            });
+            ->where('orders.type', 'INV');
 
         // Filter by user's assigned customers (unless KBS user or admin role)
         if ($user && !hasFullAccess()) {
@@ -91,41 +67,85 @@ class DebtController extends Controller
             });
         }
 
-        $invoicesWithCustomers = $invoicesQuery
-            ->orderBy('order_date', 'desc')
+        $invoices = $invoicesQuery
+            ->orderBy('orders.order_date', 'desc')
             ->orderBy('orders.id', 'desc')
-            ->orderBy('reference_no', 'desc')
+            ->orderBy('orders.reference_no', 'desc')
             ->get();
 
-        // Filter out invoices without customer data and group by customer
-        $customersWithDebts = $invoicesWithCustomers
+        if ($invoices->isEmpty()) {
+            return makeResponse(200, 'Customer debts retrieved successfully.', []);
+        }
+
+        // Step 2: Collect all reference numbers for candidate invoices
+        $refNos = $invoices->pluck('reference_no')->filter()->unique()->values()->all();
+
+        // Step 3: Fetch aggregated payments ONLY for the candidate invoices (chunked to prevent oversized SQL)
+        $payments = [];
+        if (!empty($refNos)) {
+            foreach (array_chunk($refNos, 1000) as $chunk) {
+                $chunkPayments = DB::table('receipt_orders as ro')
+                    ->join('receipts as r', 'ro.receipt_id', '=', 'r.id')
+                    ->whereNull('r.deleted_at')
+                    ->whereIn('ro.order_refno', $chunk)
+                    ->selectRaw('ro.order_refno, SUM(ro.amount_applied) as total_payments')
+                    ->groupBy('ro.order_refno')
+                    ->pluck('total_payments', 'order_refno')
+                    ->all();
+
+                foreach ($chunkPayments as $ref => $amt) {
+                    $payments[$ref] = (float) $amt;
+                }
+            }
+        }
+
+        // Step 4: Fetch aggregated credit notes ONLY for the candidate invoices
+        $creditNotes = [];
+        if (!empty($refNos)) {
+            foreach (array_chunk($refNos, 1000) as $chunk) {
+                $chunkCredits = DB::table('orders as cn')
+                    ->whereIn('cn.type', ['CN', 'CN2'])
+                    ->whereIn('cn.credit_invoice_no', $chunk)
+                    ->selectRaw('cn.credit_invoice_no, SUM(cn.net_amount) as credit_amount')
+                    ->groupBy('cn.credit_invoice_no')
+                    ->pluck('credit_amount', 'credit_invoice_no')
+                    ->all();
+
+                foreach ($chunkCredits as $ref => $amt) {
+                    $creditNotes[$ref] = (float) $amt;
+                }
+            }
+        }
+
+        // Step 5: Filter out invoices without customer data and group by customer
+        $customersWithDebts = $invoices
             ->filter(function ($invoice) {
                 return !empty($invoice->customer_code);
             })
             ->groupBy('customer_code');
 
-        // Transform the data to match the Flutter UI's expected structure
-        $formattedData = $customersWithDebts->map(function ($invoices, $customerCode) {
-            $firstInvoice = $invoices->first();
+        // Step 6: Transform and calculate balances
+        $formattedData = $customersWithDebts->map(function ($customerInvoices, $custCode) use ($payments, $creditNotes) {
+            $firstInvoice = $customerInvoices->first();
 
-            // Map the invoices to the 'debtItems' structure
-            $debtItems = $invoices->map(function ($invoice) use ($firstInvoice, $customerCode) {
+            $debtItems = $customerInvoices->map(function ($invoice) use ($firstInvoice, $payments, $creditNotes) {
                 $orderDate = $invoice->order_date instanceof Carbon ? $invoice->order_date : Carbon::parse($invoice->order_date);
                 $dueDate = $this->calculateDueDate($orderDate, $firstInvoice->payment_term);
 
-                $totalPayments     = (float) ($invoice->total_payments ?? 0);
-                $salesAmount       = (float) ($invoice->net_amount ?? 0); // Use net_amount to include discounts
-                $creditAmount      = (float) ($invoice->credit_amount ?? 0);
+                $refNo             = $invoice->reference_no;
+                $totalPayments     = (float) ($payments[$refNo] ?? 0);
+                $salesAmount       = (float) ($invoice->net_amount ?? 0);
+                $creditAmount      = (float) ($creditNotes[$refNo] ?? 0);
                 $tradeReturnAmount = 0.0;
                 $totalReturnAmt    = $tradeReturnAmount + $creditAmount;
 
                 // Outstanding balance = sales amount (net_amount) - return amount - credit amount - payments
                 $outstandingBalance = $salesAmount - $tradeReturnAmount - $creditAmount - $totalPayments;
 
-                // Need to exclude credit note only invoice with zero sales amount and non-positive balance
+                // Filter out fully settled / zero invoices
                 if ($salesAmount == 0 && $outstandingBalance <= 0) {
                     return null;
-                } else if ($outstandingBalance <= 0) {
+                } else if ($outstandingBalance <= 0.01) {
                     return null;
                 }
 
@@ -146,14 +166,18 @@ class DebtController extends Controller
                 ];
             })->filter()->values();
 
+            if ($debtItems->isEmpty()) {
+                return null;
+            }
+
             $totalOutstanding = $debtItems->sum('outstandingAmount');
 
             // Find dates with active regular invoices
             $dateGroup = [];
             foreach ($debtItems as $item) {
-                $salesAmount = $item['salesAmount'];
-                $outstandingBalance = $item['outstandingAmount'];
-                if (!($salesAmount == 0 && $outstandingBalance <= 0)) {
+                $sAmt = $item['salesAmount'];
+                $ostd = $item['outstandingAmount'];
+                if (!($sAmt == 0 && $ostd <= 0)) {
                     $dateGroup[$item['salesDate']] = true;
                 }
             }
@@ -171,14 +195,18 @@ class DebtController extends Controller
                 $filteredDebtItems[] = $item;
             }
 
+            if (empty($filteredDebtItems)) {
+                return null;
+            }
+
             return [
-                'customerCode' => (string) $customerCode,
-                'outletsCode' => (string) $customerCode,
+                'customerCode' => (string) $custCode,
+                'outletsCode' => (string) $custCode,
                 'companyName' => $firstInvoice->company_name ?? $firstInvoice->customer_name ?? 'Unknown Customer',
                 'debtItems' => $filteredDebtItems,
                 'totalOutstandingAmount' => $totalOutstanding,
             ];
-        })->values()->all();
+        })->filter()->values()->all();
 
         return makeResponse(200, 'Customer debts retrieved successfully.', $formattedData);
     }
