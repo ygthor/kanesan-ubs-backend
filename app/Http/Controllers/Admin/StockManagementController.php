@@ -73,8 +73,8 @@ class StockManagementController extends Controller
             // This avoids N+1 query problem when looping through items
             $stockSummaryKeyed = $stockService->getAgentStockSummaryKeyed($agentNo);
 
-            // Base query
-            $itemsQuery = Icitem::query();
+            // Base query - only active items
+            $itemsQuery = Icitem::active();
 
             if ($hasSearch || $hasGroupFilter) {
                 // Search ALL items
@@ -139,6 +139,11 @@ class StockManagementController extends Controller
                 ->where($itemTransactionTable . '.transaction_type', 'in')
                 ->join('icitem', function ($join) use ($itemTransactionTable) {
                     $join->on(DB::raw($itemTransactionTable . '.ITEMNO COLLATE utf8mb4_unicode_ci'), '=', DB::raw('icitem.ITEMNO COLLATE utf8mb4_unicode_ci'));
+                })
+                ->where(function ($q) {
+                    $q->whereNull('icitem.ITEM_STAT')
+                        ->orWhere('icitem.ITEM_STAT', '')
+                        ->orWhereNotIn('icitem.ITEM_STAT', ['INACTIVE', 'I']);
                 });
 
             // Apply group filter if provided
@@ -294,9 +299,9 @@ class StockManagementController extends Controller
             $hasItemSearch = $request->has('item_search') && $request->input('item_search');
 
             if ($hasGroupFilter || $hasItemSearch) {
-                // If searching, show ALL items from icitem that match the search
+                // If searching, show ALL active items from icitem that match the search
                 // This allows finding items even if they don't have transactions yet
-                $itemsQuery = Icitem::query();
+                $itemsQuery = Icitem::active();
 
                 // Filter by group if provided (use LIKE for partial match)
                 if ($hasGroupFilter) {
@@ -350,8 +355,8 @@ class StockManagementController extends Controller
                 if (empty($allItemNos)) {
                     $items = collect([]);
                 } else {
-                    // Get item details from icitem for all unique items
-                    $items = Icitem::whereIn('ITEMNO', $allItemNos)
+                    // Get item details from icitem for all unique items (active only)
+                    $items = Icitem::active()->whereIn('ITEMNO', $allItemNos)
                         ->orderBy('GROUP')
                         ->orderBy('ITEMNO')
                         ->get();
@@ -1270,8 +1275,8 @@ class StockManagementController extends Controller
         $stockService = new StockService();
         $stockSummaryKeyed = $stockService->getAgentStockSummaryKeyed($selectedAgent);
 
-        // Base query
-        $itemsQuery = Icitem::query();
+        // Base query - active items only
+        $itemsQuery = Icitem::active();
 
         if ($searchTerm || $groupFilter) {
             // Search ALL items
@@ -1367,8 +1372,8 @@ class StockManagementController extends Controller
         $stockService = new StockService();
         $stockSummaryKeyed = $stockService->getAgentStockSummaryKeyed($selectedAgent);
 
-        // Base query
-        $itemsQuery = Icitem::query();
+        // Base query - active items only
+        $itemsQuery = Icitem::active();
 
         if ($searchTerm || $groupFilter) {
             // Search ALL items

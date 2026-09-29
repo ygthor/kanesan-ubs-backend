@@ -104,6 +104,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('configurations', [\App\Http\Controllers\Admin\ConfigurationController::class, 'index'])->name('configurations.index');
     Route::put('configurations', [\App\Http\Controllers\Admin\ConfigurationController::class, 'update'])->name('configurations.update');
 
+    // Item Status Management (not displayed in menu, direct URL: /admin/items)
+    Route::get('items', [\App\Http\Controllers\Admin\ItemManagementController::class, 'index'])->name('items.index');
+    Route::post('items/{itemno}/toggle-status', [\App\Http\Controllers\Admin\ItemManagementController::class, 'toggleStatus'])->name('items.toggle-status');
+    Route::post('items/batch-update-status', [\App\Http\Controllers\Admin\ItemManagementController::class, 'batchUpdateStatus'])->name('items.batch-update-status');
+
     // Invoices Management (KBS/admin only - checked in controller)
     Route::get('invoices', [\App\Http\Controllers\Admin\InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{id}', [\App\Http\Controllers\Admin\InvoiceController::class, 'show'])->name('invoices.show');

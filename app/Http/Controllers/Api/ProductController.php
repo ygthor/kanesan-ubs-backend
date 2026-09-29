@@ -33,6 +33,7 @@ class ProductController extends Controller
                 'GROUP',
                 'UCOST',  // Unit cost - fallback if PRICE is not available
                 'PRICE',  // Price field - primary field used for unit price
+                'ITEM_STAT',
             ])
             ->orderBy('GROUP')
             ->orderBy('ITEMNO')
@@ -48,7 +49,7 @@ class ProductController extends Controller
                     'description' => $item->DESP ?? '',
                     'group_name' => $item->GROUP ?? '',
                     'unit_price' => (float)$unitPrice, // Unit price from UCOST or PRICE
-                    'is_active' => true, // Assume all items are active (icitem table doesn't have is_active)
+                    'is_active' => $item->is_active,
                 ];
             })->values()->toArray(); // Convert Collection to array for proper JSON serialization
             

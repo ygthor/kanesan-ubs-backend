@@ -36,12 +36,49 @@ class Icitem extends BaseModel
         'T_UCOST',  // Denormalized customer name for quick display
         'QTY',  // Denormalized customer name for quick display
 
+        'ITEM_STAT',
         'CREATED_BY',        
         'UPDATED_BY',        
         'CREATED_ON',        
         'UPDATED_ON',  
         // 'tax1_percentage' // Not a DB column, but useful for calculations
     ];
+
+    /**
+     * Scope to get only active items
+     */
+    public function scopeActive($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('ITEM_STAT')
+              ->orWhere('ITEM_STAT', '')
+              ->orWhereNotIn('ITEM_STAT', ['INACTIVE', 'I']);
+        });
+    }
+
+    /**
+     * Scope to get only inactive items
+     */
+    public function scopeInactive($query)
+    {
+        return $query->whereIn('ITEM_STAT', ['INACTIVE', 'I']);
+    }
+
+    /**
+     * Check if the item is active
+     */
+    public function getIsActiveAttribute(): bool
+    {
+        return !in_array($this->ITEM_STAT, ['INACTIVE', 'I']);
+    }
+
+    /**
+     * Set active status
+     */
+    public function setIsActiveAttribute($value): void
+    {
+        $this->attributes['ITEM_STAT'] = $value ? 'ACTIVE' : 'INACTIVE';
+    }
 
     // Cast fields to native types
     protected $casts = [
